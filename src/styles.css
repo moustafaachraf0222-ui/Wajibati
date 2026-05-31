@@ -1866,6 +1866,22 @@ tbody tr.account-details-row:hover td {
   font-weight: 800;
 }
 
+.locked-feedback-box {
+  border-color: rgba(0, 98, 51, 0.24);
+}
+
+.feedback-lock-note {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.feedback-lock-note.with-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
 .rating-row {
   display: flex;
   flex-wrap: wrap;
@@ -2119,6 +2135,11 @@ tbody tr.account-details-row:hover td {
 .delete-target-card span,
 .delete-target-card small {
   color: var(--muted);
+}
+
+.completion-target-card strong {
+  color: var(--ink);
+  line-height: 1.55;
 }
 
 @media (prefers-reduced-motion: reduce) {

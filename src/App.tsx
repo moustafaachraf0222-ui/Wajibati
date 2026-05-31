@@ -489,6 +489,12 @@ const copy: Record<Language, Record<string, string>> = {
     groupedByTarget: 'مرتبة حسب الشعبة ثم القسم',
     done: 'تم الإنجاز',
     completed: 'منجز',
+    confirmDoneTitle: 'تأكيد الإنجاز',
+    confirmDoneQuestion: 'هل تريد تأكيد إنجاز هذا التمرين؟',
+    confirmDoneWarning: 'بعد التأكيد لن تستطيع تعديل التقييم أو الملاحظة.',
+    confirmDoneAction: 'تأكيد الإنجاز',
+    lockedFeedbackAfterDone: 'تم تثبيت التقييم والملاحظة بعد الإنجاز.',
+    noSubmittedFeedback: 'تم الإنجاز بدون تقييم أو ملاحظة.',
     imagePreview: 'معاينة الصورة',
     announcementTitle: 'عنوان الإعلان',
     announcementBody: 'نص الإعلان',
@@ -676,6 +682,12 @@ const copy: Record<Language, Record<string, string>> = {
     groupedByTarget: 'Classés par filière puis classe',
     done: 'Terminé',
     completed: 'Fait',
+    confirmDoneTitle: 'Confirmer le devoir',
+    confirmDoneQuestion: 'Voulez-vous confirmer que cet exercice est terminé ?',
+    confirmDoneWarning: 'Après confirmation, la note et l’évaluation ne pourront plus être modifiées.',
+    confirmDoneAction: 'Confirmer',
+    lockedFeedbackAfterDone: 'L’évaluation et la note sont verrouillées après validation.',
+    noSubmittedFeedback: 'Terminé sans évaluation ni note.',
     imagePreview: 'Aperçu',
     announcementTitle: 'Titre de l’annonce',
     announcementBody: 'Texte de l’annonce',
@@ -863,6 +875,12 @@ const copy: Record<Language, Record<string, string>> = {
     groupedByTarget: 'Grouped by stream then class',
     done: 'Done',
     completed: 'Completed',
+    confirmDoneTitle: 'Confirm completion',
+    confirmDoneQuestion: 'Do you want to confirm this exercise as completed?',
+    confirmDoneWarning: 'After confirmation, the rating and note cannot be edited.',
+    confirmDoneAction: 'Confirm completion',
+    lockedFeedbackAfterDone: 'The rating and note are locked after completion.',
+    noSubmittedFeedback: 'Completed without a rating or note.',
     imagePreview: 'Image preview',
     announcementTitle: 'Announcement title',
     announcementBody: 'Announcement text',
@@ -6010,6 +6028,7 @@ function StudentExercises({ data, setData, currentUser, language }: CommonViewPr
   const exercises = scopedExercises(data, currentUser);
   const completed = data.completions[currentUser.id] ?? [];
   const [selectedExerciseId, setSelectedExerciseId] = useState<string | null>(null);
+  const [pendingDoneExercise, setPendingDoneExercise] = useState<Exercise | null>(null);
   const visibleExerciseIds = new Set(exercises.map((exercise) => exercise.id));
   const completedVisible = completed.filter((exerciseId) => visibleExerciseIds.has(exerciseId));
   const selectedExercise = exercises.find((exercise) => exercise.id === selectedExerciseId) ?? null;
@@ -6044,6 +6063,10 @@ function StudentExercises({ data, setData, currentUser, language }: CommonViewPr
 
   const updateFeedback = (exerciseId: string, update: Partial<HomeworkFeedback>) => {
     setData((previous) => {
+      if (isExerciseCompletedBy(previous, currentUser.id, exerciseId)) {
+        return previous;
+      }
+
       const currentFeedback = previous.feedback[currentUser.id]?.[exerciseId] ?? { updatedAt: new Date().toISOString() };
       return {
         ...previous,
@@ -6060,6 +6083,23 @@ function StudentExercises({ data, setData, currentUser, language }: CommonViewPr
         }
       };
     });
+  };
+
+  const requestDoneConfirmation = (exercise: Exercise) => {
+    if (completed.includes(exercise.id)) {
+      return;
+    }
+
+    setPendingDoneExercise(exercise);
+  };
+
+  const confirmDone = () => {
+    if (!pendingDoneExercise) {
+      return;
+    }
+
+    markDone(pendingDoneExercise.id);
+    setPendingDoneExercise(null);
   };
 
   const renderFeedbackSummary = (exercise: Exercise) => {
@@ -6088,6 +6128,20 @@ function StudentExercises({ data, setData, currentUser, language }: CommonViewPr
 
   const renderFeedbackControls = (exercise: Exercise) => {
     const feedback = feedbackForStudent(data, currentUser.id, exercise.id);
+    const isDone = completed.includes(exercise.id);
+
+    if (isDone) {
+      return (
+        <div className="student-feedback-box locked-feedback-box">
+          <span>{tr(language, 'difficultyRating')}</span>
+          {renderFeedbackSummary(exercise) ?? <p className="feedback-lock-note">{tr(language, 'noSubmittedFeedback')}</p>}
+          <p className="feedback-lock-note with-icon">
+            <LockKeyhole size={15} aria-hidden="true" />
+            <span>{tr(language, 'lockedFeedbackAfterDone')}</span>
+          </p>
+        </div>
+      );
+    }
 
     return (
       <div className="student-feedback-box">
@@ -6186,7 +6240,7 @@ function StudentExercises({ data, setData, currentUser, language }: CommonViewPr
                           <BookOpen size={17} aria-hidden="true" />
                           <span>{tr(language, 'viewHomework')}</span>
                         </button>
-                        <button className={isDone ? 'button success' : 'button primary'} type="button" disabled={isDone} onClick={() => markDone(exercise.id)}>
+                        <button className={isDone ? 'button success' : 'button primary'} type="button" disabled={isDone} onClick={() => requestDoneConfirmation(exercise)}>
                           <CheckCircle2 size={17} aria-hidden="true" />
                           <span>{isDone ? tr(language, 'completed') : tr(language, 'done')}</span>
                         </button>
@@ -6228,7 +6282,7 @@ function StudentExercises({ data, setData, currentUser, language }: CommonViewPr
                 className={completed.includes(selectedExercise.id) ? 'button success' : 'button primary'}
                 type="button"
                 disabled={completed.includes(selectedExercise.id)}
-                onClick={() => markDone(selectedExercise.id)}
+                onClick={() => requestDoneConfirmation(selectedExercise)}
               >
                 <CheckCircle2 size={17} aria-hidden="true" />
                 <span>{completed.includes(selectedExercise.id) ? tr(language, 'completed') : tr(language, 'done')}</span>
@@ -6236,6 +6290,14 @@ function StudentExercises({ data, setData, currentUser, language }: CommonViewPr
             </div>
           </article>
         </div>
+      )}
+      {pendingDoneExercise && (
+        <DoneConfirmDialog
+          language={language}
+          exerciseTitle={pendingDoneExercise.title}
+          onConfirm={confirmDone}
+          onCancel={() => setPendingDoneExercise(null)}
+        />
       )}
     </section>
   );
@@ -6512,6 +6574,45 @@ function ConfirmDialog({ language, onConfirm, onCancel }: { language: Language; 
           <button className="button primary" type="button" onClick={onConfirm}>
             <CheckCircle2 size={17} aria-hidden="true" />
             <span>{tr(language, 'yes')}</span>
+          </button>
+          <button className="button ghost" type="button" onClick={onCancel}>
+            <X size={17} aria-hidden="true" />
+            <span>{tr(language, 'cancel')}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DoneConfirmDialog({
+  language,
+  exerciseTitle,
+  onConfirm,
+  onCancel
+}: {
+  language: Language;
+  exerciseTitle: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="modal-backdrop" role="presentation">
+      <div className="modal" role="dialog" aria-modal="true" aria-labelledby="completion-title">
+        <button className="icon-button close" type="button" title={tr(language, 'cancel')} onClick={onCancel}>
+          <X size={18} aria-hidden="true" />
+        </button>
+        <CheckCircle2 size={30} aria-hidden="true" />
+        <h2 id="completion-title">{tr(language, 'confirmDoneTitle')}</h2>
+        <p className="modal-copy">{tr(language, 'confirmDoneQuestion')}</p>
+        <div className="delete-target-card completion-target-card">
+          <strong>{exerciseTitle}</strong>
+        </div>
+        <p className="modal-warning">{tr(language, 'confirmDoneWarning')}</p>
+        <div className="button-row center">
+          <button className="button primary" type="button" onClick={onConfirm}>
+            <CheckCircle2 size={17} aria-hidden="true" />
+            <span>{tr(language, 'confirmDoneAction')}</span>
           </button>
           <button className="button ghost" type="button" onClick={onCancel}>
             <X size={17} aria-hidden="true" />
