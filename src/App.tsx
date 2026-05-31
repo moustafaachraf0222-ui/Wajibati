@@ -26,6 +26,7 @@ import {
   Moon,
   Plus,
   Printer,
+  RotateCcw,
   Save,
   School,
   Settings,
@@ -449,6 +450,7 @@ const copy: Record<Language, Record<string, string>> = {
     trashHint: 'تبقى المدارس المحذوفة هنا لمدة 24 ساعة قبل الحذف النهائي التلقائي.',
     deletedAt: 'وقت الحذف',
     deletesAt: 'الحذف النهائي',
+    restoreSchool: 'استعادة',
     forceDelete: 'حذف نهائي',
     editUser: 'تعديل الحساب',
     activate: 'تفعيل',
@@ -666,6 +668,7 @@ const copy: Record<Language, Record<string, string>> = {
     trashHint: 'Les écoles supprimées restent ici pendant 24 heures avant la suppression définitive automatique.',
     deletedAt: 'Supprimée le',
     deletesAt: 'Suppression définitive',
+    restoreSchool: 'Restaurer',
     forceDelete: 'Supprimer définitivement',
     editUser: 'Modifier le compte',
     activate: 'Activer',
@@ -883,6 +886,7 @@ const copy: Record<Language, Record<string, string>> = {
     trashHint: 'Deleted schools stay here for 24 hours before automatic permanent deletion.',
     deletedAt: 'Deleted at',
     deletesAt: 'Permanent deletion',
+    restoreSchool: 'Restore',
     forceDelete: 'Force delete',
     editUser: 'Edit account',
     activate: 'Activate',
@@ -3104,6 +3108,20 @@ function trashSchoolRecords(previous: PlatformData, target: SchoolRecord): Platf
   };
 }
 
+function restoreSchoolRecords(previous: PlatformData, target: SchoolRecord): PlatformData {
+  return {
+    ...previous,
+    schools: previous.schools.map((school) => {
+      if (school.id !== target.id) {
+        return school;
+      }
+
+      const { deletedAt: _deletedAt, ...restoredSchool } = school;
+      return restoredSchool;
+    })
+  };
+}
+
 function purgeExpiredTrashedSchools(data: PlatformData, now = Date.now()): PlatformData {
   const expiredSchools = data.schools.filter((school) => schoolIsTrashed(school) && schoolTrashIsExpired(school, now));
   if (expiredSchools.length === 0) {
@@ -3773,6 +3791,14 @@ function SchoolsView({ data, setData, currentUser, language }: CommonViewProps &
     setPendingForceDeleteSchool(null);
   };
 
+  const restoreSchool = (school: SchoolRecord) => {
+    if (!canDeleteSchools) {
+      return;
+    }
+
+    setData((previous) => restoreSchoolRecords(previous, school));
+  };
+
   return (
     <section className="content-grid">
       <div className="panel">
@@ -3834,6 +3860,9 @@ function SchoolsView({ data, setData, currentUser, language }: CommonViewProps &
                   <td>{formatDateTime(language, schoolTrashExpiresAt(school))}</td>
                   <td>
                     <div className="table-actions">
+                      <button className="icon-button" type="button" title={tr(language, 'restoreSchool')} onClick={() => restoreSchool(school)}>
+                        <RotateCcw size={16} aria-hidden="true" />
+                      </button>
                       <button
                         className="icon-button danger"
                         type="button"
