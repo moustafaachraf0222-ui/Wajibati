@@ -2000,10 +2000,42 @@ tbody tr.account-details-row:hover td {
   color: var(--teal);
 }
 
+.modal.danger-modal > svg {
+  color: var(--rose);
+}
+
 .modal h2 {
   margin: 0;
   font-size: 1.35rem;
   line-height: 1.45;
+}
+
+.modal-copy,
+.modal-warning {
+  margin: 8px 0 0;
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.modal-warning {
+  max-width: 34rem;
+  color: var(--rose);
+}
+
+.delete-target-card {
+  width: 100%;
+  border: 1px solid var(--line);
+  background: var(--paper-soft);
+  border-radius: 8px;
+  padding: 12px;
+  display: grid;
+  gap: 5px;
+  overflow-wrap: anywhere;
+}
+
+.delete-target-card span,
+.delete-target-card small {
+  color: var(--muted);
 }
 
 @media (prefers-reduced-motion: reduce) {

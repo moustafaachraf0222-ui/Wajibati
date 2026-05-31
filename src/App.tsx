@@ -383,6 +383,9 @@ const copy: Record<Language, Record<string, string>> = {
     create: 'إنشاء',
     edit: 'تعديل',
     delete: 'حذف',
+    deleteAccountTitle: 'تأكيد حذف الحساب',
+    deleteAccountQuestion: 'هل تريد حذف هذا الحساب؟',
+    deleteAccountWarning: 'سيتم حذف الحساب والبيانات المرتبطة به نهائياً، ولا يمكن التراجع عن هذا الإجراء.',
     editUser: 'تعديل الحساب',
     activate: 'تفعيل',
     disable: 'تعطيل',
@@ -550,6 +553,9 @@ const copy: Record<Language, Record<string, string>> = {
     create: 'Créer',
     edit: 'Modifier',
     delete: 'Supprimer',
+    deleteAccountTitle: 'Confirmer la suppression',
+    deleteAccountQuestion: 'Voulez-vous supprimer ce compte ?',
+    deleteAccountWarning: 'Le compte et ses données liées seront supprimés définitivement. Cette action est irréversible.',
     editUser: 'Modifier le compte',
     activate: 'Activer',
     disable: 'Désactiver',
@@ -717,6 +723,9 @@ const copy: Record<Language, Record<string, string>> = {
     create: 'Create',
     edit: 'Edit',
     delete: 'Delete',
+    deleteAccountTitle: 'Confirm account deletion',
+    deleteAccountQuestion: 'Do you want to delete this account?',
+    deleteAccountWarning: 'The account and its related data will be permanently deleted. This action cannot be undone.',
     editUser: 'Edit account',
     activate: 'Activate',
     disable: 'Disable',
@@ -4805,6 +4814,7 @@ function UsersTable({
   groupByRole?: boolean;
 }) {
   const [expandedUsers, setExpandedUsers] = useState<Record<string, boolean>>({});
+  const [pendingDeleteUser, setPendingDeleteUser] = useState<PlatformUser | null>(null);
   const columns = [
     tr(language, 'fullName'),
     tr(language, 'email'),
@@ -4868,7 +4878,7 @@ function UsersTable({
                 type="button"
                 title={tr(language, 'delete')}
                 disabled={!canDeleteUser(currentUser, user)}
-                onClick={() => onDelete(user)}
+                onClick={() => setPendingDeleteUser(user)}
               >
                 <Trash2 size={16} aria-hidden="true" />
               </button>
@@ -4943,6 +4953,62 @@ function UsersTable({
       ) : (
         renderTable(users)
       )}
+      {pendingDeleteUser && (
+        <AccountDeleteDialog
+          user={pendingDeleteUser}
+          language={language}
+          onCancel={() => setPendingDeleteUser(null)}
+          onConfirm={() => {
+            onDelete(pendingDeleteUser);
+            setPendingDeleteUser(null);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function AccountDeleteDialog({
+  user,
+  language,
+  onConfirm,
+  onCancel
+}: {
+  user: PlatformUser;
+  language: Language;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="modal-backdrop" role="presentation">
+      <div className="modal danger-modal" role="dialog" aria-modal="true" aria-labelledby="delete-account-title">
+        <button className="icon-button close" type="button" title={tr(language, 'cancel')} onClick={onCancel}>
+          <X size={18} aria-hidden="true" />
+        </button>
+        <Trash2 size={30} aria-hidden="true" />
+        <div>
+          <h2 id="delete-account-title">{tr(language, 'deleteAccountTitle')}</h2>
+          <p className="modal-copy">{tr(language, 'deleteAccountQuestion')}</p>
+        </div>
+        <div className="delete-target-card">
+          <strong>{user.name}</strong>
+          <span>{user.email}</span>
+          <small>
+            <RoleLabel role={user.role} language={language} />
+          </small>
+        </div>
+        <p className="modal-warning">{tr(language, 'deleteAccountWarning')}</p>
+        <div className="button-row center">
+          <button className="button danger" type="button" onClick={onConfirm}>
+            <Trash2 size={17} aria-hidden="true" />
+            <span>{tr(language, 'delete')}</span>
+          </button>
+          <button className="button ghost" type="button" onClick={onCancel}>
+            <X size={17} aria-hidden="true" />
+            <span>{tr(language, 'cancel')}</span>
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
