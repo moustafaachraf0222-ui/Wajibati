@@ -2739,8 +2739,8 @@ function randomIndex(max: number) {
 }
 
 function makeTemporaryPassword() {
-  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789@#$';
-  return Array.from({ length: 12 }, () => alphabet[randomIndex(alphabet.length)]).join('');
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+  return Array.from({ length: 6 }, () => alphabet[randomIndex(alphabet.length)]).join('');
 }
 
 function slugifyEmailPart(value: string) {
@@ -2754,7 +2754,6 @@ function slugifyEmailPart(value: string) {
 }
 
 function uniqueEmailForSchool(
-  suggestedEmail: string | undefined,
   role: 'teacher' | 'student',
   name: string,
   domain: string,
@@ -2762,9 +2761,7 @@ function uniqueEmailForSchool(
   index: number
 ) {
   const cleanDomain = domain.replace(/^@/, '').trim().toLowerCase();
-  const normalizedSuggestion = (suggestedEmail ?? '').trim().toLowerCase();
-  const suggestedLocal = normalizedSuggestion.endsWith(`@${cleanDomain}`) ? normalizedSuggestion.split('@')[0] : '';
-  const localBase = suggestedLocal || slugifyEmailPart(name) || `${role}${index + 1}`;
+  const localBase = slugifyEmailPart(name) || `${role}${index + 1}`;
   let candidate = `${localBase}@${cleanDomain}`;
   let counter = 2;
 
@@ -2810,7 +2807,7 @@ function normalizeAiAccountSuggestions(rawAccounts: unknown, school: SchoolRecor
     }
 
     const name = String(source.name ?? '').trim();
-    const email = uniqueEmailForSchool(String(source.email ?? ''), role, name, school.domain, usedEmails, index);
+    const email = uniqueEmailForSchool(role, name, school.domain, usedEmails, index);
     usedEmails.add(email.toLowerCase());
 
     const draft: AiAccountDraft = {
@@ -2818,10 +2815,10 @@ function normalizeAiAccountSuggestions(rawAccounts: unknown, school: SchoolRecor
       role,
       name,
       email,
-      password: String(source.password ?? '').trim() || makeTemporaryPassword(),
+      password: makeTemporaryPassword(),
       subject: isSubject(source.subject) ? source.subject : '',
       schoolYear: Number.isInteger(Number(source.schoolYear)) ? Number(source.schoolYear) : undefined,
-        classGroup: normalizeAiClassGroup(String(source.classGroup ?? '')),
+      classGroup: normalizeAiClassGroup(String(source.classGroup ?? '')),
       stream: isSecondaryStream(source.stream) ? source.stream : '',
       assignments: normalizeAiAssignments(source.assignments),
       confidence: typeof source.confidence === 'number' ? Math.max(0, Math.min(source.confidence, 1)) : undefined,
