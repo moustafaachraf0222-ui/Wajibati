@@ -14,6 +14,7 @@ import {
   Dumbbell,
   Edit3,
   FlaskConical,
+  Database,
   Globe2,
   GraduationCap,
   Landmark,
@@ -24,6 +25,7 @@ import {
   MessageSquare,
   Moon,
   Plus,
+  Printer,
   Save,
   School,
   Settings,
@@ -407,6 +409,14 @@ const copy: Record<Language, Record<string, string>> = {
     createDirector: 'إنشاء حساب مدير',
     createAccountTab: 'إنشاء حساب',
     viewAccountsTab: 'عرض الحسابات',
+    databaseTab: 'قاعدة البيانات',
+    credentialsDatabase: 'قاعدة بيانات الحسابات',
+    credentialsDatabaseHint: 'تحتوي على البريد الإلكتروني والكود الذي أنشأه المدير لكل حساب.',
+    teacherDatabase: 'قاعدة بيانات الأساتذة',
+    studentDatabase: 'قاعدة بيانات التلاميذ',
+    accountCode: 'الكود',
+    printTable: 'طباعة الجدول',
+    databaseEmpty: 'لا توجد حسابات في هذه القاعدة.',
     directorEdit: 'تعديل بيانات مدير',
     fullName: 'الاسم واللقب الكامل',
     schoolName: 'اسم المدرسة',
@@ -600,6 +610,14 @@ const copy: Record<Language, Record<string, string>> = {
     createDirector: 'Créer un directeur',
     createAccountTab: 'Créer compte',
     viewAccountsTab: 'Voir comptes',
+    databaseTab: 'Base de données',
+    credentialsDatabase: 'Base des comptes',
+    credentialsDatabaseHint: 'Contient l’e-mail et le code créé par le directeur pour chaque compte.',
+    teacherDatabase: 'Base des enseignants',
+    studentDatabase: 'Base des élèves',
+    accountCode: 'Code',
+    printTable: 'Imprimer le tableau',
+    databaseEmpty: 'Aucun compte dans cette base.',
     directorEdit: 'Modifier un directeur',
     fullName: 'Nom et prénom complets',
     schoolName: 'Nom de l’école',
@@ -793,6 +811,14 @@ const copy: Record<Language, Record<string, string>> = {
     createDirector: 'Create director account',
     createAccountTab: 'Create account',
     viewAccountsTab: 'View accounts',
+    databaseTab: 'Database',
+    credentialsDatabase: 'Account database',
+    credentialsDatabaseHint: 'Contains the email and code created by the director for each account.',
+    teacherDatabase: 'Teacher database',
+    studentDatabase: 'Student database',
+    accountCode: 'Code',
+    printTable: 'Print table',
+    databaseEmpty: 'No accounts in this database.',
     directorEdit: 'Edit director data',
     fullName: 'First and last name',
     schoolName: 'School name',
@@ -2608,6 +2634,100 @@ function readAttachmentFromInput(
   reader.readAsDataURL(file);
 }
 
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function sortedCredentialUsers(users: PlatformUser[], role: 'teacher' | 'student') {
+  return users
+    .filter((user) => user.role === role)
+    .sort((left, right) => left.name.localeCompare(right.name, undefined, { numeric: true, sensitivity: 'base' }));
+}
+
+function printCredentialTable(language: Language, title: string, schoolName: string, users: PlatformUser[]) {
+  if (typeof document === 'undefined') {
+    return;
+  }
+
+  const direction = language === 'ar' ? 'rtl' : 'ltr';
+  const printedAt = new Intl.DateTimeFormat(localeNames[language], { dateStyle: 'medium' }).format(new Date());
+  const rows = users
+    .map(
+      (user, index) => `
+        <tr>
+          <td>${index + 1}</td>
+          <td>${escapeHtml(user.name)}</td>
+          <td dir="ltr">${escapeHtml(user.email)}</td>
+          <td dir="ltr">${escapeHtml(user.password)}</td>
+        </tr>`
+    )
+    .join('');
+  const frame = document.createElement('iframe');
+  frame.setAttribute('aria-hidden', 'true');
+  frame.style.position = 'fixed';
+  frame.style.inset = 'auto 0 0 auto';
+  frame.style.width = '0';
+  frame.style.height = '0';
+  frame.style.border = '0';
+  document.body.appendChild(frame);
+
+  const frameDocument = frame.contentDocument ?? frame.contentWindow?.document;
+  if (!frameDocument || !frame.contentWindow) {
+    frame.remove();
+    return;
+  }
+
+  frameDocument.open();
+  frameDocument.write(`<!doctype html>
+    <html lang="${language}" dir="${direction}">
+      <head>
+        <meta charset="utf-8" />
+        <title>${escapeHtml(title)}</title>
+        <style>
+          @page { size: A4; margin: 16mm; }
+          * { box-sizing: border-box; }
+          body { margin: 0; color: #111827; font-family: Arial, Tahoma, sans-serif; direction: ${direction}; }
+          header { border-bottom: 3px solid #006233; padding-bottom: 12px; margin-bottom: 18px; }
+          h1 { margin: 0 0 6px; color: #006233; font-size: 22px; }
+          p { margin: 0; color: #4b5563; font-size: 13px; }
+          table { width: 100%; border-collapse: collapse; font-size: 13px; }
+          th, td { border: 1px solid #d1d5db; padding: 9px 8px; text-align: start; vertical-align: middle; }
+          th { background: #f3f4f6; color: #111827; font-weight: 700; }
+          tbody tr:nth-child(even) td { background: #fafafa; }
+        </style>
+      </head>
+      <body>
+        <header>
+          <h1>${escapeHtml(title)}</h1>
+          <p>${escapeHtml(schoolName)} - ${escapeHtml(printedAt)}</p>
+        </header>
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>${escapeHtml(tr(language, 'fullName'))}</th>
+              <th>${escapeHtml(tr(language, 'email'))}</th>
+              <th>${escapeHtml(tr(language, 'accountCode'))}</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </body>
+    </html>`);
+  frameDocument.close();
+
+  setTimeout(() => {
+    frame.contentWindow?.focus();
+    frame.contentWindow?.print();
+    setTimeout(() => frame.remove(), 500);
+  }, 120);
+}
+
 function getSchool(data: PlatformData, user?: PlatformUser) {
   if (!user?.schoolId) {
     return undefined;
@@ -3696,7 +3816,7 @@ function AdminUsersPanel({ data, setData, currentUser, language }: CommonViewPro
 
 function DirectorUsersPanel({ data, setData, currentUser, language }: CommonViewProps & { setData: DataSetter }) {
   const school = getSchool(data, currentUser);
-  const [accountMode, setAccountMode] = useState<'create' | 'view'>('view');
+  const [accountMode, setAccountMode] = useState<'create' | 'view' | 'database'>('view');
   const [form, setForm] = useState({
     role: 'teacher' as 'teacher' | 'student',
     name: '',
@@ -4078,6 +4198,10 @@ function DirectorUsersPanel({ data, setData, currentUser, language }: CommonView
             <Users size={16} aria-hidden="true" />
             <span>{tr(language, 'viewAccountsTab')}</span>
           </button>
+          <button type="button" className={accountMode === 'database' ? 'active' : ''} onClick={() => setAccountMode('database')}>
+            <Database size={16} aria-hidden="true" />
+            <span>{tr(language, 'databaseTab')}</span>
+          </button>
           <button type="button" className={accountMode === 'create' ? 'active' : ''} onClick={() => setAccountMode('create')}>
             <Plus size={16} aria-hidden="true" />
             <span>{tr(language, 'createAccountTab')}</span>
@@ -4371,6 +4495,8 @@ function DirectorUsersPanel({ data, setData, currentUser, language }: CommonView
       </div>
       )}
 
+      {accountMode === 'database' && <CredentialDatabasePanel users={schoolUsers} school={school} language={language} />}
+
       {accountMode === 'view' && editingUser && (
         <AccountEditPanel
           data={data}
@@ -4396,6 +4522,66 @@ function DirectorUsersPanel({ data, setData, currentUser, language }: CommonView
           groupByRole
         />
       )}
+    </section>
+  );
+}
+
+function CredentialDatabasePanel({ users, school, language }: { users: PlatformUser[]; school: SchoolRecord | undefined; language: Language }) {
+  const teacherUsers = sortedCredentialUsers(users, 'teacher');
+  const studentUsers = sortedCredentialUsers(users, 'student');
+  const schoolName = school?.name ?? '-';
+
+  return (
+    <div className="panel credential-database-panel">
+      <div className="panel-heading">
+        <div>
+          <p>{tr(language, 'credentialsDatabaseHint')}</p>
+          <h2>{tr(language, 'credentialsDatabase')}</h2>
+        </div>
+        <Database size={24} aria-hidden="true" />
+      </div>
+      <div className="credential-database-grid">
+        <CredentialDatabaseCard title={tr(language, 'teacherDatabase')} users={teacherUsers} schoolName={schoolName} language={language} />
+        <CredentialDatabaseCard title={tr(language, 'studentDatabase')} users={studentUsers} schoolName={schoolName} language={language} />
+      </div>
+    </div>
+  );
+}
+
+function CredentialDatabaseCard({
+  title,
+  users,
+  schoolName,
+  language
+}: {
+  title: string;
+  users: PlatformUser[];
+  schoolName: string;
+  language: Language;
+}) {
+  const columns = [tr(language, 'fullName'), tr(language, 'email'), tr(language, 'accountCode')];
+
+  return (
+    <section className="credential-database-card">
+      <div className="credential-database-head">
+        <div>
+          <h3>{title}</h3>
+          <span>{users.length}</span>
+        </div>
+        <button className="button ghost" type="button" disabled={users.length === 0} onClick={() => printCredentialTable(language, title, schoolName, users)}>
+          <Printer size={17} aria-hidden="true" />
+          <span>{tr(language, 'printTable')}</span>
+        </button>
+      </div>
+      <ResponsiveTable columns={columns} emptyText={tr(language, 'databaseEmpty')}>
+        {users.map((user) => (
+          <tr key={user.id}>
+            <td>{user.name}</td>
+            <td dir="ltr">{user.email}</td>
+            <td dir="ltr">{user.password}</td>
+          </tr>
+        ))}
+      </ResponsiveTable>
     </section>
   );
 }
