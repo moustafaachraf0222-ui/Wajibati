@@ -6420,7 +6420,8 @@ function SettingsView({
               className={language === option ? 'active' : ''}
               onClick={() => onLanguageChange(option)}
             >
-              {languageNames[option]}
+              <span className="language-flag" aria-hidden="true">{languageFlags[option]}</span>
+              <span>{languageNames[option]}</span>
             </button>
           ))}
         </div>
