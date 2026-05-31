@@ -477,6 +477,7 @@ const copy: Record<Language, Record<string, string>> = {
     exerciseTitle: 'عنوان التمرين',
     exerciseBody: 'نص التمرين',
     dueDate: 'آخر أجل',
+    dueDatePast: 'لا يمكن اختيار تاريخ سابق. اختر اليوم أو تاريخاً قادماً.',
     uploadImage: 'رفع صورة',
     uploadFile: 'رفع ملف أو صورة',
     publishExercise: 'نشر التمرين',
@@ -663,6 +664,7 @@ const copy: Record<Language, Record<string, string>> = {
     exerciseTitle: 'Titre',
     exerciseBody: 'Énoncé',
     dueDate: 'Échéance',
+    dueDatePast: 'Impossible de choisir une date passée. Choisissez aujourd’hui ou une date future.',
     uploadImage: 'Importer image',
     uploadFile: 'Importer fichier ou image',
     publishExercise: 'Publier',
@@ -849,6 +851,7 @@ const copy: Record<Language, Record<string, string>> = {
     exerciseTitle: 'Exercise title',
     exerciseBody: 'Exercise text',
     dueDate: 'Due date',
+    dueDatePast: 'Past dates are not allowed. Choose today or a future date.',
     uploadImage: 'Upload image',
     uploadFile: 'Upload file or image',
     publishExercise: 'Publish exercise',
@@ -5696,6 +5699,7 @@ function TeacherExercises({ data, setData, currentUser, language }: CommonViewPr
   const streamOptionsForSelectedYear = teacherStreamsForYear(form.targetSchoolYear);
   const streamRequired = currentUser.stage === 'secondary';
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [error, setError] = useState('');
   const exercises = scopedExercises(data, currentUser);
 
   useEffect(() => {
@@ -5745,6 +5749,11 @@ function TeacherExercises({ data, setData, currentUser, language }: CommonViewPr
       return;
     }
 
+    if (form.dueDate < todayIso()) {
+      setError(tr(language, 'dueDatePast'));
+      return;
+    }
+
     if (editingId) {
       setData((previous) => ({
         ...previous,
@@ -5787,10 +5796,11 @@ function TeacherExercises({ data, setData, currentUser, language }: CommonViewPr
             isVacation: form.isVacation || undefined,
             createdAt: new Date().toISOString().slice(0, 10)
           }
-        ]
-      }));
+      ]
+    }));
     }
 
+    setError('');
     setForm({
       title: '',
       body: '',
@@ -5809,10 +5819,11 @@ function TeacherExercises({ data, setData, currentUser, language }: CommonViewPr
     }
 
     setEditingId(exercise.id);
+    setError('');
     setForm({
       title: exercise.title,
       body: exercise.body,
-      dueDate: exercise.dueDate,
+      dueDate: exercise.dueDate < todayIso() ? todayIso() : exercise.dueDate,
       image: exercise.image ?? '',
       targetSchoolYear: exercise.schoolYear ?? firstYear,
       targetClassGroup:
@@ -5889,7 +5900,14 @@ function TeacherExercises({ data, setData, currentUser, language }: CommonViewPr
             <span>{tr(language, 'exerciseBody')}</span>
             <textarea value={form.body} onChange={(event) => setForm({ ...form, body: event.target.value })} required rows={5} />
           </label>
-          <Field label={tr(language, 'dueDate')} value={form.dueDate} onChange={(value) => setForm({ ...form, dueDate: value })} type="date" required />
+          <Field
+            label={tr(language, 'dueDate')}
+            value={form.dueDate}
+            onChange={(value) => setForm({ ...form, dueDate: value })}
+            type="date"
+            min={todayIso()}
+            required
+          />
           <label>
             <span>{tr(language, 'schoolYear')}</span>
             <select
@@ -5968,6 +5986,7 @@ function TeacherExercises({ data, setData, currentUser, language }: CommonViewPr
             <input type="checkbox" checked={form.isVacation} onChange={(event) => setForm({ ...form, isVacation: event.target.checked })} />
           </label>
           <p className="hint">{tr(language, 'targetGroup')}</p>
+          {error && <p className="form-error">{error}</p>}
           <button className="button primary" type="submit">
             {editingId ? <Save size={17} aria-hidden="true" /> : <Plus size={17} aria-hidden="true" />}
             <span>{editingId ? tr(language, 'updateExercise') : tr(language, 'publishExercise')}</span>
@@ -6509,18 +6528,20 @@ function Field({
   value,
   onChange,
   type = 'text',
+  min,
   required = false
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   type?: string;
+  min?: string;
   required?: boolean;
 }) {
   return (
     <label>
       <span>{label}</span>
-      <input value={value} type={type} required={required} onChange={(event) => onChange(event.target.value)} />
+      <input value={value} type={type} min={min} required={required} onChange={(event) => onChange(event.target.value)} />
     </label>
   );
 }
