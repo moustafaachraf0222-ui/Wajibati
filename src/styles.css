@@ -524,6 +524,62 @@ img {
   flex-wrap: wrap;
 }
 
+.sync-indicator {
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+  background: var(--paper-soft);
+  font-size: 0.82rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.sync-indicator.compact {
+  width: fit-content;
+  margin-block: 8px 4px;
+}
+
+.sync-indicator.shared {
+  color: var(--teal);
+  background: var(--teal-soft);
+  border-color: rgba(0, 98, 51, 0.2);
+}
+
+.sync-indicator.saving,
+.sync-indicator.checking {
+  color: var(--gold);
+  background: var(--gold-soft);
+  border-color: rgba(210, 168, 65, 0.22);
+}
+
+.sync-indicator.local,
+.sync-indicator.error {
+  color: var(--red);
+  background: var(--red-soft);
+  border-color: rgba(210, 16, 52, 0.2);
+}
+
+.sync-indicator.saving svg,
+.sync-indicator.checking svg {
+  animation: syncPulse 1.2s ease-in-out infinite;
+}
+
+@keyframes syncPulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.12);
+  }
+}
+
 .language-menu {
   position: relative;
   display: inline-flex;

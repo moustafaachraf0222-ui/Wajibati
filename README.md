@@ -35,10 +35,34 @@ Production branch: main
 
 Cloudflare will rebuild and redeploy the website automatically whenever new changes are pushed to the `main` branch.
 
+## Shared Cloudflare Data
+
+The deployed website uses a Cloudflare Pages Function at:
+
+```text
+/api/state
+```
+
+That function stores platform data in a Cloudflare D1 database. Create a D1 database in Cloudflare, then bind it to the Pages project with this exact variable name:
+
+```text
+DB
+```
+
+Dashboard path:
+
+```text
+Workers & Pages -> your Pages project -> Settings -> Bindings -> Add binding -> D1 database
+```
+
+After adding the binding, redeploy the Pages project. The function creates its `app_state` table automatically on the first request.
+
+If the binding is missing, the app falls back to local browser storage and accounts will not appear on other devices.
+
 ## Standalone File
 
 `Website.html` is a standalone version that can be opened directly from the desktop without a dev server.
 
 ## Current Storage Note
 
-This prototype stores platform data in the browser with `localStorage`. That is fine for testing the interface, but a real shared school platform needs a backend database before multiple devices or users can share the same live data.
+`localStorage` is now only used as a local fallback/cache. The online shared data source is Cloudflare D1.

@@ -164,6 +164,7 @@ type PlatformData = {
 };
 
 type DataSetter = Dispatch<SetStateAction<PlatformData>>;
+type SyncStatus = 'checking' | 'shared' | 'saving' | 'local' | 'error';
 
 type AccountEditState = {
   id: string;
@@ -201,6 +202,7 @@ const SESSION_KEY = 'school_platform_session_v2';
 const LANGUAGE_KEY = 'school_platform_language_v1';
 const THEME_KEY = 'school_platform_theme_v1';
 const REMEMBERED_ACCOUNTS_KEY = 'school_platform_remembered_accounts_v1';
+const REMOTE_STATE_ENDPOINT = '/api/state';
 
 const languages: Language[] = ['ar', 'fr', 'en'];
 const primarySubjects: Subject[] = [
@@ -346,6 +348,11 @@ const copy: Record<Language, Record<string, string>> = {
     demoAccounts: 'حساب المشرف العام',
     invalidCredentials: 'بيانات الدخول غير صحيحة.',
     disabledAccount: 'هذا الحساب معطل ولا يمكنه تسجيل الدخول حتى يتم تفعيله.',
+    checkingData: 'فحص الاتصال',
+    sharedData: 'بيانات مشتركة',
+    savingData: 'جاري الحفظ',
+    localOnly: 'محلي فقط',
+    syncError: 'تعذر الحفظ',
     chooseLanguage: 'لغة الواجهة',
     overview: 'نظرة عامة',
     schools: 'المدارس',
@@ -507,6 +514,11 @@ const copy: Record<Language, Record<string, string>> = {
     demoAccounts: 'Compte administrateur',
     invalidCredentials: 'Identifiants incorrects.',
     disabledAccount: 'Ce compte est désactivé et ne peut pas se connecter.',
+    checkingData: 'Connexion',
+    sharedData: 'Données partagées',
+    savingData: 'Enregistrement',
+    localOnly: 'Local seulement',
+    syncError: 'Échec synchro',
     chooseLanguage: 'Langue',
     overview: 'Vue',
     schools: 'Écoles',
@@ -668,6 +680,11 @@ const copy: Record<Language, Record<string, string>> = {
     demoAccounts: 'Administrator account',
     invalidCredentials: 'Invalid credentials.',
     disabledAccount: 'This account is disabled and cannot sign in.',
+    checkingData: 'Checking sync',
+    sharedData: 'Shared data',
+    savingData: 'Saving',
+    localOnly: 'Local only',
+    syncError: 'Sync failed',
     chooseLanguage: 'Interface language',
     overview: 'Overview',
     schools: 'Schools',
@@ -2189,6 +2206,96 @@ function cloneSeedData(): PlatformData {
   return JSON.parse(JSON.stringify(seedData)) as PlatformData;
 }
 
+function normalizePlatformData(value: Partial<PlatformData> | null | undefined): PlatformData {
+  const fallback = cloneSeedData();
+  const source = value ?? {};
+
+  return {
+    ...fallback,
+    ...source,
+    schools: Array.isArray(source.schools) ? source.schools : fallback.schools,
+    users: Array.isArray(source.users) ? source.users : fallback.users,
+    exercises: Array.isArray(source.exercises) ? source.exercises : fallback.exercises,
+    completions: source.completions && typeof source.completions === 'object' ? source.completions : fallback.completions,
+    completionDates:
+      source.completionDates && typeof source.completionDates === 'object' ? source.completionDates : fallback.completionDates,
+    feedback: source.feedback && typeof source.feedback === 'object' ? source.feedback : fallback.feedback,
+    settings: {
+      ...fallback.settings,
+      ...(source.settings ?? {})
+    }
+  };
+}
+
+async function fetchSharedData() {
+  if (window.location.protocol === 'file:') {
+    return null;
+  }
+
+  const response = await fetch(REMOTE_STATE_ENDPOINT, {
+    headers: { Accept: 'application/json' },
+    cache: 'no-store'
+  });
+
+  if (!response.ok) {
+    throw new Error(`Shared data request failed with ${response.status}`);
+  }
+
+  const payload = (await response.json()) as { data?: PlatformData };
+  return normalizePlatformData(payload.data);
+}
+
+async function saveSharedData(data: PlatformData) {
+  if (window.location.protocol === 'file:') {
+    return;
+  }
+
+  const response = await fetch(REMOTE_STATE_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ data })
+  });
+
+  if (!response.ok) {
+    throw new Error(`Shared data save failed with ${response.status}`);
+  }
+}
+
+function hasUserData(data: PlatformData) {
+  return (
+    data.schools.length > 0 ||
+    data.users.length > 1 ||
+    data.exercises.length > 0 ||
+    Object.keys(data.completions).length > 0 ||
+    Object.keys(data.completionDates).length > 0 ||
+    Object.keys(data.feedback).length > 0
+  );
+}
+
+function isSeedOnlyData(data: PlatformData) {
+  return (
+    data.schools.length === 0 &&
+    data.exercises.length === 0 &&
+    data.users.length === 1 &&
+    data.users[0]?.id === seedData.users[0].id &&
+    Object.keys(data.completions).length === 0 &&
+    Object.keys(data.completionDates).length === 0 &&
+    Object.keys(data.feedback).length === 0
+  );
+}
+
+async function promoteLocalDataIfRemoteIsEmpty(sharedData: PlatformData, localData: PlatformData) {
+  if (isSeedOnlyData(sharedData) && hasUserData(localData)) {
+    await saveSharedData(localData);
+    return localData;
+  }
+
+  return sharedData;
+}
+
 function isLanguage(value: string | null): value is Language {
   return value === 'ar' || value === 'fr' || value === 'en';
 }
@@ -2309,16 +2416,7 @@ function loadData(): PlatformData {
 
   try {
     const parsed = JSON.parse(stored) as PlatformData;
-    return {
-      ...cloneSeedData(),
-      ...parsed,
-      completionDates: parsed.completionDates ?? {},
-      feedback: parsed.feedback ?? {},
-      settings: {
-        ...cloneSeedData().settings,
-        ...parsed.settings
-      }
-    };
+    return normalizePlatformData(parsed);
   } catch {
     return cloneSeedData();
   }
@@ -2499,6 +2597,9 @@ function App() {
   const [sessionUserId, setSessionUserId] = useState<string | null>(() => localStorage.getItem(SESSION_KEY));
   const [activeView, setActiveView] = useState<View>('overview');
   const [logoutOpen, setLogoutOpen] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>('checking');
+  const remoteLoadedRef = useRef(false);
+  const remoteEnabledRef = useRef(false);
 
   const currentUser = data.users.find((user) => user.id === sessionUserId && user.status === 'active') ?? null;
   const tabs = currentUser ? navItems[currentUser.role] : [];
@@ -2515,8 +2616,84 @@ function App() {
     setSessionUserId(null);
   };
 
+  const refreshSharedData = async () => {
+    try {
+      setSyncStatus('checking');
+      const sharedData = await fetchSharedData();
+      if (!sharedData) {
+        remoteEnabledRef.current = false;
+        remoteLoadedRef.current = true;
+        setSyncStatus('local');
+        return data;
+      }
+
+      const nextData = await promoteLocalDataIfRemoteIsEmpty(sharedData, data);
+      remoteEnabledRef.current = true;
+      remoteLoadedRef.current = true;
+      setData(nextData);
+      setSyncStatus('shared');
+      return nextData;
+    } catch {
+      remoteEnabledRef.current = false;
+      remoteLoadedRef.current = true;
+      setSyncStatus('local');
+      return data;
+    }
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadSharedData = async () => {
+      try {
+        const sharedData = await fetchSharedData();
+        if (cancelled) {
+          return;
+        }
+
+        if (!sharedData) {
+          remoteEnabledRef.current = false;
+          setSyncStatus('local');
+          return;
+        }
+
+        const nextData = await promoteLocalDataIfRemoteIsEmpty(sharedData, data);
+        remoteEnabledRef.current = true;
+        setData(nextData);
+        setSyncStatus('shared');
+      } catch {
+        if (!cancelled) {
+          remoteEnabledRef.current = false;
+          setSyncStatus('local');
+        }
+      } finally {
+        if (!cancelled) {
+          remoteLoadedRef.current = true;
+        }
+      }
+    };
+
+    loadSharedData();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   useEffect(() => {
     localStorage.setItem(DATA_KEY, JSON.stringify(data));
+    if (!remoteLoadedRef.current || !remoteEnabledRef.current) {
+      return;
+    }
+
+    setSyncStatus('saving');
+    const saveTimer = window.setTimeout(() => {
+      saveSharedData(data)
+        .then(() => setSyncStatus('shared'))
+        .catch(() => setSyncStatus('error'));
+    }, 500);
+
+    return () => window.clearTimeout(saveTimer);
   }, [data]);
 
   useEffect(() => {
@@ -2559,6 +2736,8 @@ function App() {
         onLanguageChange={setLanguage}
         onThemeChange={setTheme}
         onLogin={loginUser}
+        onRefreshData={refreshSharedData}
+        syncStatus={syncStatus}
       />
     );
   }
@@ -2650,6 +2829,7 @@ function App() {
             <h1>{currentUser.name}</h1>
           </div>
           <div className="topbar-actions">
+            <SyncIndicator status={syncStatus} language={language} />
             <LanguageMenu language={language} onLanguageChange={setLanguage} />
             <button
               className="icon-text-button"
@@ -2684,6 +2864,24 @@ function App() {
   );
 }
 
+function SyncIndicator({ status, language, compact = false }: { status: SyncStatus; language: Language; compact?: boolean }) {
+  const statusConfig: Record<SyncStatus, { icon: LucideIcon; labelKey: string }> = {
+    checking: { icon: Globe2, labelKey: 'checkingData' },
+    shared: { icon: CheckCircle2, labelKey: 'sharedData' },
+    saving: { icon: Upload, labelKey: 'savingData' },
+    local: { icon: CircleOff, labelKey: 'localOnly' },
+    error: { icon: CircleOff, labelKey: 'syncError' }
+  };
+  const Icon = statusConfig[status].icon;
+
+  return (
+    <span className={compact ? `sync-indicator compact ${status}` : `sync-indicator ${status}`} title={tr(language, statusConfig[status].labelKey)}>
+      <Icon size={15} aria-hidden="true" />
+      <span>{tr(language, statusConfig[status].labelKey)}</span>
+    </span>
+  );
+}
+
 type LoginProps = {
   data: PlatformData;
   language: Language;
@@ -2691,14 +2889,17 @@ type LoginProps = {
   onLanguageChange: (language: Language) => void;
   onThemeChange: (theme: Theme) => void;
   onLogin: (userId: string) => void;
+  onRefreshData: () => Promise<PlatformData>;
+  syncStatus: SyncStatus;
 };
 
-function LoginPage({ data, language, theme, onLanguageChange, onThemeChange, onLogin }: LoginProps) {
+function LoginPage({ data, language, theme, onLanguageChange, onThemeChange, onLogin, onRefreshData, syncStatus }: LoginProps) {
   const [email, setEmail] = useState('wajibati@admin.dz');
   const [password, setPassword] = useState('LATTOUI1qaz0plm@7');
   const [rememberMe, setRememberMe] = useState(false);
   const [rememberedAccounts, setRememberedAccounts] = useState<RememberedAccount[]>(loadRememberedAccounts);
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const visibleRememberedAccounts = rememberedAccounts
     .map((remembered) => data.users.find((user) => user.id === remembered.id || user.email.toLowerCase() === remembered.email.toLowerCase()))
     .filter((user): user is PlatformUser => Boolean(user));
@@ -2732,11 +2933,14 @@ function LoginPage({ data, language, theme, onLanguageChange, onThemeChange, onL
     setRememberedAccounts(next);
   };
 
-  const submitLogin = (event: FormEvent<HTMLFormElement>) => {
+  const submitLogin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
     const shouldRemember = rememberMe || formData.get('remember') === 'on';
-    const account = data.users.find((user) => user.email.toLowerCase() === email.trim().toLowerCase());
+    setIsSubmitting(true);
+    const latestData = await onRefreshData();
+    const account = latestData.users.find((user) => user.email.toLowerCase() === email.trim().toLowerCase());
+    setIsSubmitting(false);
 
     if (!account || account.password !== password) {
       setError(tr(language, 'invalidCredentials'));
@@ -2783,6 +2987,7 @@ function LoginPage({ data, language, theme, onLanguageChange, onThemeChange, onL
 
           <h1>{tr(language, 'loginTitle')}</h1>
           <p>{tr(language, 'loginSubtitle')}</p>
+          <SyncIndicator status={syncStatus} language={language} compact />
 
           {visibleRememberedAccounts.length > 0 && (
             <div className="remembered-box">
@@ -2820,7 +3025,7 @@ function LoginPage({ data, language, theme, onLanguageChange, onThemeChange, onL
               <span>{tr(language, 'rememberMe')}</span>
             </label>
             {error && <p className="form-error">{error}</p>}
-            <button className="button primary wide" type="submit">
+            <button className="button primary wide" type="submit" disabled={isSubmitting}>
               <ShieldCheck size={18} aria-hidden="true" />
               <span>{tr(language, 'signIn')}</span>
             </button>

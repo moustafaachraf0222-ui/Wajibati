@@ -1,0 +1,8 @@
+name = "wajibati"
+compatibility_date = "2026-05-31"
+pages_build_output_dir = "dist"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "wajibati-db"
+database_id = "replace-with-your-d1-database-id"
