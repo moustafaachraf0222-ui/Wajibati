@@ -51,11 +51,11 @@ const subjectHints = {
   scientific_technology: ['التربية العلمية والتكنولوجية', 'éducation scientifique et technologique'],
   art_education: ['التربية الفنية', 'éducation artistique', 'art education'],
   music_education: ['التربية الموسيقية', 'éducation musicale', 'music education'],
-  arabic_literature: ['اللغة العربية وآدابها', 'langue arabe et littérature'],
-  life_science: ['علوم الطبيعة والحياة', 'sciences de la nature et de la vie'],
-  physical_science_technology: ['العلوم الفيزيائية والتكنولوجيا', 'sciences physiques et technologie'],
-  islamic_science: ['العلوم الإسلامية', 'sciences islamiques'],
-  philosophy: ['الفلسفة', 'philosophie'],
+  arabic_literature: ['اللغة العربية وآدابها', 'langue arabe et littérature', 'arabic literature'],
+  life_science: ['علوم الطبيعة والحياة', 'sciences de la nature et de la vie', 'life science', 'life sciences'],
+  physical_science_technology: ['العلوم الفيزيائية والتكنولوجيا', 'sciences physiques et technologie', 'physical science and technology'],
+  islamic_science: ['العلوم الإسلامية', 'sciences islamiques', 'islamic sciences'],
+  philosophy: ['الفلسفة', 'philosophie', 'philosophy'],
   computer_science: ['الإعلام الآلي', 'informatique', 'computer science'],
   physical_education: ['التربية البدنية والرياضية', 'éducation physique et sportive'],
   tamazight: ['الأمازيغية', 'tamazight'],
@@ -63,7 +63,7 @@ const subjectHints = {
   electrical_engineering_subject: ['هندسة كهربائية', 'génie électrique', 'electrical engineering'],
   mechanical_engineering_subject: ['هندسة ميكانيكية', 'génie mécanique', 'mechanical engineering'],
   process_engineering_subject: ['هندسة الطرائق', 'génie des procédés', 'process engineering'],
-  physical_sciences: ['العلوم الفيزيائية', 'sciences physiques'],
+  physical_sciences: ['العلوم الفيزيائية', 'sciences physiques', 'physical sciences'],
   technology: ['التكنولوجيا', 'technologie', 'technology'],
   spanish: ['اللغة الإسبانية', 'espagnol', 'spanish'],
   german: ['اللغة الألمانية', 'allemand', 'german'],
@@ -90,7 +90,7 @@ const streamHints = {
   mechanical_engineering: ['تقني رياضي هندسة ميكانيكية', 'génie mécanique', 'mechanical engineering'],
   process_engineering: ['تقني رياضي هندسة الطرائق', 'génie des procédés', 'process engineering'],
   management_economics: ['تسيير واقتصاد', 'gestion et économie', 'management and economics'],
-  literature_philosophy: ['آداب وفلسفة', 'آداب', 'lettres', 'literature and philosophy'],
+  literature_philosophy: ['آداب وفلسفة', 'آداب', 'lettres', 'literature and philosophy', 'literature'],
   foreign_languages: ['لغات أجنبية', 'langues étrangères', 'foreign languages']
 };
 
@@ -183,9 +183,13 @@ function normalizeText(value) {
 }
 
 function findSubject(line) {
-  const normalized = normalizeText(line);
+  const subjectMatch = String(line).match(/(?:مادة|subject|mati[eè]re)\s*[:\-]?\s*(.+?)(?=\s*(?:السنة|سنة|year|annee|année|الشعبة|شعبة|قسم|class|classe)|$)/i);
+  const normalized = normalizeText(subjectMatch?.[1] ?? line);
 
-  for (const [subject, hints] of Object.entries(subjectHints)) {
+  for (const [subject, hints] of Object.entries(subjectHints).sort(
+    (left, right) =>
+      Math.max(...right[1].map((hint) => normalizeText(hint).length)) - Math.max(...left[1].map((hint) => normalizeText(hint).length))
+  )) {
     if (hints.some((hint) => normalized.includes(normalizeText(hint)))) {
       return subject;
     }
@@ -195,9 +199,13 @@ function findSubject(line) {
 }
 
 function findStream(line) {
-  const normalized = normalizeText(line);
+  const streamMatch = String(line).match(/(?:الشعبة|شعبة|stream|fili[eè]re)\s*[:\-]?\s*(.+?)(?=\s*(?:قسم|class|classe|المادة|مادة|السنة|سنة|year|annee|année)|$)/i);
+  const normalized = normalizeText(streamMatch?.[1] ?? line);
 
-  for (const [stream, hints] of Object.entries(streamHints)) {
+  for (const [stream, hints] of Object.entries(streamHints).sort(
+    (left, right) =>
+      Math.max(...right[1].map((hint) => normalizeText(hint).length)) - Math.max(...left[1].map((hint) => normalizeText(hint).length))
+  )) {
     if (hints.some((hint) => normalized.includes(normalizeText(hint)))) {
       return stream;
     }
@@ -208,20 +216,39 @@ function findStream(line) {
 
 function findSchoolYear(line) {
   const normalized = normalizeText(line);
-  const digitMatch = normalized.match(/(?:السنة|year|annee|année)\s*(\d)/);
+  const digitMatch = normalized.match(/(?:السنة|سنة|year|annee|année)\s*(\d)/);
   if (digitMatch) {
     return Number(digitMatch[1]);
   }
 
   const yearWords = [
-    ['الأولى', 'الاولى', 'اولى', 'premiere', 'première', 'first'],
-    ['الثانية', 'ثانية', 'deuxieme', 'deuxième', 'second'],
-    ['الثالثة', 'ثالثة', 'troisieme', 'troisième', 'third'],
-    ['الرابعة', 'رابعة', 'quatrieme', 'quatrième', 'fourth'],
-    ['الخامسة', 'خامسة', 'cinquieme', 'cinquième', 'fifth']
+    {
+      arabic: ['الأولى', 'الاولى', 'اولى'],
+      latin: ['premiere', 'première', 'first']
+    },
+    {
+      arabic: ['الثانية', 'ثانية'],
+      latin: ['deuxieme', 'deuxième', 'second']
+    },
+    {
+      arabic: ['الثالثة', 'ثالثة'],
+      latin: ['troisieme', 'troisième', 'third']
+    },
+    {
+      arabic: ['الرابعة', 'رابعة'],
+      latin: ['quatrieme', 'quatrième', 'fourth']
+    },
+    {
+      arabic: ['الخامسة', 'خامسة'],
+      latin: ['cinquieme', 'cinquième', 'fifth']
+    }
   ];
 
-  const index = yearWords.findIndex((words) => words.some((word) => normalized.includes(normalizeText(word))));
+  const index = yearWords.findIndex((words) => {
+    const hasArabicYear = words.arabic.some((word) => normalized.includes(normalizeText(word)));
+    const hasLatinYear = words.latin.some((word) => new RegExp(`\\b${normalizeText(word)}\\b`, 'i').test(normalized));
+    return hasArabicYear || hasLatinYear;
+  });
   return index >= 0 ? index + 1 : 0;
 }
 
