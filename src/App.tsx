@@ -1114,6 +1114,12 @@ const languageNames: Record<Language, string> = {
   en: 'English'
 };
 
+const languageFlags: Record<Language, string> = {
+  ar: '🇩🇿',
+  fr: '🇫🇷',
+  en: '🇬🇧'
+};
+
 const localeNames: Record<Language, string> = {
   ar: 'ar-DZ',
   fr: 'fr-DZ',
@@ -1897,6 +1903,7 @@ function LanguageMenu({
         <Languages size={variant === 'corner' ? 18 : 16} aria-hidden="true" />
         {variant === 'inline' && (
           <>
+            <span className="language-flag" aria-hidden="true">{languageFlags[language]}</span>
             <span>{languageNames[language]}</span>
             <ChevronDown size={15} aria-hidden="true" />
           </>
@@ -1916,7 +1923,8 @@ function LanguageMenu({
                 setOpen(false);
               }}
             >
-              {languageNames[option]}
+              <span className="language-flag" aria-hidden="true">{languageFlags[option]}</span>
+              <span>{languageNames[option]}</span>
             </button>
           ))}
         </div>

@@ -648,7 +648,16 @@ img {
   padding: 8px 10px;
   text-align: start;
   font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 9px;
   transition: transform 0.16s ease, border-color 0.16s ease, color 0.16s ease, background-color 0.16s ease;
+}
+
+.language-flag {
+  font-size: 1.05rem;
+  line-height: 1;
+  flex: 0 0 auto;
 }
 
 .language-options button:hover,
