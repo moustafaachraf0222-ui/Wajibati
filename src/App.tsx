@@ -48,6 +48,12 @@ type Language = 'ar' | 'fr' | 'en';
 type Theme = 'light' | 'dark';
 type AccountStatus = 'active' | 'disabled';
 type HomeworkDifficulty = 'easy' | 'medium' | 'hard';
+type UploadedAttachment = {
+  name: string;
+  type: string;
+  size: number;
+  dataUrl: string;
+};
 type Subject =
   | 'math'
   | 'arabic'
@@ -80,7 +86,7 @@ type Subject =
   | 'spanish'
   | 'german'
   | 'italian';
-type View = 'overview' | 'schools' | 'users' | 'school' | 'exercises' | 'settings';
+type View = 'overview' | 'schools' | 'users' | 'school' | 'exercises' | 'announcements' | 'notes' | 'settings';
 type SecondaryStream =
   | 'experimental_science'
   | 'mathematics'
@@ -144,6 +150,31 @@ type Exercise = {
   createdAt: string;
 };
 
+type Announcement = {
+  id: string;
+  schoolId: string;
+  authorId: string;
+  title: string;
+  body: string;
+  image?: UploadedAttachment;
+  createdAt: string;
+};
+
+type TeacherNote = {
+  id: string;
+  schoolId: string;
+  stage: Stage;
+  teacherId: string;
+  subject?: Subject;
+  title: string;
+  body: string;
+  schoolYear?: number;
+  classGroup?: string;
+  stream?: SecondaryStream;
+  attachment?: UploadedAttachment;
+  createdAt: string;
+};
+
 type HomeworkFeedback = {
   difficulty?: HomeworkDifficulty;
   note?: string;
@@ -154,6 +185,8 @@ type PlatformData = {
   schools: SchoolRecord[];
   users: PlatformUser[];
   exercises: Exercise[];
+  announcements: Announcement[];
+  notes: TeacherNote[];
   completions: Record<string, string[]>;
   completionDates: Record<string, Record<string, string>>;
   feedback: Record<string, Record<string, HomeworkFeedback>>;
@@ -203,6 +236,7 @@ const LANGUAGE_KEY = 'school_platform_language_v1';
 const THEME_KEY = 'school_platform_theme_v1';
 const REMEMBERED_ACCOUNTS_KEY = 'school_platform_remembered_accounts_v1';
 const REMOTE_STATE_ENDPOINT = '/api/state';
+const MAX_ATTACHMENT_SIZE = 1_000_000;
 
 const languages: Language[] = ['ar', 'fr', 'en'];
 const primarySubjects: Subject[] = [
@@ -359,6 +393,8 @@ const copy: Record<Language, Record<string, string>> = {
     users: 'الحسابات',
     school: 'المدرسة',
     exercises: 'التمارين',
+    announcements: 'الإعلانات',
+    notes: 'الملاحظات',
     settings: 'الإعدادات',
     theme: 'المظهر',
     darkMode: 'الوضع الداكن',
@@ -442,6 +478,7 @@ const copy: Record<Language, Record<string, string>> = {
     exerciseBody: 'نص التمرين',
     dueDate: 'آخر أجل',
     uploadImage: 'رفع صورة',
+    uploadFile: 'رفع ملف أو صورة',
     publishExercise: 'نشر التمرين',
     updateExercise: 'تحديث التمرين',
     assignedExercises: 'تمارين مخصصة لك',
@@ -452,6 +489,19 @@ const copy: Record<Language, Record<string, string>> = {
     done: 'تم الإنجاز',
     completed: 'منجز',
     imagePreview: 'معاينة الصورة',
+    announcementTitle: 'عنوان الإعلان',
+    announcementBody: 'نص الإعلان',
+    publishAnnouncement: 'نشر الإعلان',
+    schoolAnnouncements: 'إعلانات المدرسة',
+    noAnnouncements: 'لا توجد إعلانات بعد.',
+    noteTitle: 'عنوان الملاحظة',
+    noteBody: 'نص الملاحظة',
+    publishNote: 'نشر الملاحظة',
+    teacherNotes: 'ملاحظات الأستاذ',
+    attachment: 'مرفق',
+    downloadFile: 'تنزيل الملف',
+    noNotes: 'لا توجد ملاحظات بعد.',
+    fileTooLarge: 'حجم الملف كبير. الحد الأقصى 1MB.',
     onlySubject: 'لا يمكنك إضافة أو تعديل تمارين إلا ضمن المادة المخصصة لك.',
     targetGroup: 'اختر السنة والقسم المستهدفين من الأقسام المخصصة لك.',
     systemSettings: 'إعدادات النظام',
@@ -529,6 +579,8 @@ const copy: Record<Language, Record<string, string>> = {
     users: 'Comptes',
     school: 'École',
     exercises: 'Exercices',
+    announcements: 'Annonces',
+    notes: 'Notes',
     settings: 'Paramètres',
     theme: 'Thème',
     darkMode: 'Mode sombre',
@@ -612,6 +664,7 @@ const copy: Record<Language, Record<string, string>> = {
     exerciseBody: 'Énoncé',
     dueDate: 'Échéance',
     uploadImage: 'Importer image',
+    uploadFile: 'Importer fichier ou image',
     publishExercise: 'Publier',
     updateExercise: 'Mettre à jour',
     assignedExercises: 'Exercices assignés',
@@ -622,6 +675,19 @@ const copy: Record<Language, Record<string, string>> = {
     done: 'Terminé',
     completed: 'Fait',
     imagePreview: 'Aperçu',
+    announcementTitle: 'Titre de l’annonce',
+    announcementBody: 'Texte de l’annonce',
+    publishAnnouncement: 'Publier l’annonce',
+    schoolAnnouncements: 'Annonces de l’école',
+    noAnnouncements: 'Aucune annonce.',
+    noteTitle: 'Titre de la note',
+    noteBody: 'Texte de la note',
+    publishNote: 'Publier la note',
+    teacherNotes: 'Notes du professeur',
+    attachment: 'Pièce jointe',
+    downloadFile: 'Télécharger',
+    noNotes: 'Aucune note.',
+    fileTooLarge: 'Le fichier est trop volumineux. Maximum 1MB.',
     onlySubject: 'Vous ne pouvez gérer que votre matière.',
     targetGroup: 'Choisissez l’année et la classe ciblées parmi vos affectations.',
     systemSettings: 'Paramètres système',
@@ -699,6 +765,8 @@ const copy: Record<Language, Record<string, string>> = {
     users: 'Accounts',
     school: 'School',
     exercises: 'Exercises',
+    announcements: 'Announcements',
+    notes: 'Notes',
     settings: 'Settings',
     theme: 'Theme',
     darkMode: 'Dark mode',
@@ -782,6 +850,7 @@ const copy: Record<Language, Record<string, string>> = {
     exerciseBody: 'Exercise text',
     dueDate: 'Due date',
     uploadImage: 'Upload image',
+    uploadFile: 'Upload file or image',
     publishExercise: 'Publish exercise',
     updateExercise: 'Update exercise',
     assignedExercises: 'Assigned exercises',
@@ -792,6 +861,19 @@ const copy: Record<Language, Record<string, string>> = {
     done: 'Done',
     completed: 'Completed',
     imagePreview: 'Image preview',
+    announcementTitle: 'Announcement title',
+    announcementBody: 'Announcement text',
+    publishAnnouncement: 'Publish announcement',
+    schoolAnnouncements: 'School announcements',
+    noAnnouncements: 'No announcements yet.',
+    noteTitle: 'Note title',
+    noteBody: 'Note text',
+    publishNote: 'Publish note',
+    teacherNotes: 'Teacher notes',
+    attachment: 'Attachment',
+    downloadFile: 'Download file',
+    noNotes: 'No notes yet.',
+    fileTooLarge: 'File is too large. Maximum is 1MB.',
     onlySubject: 'You can only add or edit exercises in your assigned subject.',
     targetGroup: 'Choose the target year and class from your assignments.',
     systemSettings: 'System settings',
@@ -1051,15 +1133,20 @@ const navItems: Record<Role, Array<{ id: View; labelKey: string; icon: LucideIco
     { id: 'overview', labelKey: 'overview', icon: Building2 },
     { id: 'school', labelKey: 'school', icon: School },
     { id: 'users', labelKey: 'users', icon: UserPlus },
+    { id: 'announcements', labelKey: 'announcements', icon: MessageSquare },
     { id: 'settings', labelKey: 'settings', icon: Settings }
   ],
   teacher: [
     { id: 'overview', labelKey: 'overview', icon: GraduationCap },
+    { id: 'announcements', labelKey: 'announcements', icon: MessageSquare },
     { id: 'exercises', labelKey: 'exercises', icon: BookOpen },
+    { id: 'notes', labelKey: 'notes', icon: MessageSquare },
     { id: 'settings', labelKey: 'settings', icon: Settings }
   ],
   student: [
+    { id: 'announcements', labelKey: 'announcements', icon: MessageSquare },
     { id: 'exercises', labelKey: 'exercises', icon: BookOpen },
+    { id: 'notes', labelKey: 'notes', icon: MessageSquare },
     { id: 'settings', labelKey: 'settings', icon: Settings }
   ]
 };
@@ -1077,6 +1164,8 @@ const seedData: PlatformData = {
     }
   ],
   exercises: [],
+  announcements: [],
+  notes: [],
   completions: {},
   completionDates: {},
   feedback: {},
@@ -2243,6 +2332,8 @@ function normalizePlatformData(value: Partial<PlatformData> | null | undefined):
       : fallback.schools,
     users: Array.isArray(source.users) ? source.users : fallback.users,
     exercises: Array.isArray(source.exercises) ? source.exercises : fallback.exercises,
+    announcements: Array.isArray(source.announcements) ? source.announcements : fallback.announcements,
+    notes: Array.isArray(source.notes) ? source.notes : fallback.notes,
     completions: source.completions && typeof source.completions === 'object' ? source.completions : fallback.completions,
     completionDates:
       source.completionDates && typeof source.completionDates === 'object' ? source.completionDates : fallback.completionDates,
@@ -2296,6 +2387,8 @@ function hasUserData(data: PlatformData) {
     data.schools.length > 0 ||
     data.users.length > 1 ||
     data.exercises.length > 0 ||
+    data.announcements.length > 0 ||
+    data.notes.length > 0 ||
     Object.keys(data.completions).length > 0 ||
     Object.keys(data.completionDates).length > 0 ||
     Object.keys(data.feedback).length > 0
@@ -2306,6 +2399,8 @@ function isSeedOnlyData(data: PlatformData) {
   return (
     data.schools.length === 0 &&
     data.exercises.length === 0 &&
+    data.announcements.length === 0 &&
+    data.notes.length === 0 &&
     data.users.length === 1 &&
     data.users[0]?.id === seedData.users[0].id &&
     Object.keys(data.completions).length === 0 &&
@@ -2453,6 +2548,33 @@ function makeId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
 }
 
+function readAttachmentFromInput(
+  event: ChangeEvent<HTMLInputElement>,
+  onReady: (attachment: UploadedAttachment) => void,
+  onTooLarge: () => void
+) {
+  const file = event.target.files?.[0];
+  if (!file) {
+    return;
+  }
+
+  if (file.size > MAX_ATTACHMENT_SIZE) {
+    event.target.value = '';
+    onTooLarge();
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = () =>
+    onReady({
+      name: file.name,
+      type: file.type || 'application/octet-stream',
+      size: file.size,
+      dataUrl: String(reader.result)
+    });
+  reader.readAsDataURL(file);
+}
+
 function getSchool(data: PlatformData, user?: PlatformUser) {
   if (!user?.schoolId) {
     return undefined;
@@ -2502,6 +2624,46 @@ function scopedExercises(data: PlatformData, user: PlatformUser) {
   return data.exercises.filter(
     (exercise) => exercise.schoolId === user.schoolId && exercise.stage === user.stage && exerciseMatchesYearAndClass(exercise, user)
   );
+}
+
+function scopedAnnouncements(data: PlatformData, user: PlatformUser) {
+  if (user.role === 'admin') {
+    return data.announcements;
+  }
+
+  if (!user.schoolId) {
+    return [];
+  }
+
+  return data.announcements.filter((announcement) => announcement.schoolId === user.schoolId);
+}
+
+function noteMatchesStudent(note: TeacherNote, user: PlatformUser) {
+  if (user.role !== 'student') {
+    return false;
+  }
+
+  const yearMatches = note.schoolYear === undefined || note.schoolYear === user.schoolYear;
+  const streamMatches = note.stream === undefined || note.stream === user.stream;
+  const classMatches = note.classGroup === undefined || sameClassGroup(note.classGroup, user.classGroup ?? '');
+
+  return note.schoolId === user.schoolId && note.stage === user.stage && yearMatches && streamMatches && classMatches;
+}
+
+function scopedNotes(data: PlatformData, user: PlatformUser) {
+  if (user.role === 'admin') {
+    return data.notes;
+  }
+
+  if (user.role === 'director') {
+    return data.notes.filter((note) => note.schoolId === user.schoolId);
+  }
+
+  if (user.role === 'teacher') {
+    return data.notes.filter((note) => note.teacherId === user.id);
+  }
+
+  return data.notes.filter((note) => noteMatchesStudent(note, user));
 }
 
 function defaultView(role: Role): View {
@@ -2557,6 +2719,8 @@ function deleteUserRecords(previous: PlatformData, target: PlatformUser): Platfo
     users: previous.users.filter((user) => user.id !== target.id),
     schools: previous.schools.map((school) => (school.directorId === target.id ? { ...school, directorId: undefined } : school)),
     exercises: previous.exercises.filter((exercise) => exercise.teacherId !== target.id),
+    announcements: previous.announcements.filter((announcement) => announcement.authorId !== target.id),
+    notes: previous.notes.filter((note) => note.teacherId !== target.id),
     completions: Object.fromEntries(
       Object.entries(previous.completions)
         .filter(([userId]) => userId !== target.id)
@@ -2779,6 +2943,10 @@ function App() {
         return <SchoolProfileView data={data} setData={setData} currentUser={currentUser} language={language} />;
       case 'exercises':
         return <ExercisesView data={data} setData={setData} currentUser={currentUser} language={language} />;
+      case 'announcements':
+        return <AnnouncementsView data={data} setData={setData} currentUser={currentUser} language={language} />;
+      case 'notes':
+        return <NotesView data={data} setData={setData} currentUser={currentUser} language={language} />;
       case 'settings':
         return (
           <SettingsView
@@ -5105,6 +5273,361 @@ function SchoolProfileView({ data, setData, currentUser, language }: CommonViewP
         </button>
       </form>
     </section>
+  );
+}
+
+function AttachmentPreview({ attachment, language }: { attachment: UploadedAttachment; language: Language }) {
+  const isImage = attachment.type.startsWith('image/');
+
+  return (
+    <div className="attachment-preview">
+      {isImage && <img src={attachment.dataUrl} alt={attachment.name || tr(language, 'imagePreview')} />}
+      <a className="button ghost" href={attachment.dataUrl} download={attachment.name}>
+        <Download size={16} aria-hidden="true" />
+        <span>{isImage ? attachment.name : tr(language, 'downloadFile')}</span>
+      </a>
+    </div>
+  );
+}
+
+function AnnouncementsView({ data, setData, currentUser, language }: CommonViewProps & { setData: DataSetter }) {
+  const school = getSchool(data, currentUser);
+  const announcements = scopedAnnouncements(data, currentUser).sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+  const [form, setForm] = useState<{ title: string; body: string; image: UploadedAttachment | null }>({ title: '', body: '', image: null });
+  const [error, setError] = useState('');
+
+  const readImage = (event: ChangeEvent<HTMLInputElement>) => {
+    readAttachmentFromInput(
+      event,
+      (image) => {
+        setForm((previous) => ({ ...previous, image }));
+        setError('');
+      },
+      () => setError(tr(language, 'fileTooLarge'))
+    );
+  };
+
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (currentUser.role !== 'director' || !currentUser.schoolId) {
+      return;
+    }
+
+    setData((previous) => ({
+      ...previous,
+      announcements: [
+        ...previous.announcements,
+        {
+          id: makeId('announcement'),
+          schoolId: currentUser.schoolId!,
+          authorId: currentUser.id,
+          title: form.title.trim(),
+          body: form.body.trim(),
+          image: form.image ?? undefined,
+          createdAt: new Date().toISOString()
+        }
+      ]
+    }));
+    setForm({ title: '', body: '', image: null });
+    setError('');
+  };
+
+  return (
+    <section className="content-grid">
+      {currentUser.role === 'director' && (
+        <div className="panel">
+          <div className="panel-heading">
+            <div>
+              <p>{school?.name ?? tr(language, 'schoolAnnouncements')}</p>
+              <h2>{tr(language, 'announcements')}</h2>
+            </div>
+            <MessageSquare size={24} aria-hidden="true" />
+          </div>
+          <form className="form-stack" onSubmit={submit}>
+            <Field label={tr(language, 'announcementTitle')} value={form.title} onChange={(value) => setForm({ ...form, title: value })} required />
+            <label>
+              <span>{tr(language, 'announcementBody')}</span>
+              <textarea value={form.body} onChange={(event) => setForm({ ...form, body: event.target.value })} required rows={5} />
+            </label>
+            <label className="file-field">
+              <span>{tr(language, 'uploadImage')}</span>
+              <input type="file" accept="image/*" onChange={readImage} />
+              <Upload size={18} aria-hidden="true" />
+            </label>
+            {form.image && <AttachmentPreview attachment={form.image} language={language} />}
+            {error && <p className="form-error">{error}</p>}
+            <button className="button primary" type="submit">
+              <Plus size={17} aria-hidden="true" />
+              <span>{tr(language, 'publishAnnouncement')}</span>
+            </button>
+          </form>
+        </div>
+      )}
+
+      <div className="panel">
+        <div className="panel-heading">
+          <div>
+            <p>{school?.name ?? tr(language, 'scopedData')}</p>
+            <h2>{tr(language, 'schoolAnnouncements')}</h2>
+          </div>
+          <MessageSquare size={24} aria-hidden="true" />
+        </div>
+        <div className="message-list">
+          {announcements.length === 0 && <p className="empty-state">{tr(language, 'noAnnouncements')}</p>}
+          {announcements.map((announcement) => {
+            const author = data.users.find((user) => user.id === announcement.authorId);
+            return (
+              <article className="message-card" key={announcement.id}>
+                <div className="message-card-head">
+                  <h3>{announcement.title}</h3>
+                  <small>{new Date(announcement.createdAt).toLocaleDateString(localeNames[language])}</small>
+                </div>
+                <p>{announcement.body}</p>
+                {announcement.image && <AttachmentPreview attachment={announcement.image} language={language} />}
+                <small>{author?.name ?? '-'}</small>
+              </article>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function NotesView({ data, setData, currentUser, language }: CommonViewProps & { setData: DataSetter }) {
+  if (currentUser.role === 'teacher') {
+    return <TeacherNotes data={data} setData={setData} currentUser={currentUser} language={language} />;
+  }
+
+  if (currentUser.role === 'student') {
+    return <StudentNotes data={data} currentUser={currentUser} language={language} />;
+  }
+
+  return <p className="empty-state">{tr(language, 'scopedData')}</p>;
+}
+
+function TeacherNotes({ data, setData, currentUser, language }: CommonViewProps & { setData: DataSetter }) {
+  const school = getSchool(data, currentUser);
+  const teacherYearClassGroups = assignedYearClassGroups(currentUser);
+  const teacherYearStreamClassGroups = assignedYearStreamClassGroups(currentUser);
+  const hasStreamAssignments = Object.keys(teacherYearStreamClassGroups).length > 0;
+  const teacherYears = assignedSchoolYears(currentUser);
+  const firstYear = teacherYears[0] ?? 1;
+  const teacherClassesForYear = (year: number) => teacherYearClassGroups[String(year)] ?? [];
+  const teacherStreamsForYear = (year: number) => {
+    const streamsForYear = secondaryStreamsForYear(school, year);
+    const assignedStreams = Object.keys(teacherYearStreamClassGroups[String(year)] ?? {}) as SecondaryStream[];
+    return currentUser.stage === 'secondary' ? assignedStreams.filter((stream) => streamsForYear.includes(stream)) : [];
+  };
+  const teacherClassesForYearAndStream = (year: number, stream: SecondaryStream | '') =>
+    stream && hasStreamAssignments ? teacherYearStreamClassGroups[String(year)]?.[stream] ?? [] : teacherClassesForYear(year);
+  const firstStream = teacherStreamsForYear(firstYear)[0] ?? '';
+  const [form, setForm] = useState({
+    title: '',
+    body: '',
+    targetSchoolYear: firstYear,
+    targetStream: firstStream as SecondaryStream | '',
+    targetClassGroup: teacherClassesForYearAndStream(firstYear, firstStream)[0] ?? teacherClassesForYear(firstYear)[0] ?? '',
+    attachment: null as UploadedAttachment | null
+  });
+  const [error, setError] = useState('');
+  const notes = scopedNotes(data, currentUser).sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+  const streamOptionsForSelectedYear = teacherStreamsForYear(form.targetSchoolYear);
+  const streamRequired = currentUser.stage === 'secondary';
+
+  const readFile = (event: ChangeEvent<HTMLInputElement>) => {
+    readAttachmentFromInput(
+      event,
+      (attachment) => {
+        setForm((previous) => ({ ...previous, attachment }));
+        setError('');
+      },
+      () => setError(tr(language, 'fileTooLarge'))
+    );
+  };
+
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const classGroup = form.targetClassGroup.trim();
+    const targetSubject = teacherSubjectForYear(currentUser, form.targetSchoolYear);
+    const targetStream =
+      form.targetStream && streamOptionsForSelectedYear.includes(form.targetStream as SecondaryStream) ? (form.targetStream as SecondaryStream) : undefined;
+    const targetClasses =
+      currentUser.stage === 'secondary' && targetStream
+        ? teacherClassesForYearAndStream(form.targetSchoolYear, targetStream)
+        : teacherClassesForYear(form.targetSchoolYear);
+
+    if (
+      !currentUser.schoolId ||
+      !currentUser.stage ||
+      !teacherYears.includes(form.targetSchoolYear) ||
+      !targetClasses.some((assignedClass) => sameClassGroup(assignedClass, classGroup)) ||
+      (streamRequired && !targetStream)
+    ) {
+      return;
+    }
+
+    setData((previous) => ({
+      ...previous,
+      notes: [
+        ...previous.notes,
+        {
+          id: makeId('note'),
+          schoolId: currentUser.schoolId!,
+          stage: currentUser.stage!,
+          teacherId: currentUser.id,
+          subject: targetSubject,
+          title: form.title.trim(),
+          body: form.body.trim(),
+          schoolYear: form.targetSchoolYear,
+          classGroup,
+          stream: targetStream,
+          attachment: form.attachment ?? undefined,
+          createdAt: new Date().toISOString()
+        }
+      ]
+    }));
+    setForm({
+      title: '',
+      body: '',
+      targetSchoolYear: firstYear,
+      targetStream: firstStream as SecondaryStream | '',
+      targetClassGroup: teacherClassesForYearAndStream(firstYear, firstStream)[0] ?? teacherClassesForYear(firstYear)[0] ?? '',
+      attachment: null
+    });
+    setError('');
+  };
+
+  return (
+    <section className="content-grid">
+      <div className="panel">
+        <div className="panel-heading">
+          <div>
+            <p>{tr(language, 'targetGroup')}</p>
+            <h2>{tr(language, 'teacherNotes')}</h2>
+          </div>
+          <MessageSquare size={24} aria-hidden="true" />
+        </div>
+        <form className="form-stack" onSubmit={submit}>
+          <Field label={tr(language, 'noteTitle')} value={form.title} onChange={(value) => setForm({ ...form, title: value })} required />
+          <label>
+            <span>{tr(language, 'noteBody')}</span>
+            <textarea value={form.body} onChange={(event) => setForm({ ...form, body: event.target.value })} required rows={5} />
+          </label>
+          <label>
+            <span>{tr(language, 'schoolYear')}</span>
+            <select
+              value={form.targetSchoolYear}
+              onChange={(event) => {
+                const year = Number(event.target.value);
+                const streams = teacherStreamsForYear(year);
+                const nextStream = streams.includes(form.targetStream as SecondaryStream) ? (form.targetStream as SecondaryStream) : streams[0] ?? '';
+                const classes =
+                  currentUser.stage === 'secondary' && nextStream ? teacherClassesForYearAndStream(year, nextStream) : teacherClassesForYear(year);
+                setForm({ ...form, targetSchoolYear: year, targetStream: nextStream, targetClassGroup: classes[0] ?? '' });
+              }}
+            >
+              {teacherYears.map((year) => (
+                <option value={year} key={year}>
+                  {schoolYearLabel(language, currentUser.stage, year)}
+                </option>
+              ))}
+            </select>
+          </label>
+          {streamRequired && (
+            <label>
+              <span>{tr(language, 'stream')}</span>
+              <select
+                value={form.targetStream}
+                onChange={(event) => {
+                  const stream = event.target.value as SecondaryStream | '';
+                  const classes = teacherClassesForYearAndStream(form.targetSchoolYear, stream);
+                  setForm({ ...form, targetStream: stream, targetClassGroup: classes[0] ?? '' });
+                }}
+              >
+                {streamOptionsForSelectedYear.map((stream) => (
+                  <option value={stream} key={stream}>
+                    {secondaryStreamLabel(language, stream, form.targetSchoolYear)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          <label>
+            <span>{tr(language, 'classGroup')}</span>
+            <select value={form.targetClassGroup} onChange={(event) => setForm({ ...form, targetClassGroup: event.target.value })}>
+              {(streamRequired && form.targetStream
+                ? teacherClassesForYearAndStream(form.targetSchoolYear, form.targetStream as SecondaryStream)
+                : teacherClassesForYear(form.targetSchoolYear)
+              ).map((classGroup) => (
+                <option value={classGroup} key={classGroup}>
+                  {classGroup}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="file-field">
+            <span>{tr(language, 'uploadFile')}</span>
+            <input type="file" onChange={readFile} />
+            <Upload size={18} aria-hidden="true" />
+          </label>
+          {form.attachment && <AttachmentPreview attachment={form.attachment} language={language} />}
+          {error && <p className="form-error">{error}</p>}
+          <button className="button primary" type="submit">
+            <Plus size={17} aria-hidden="true" />
+            <span>{tr(language, 'publishNote')}</span>
+          </button>
+        </form>
+      </div>
+      <NotesList notes={notes} data={data} language={language} />
+    </section>
+  );
+}
+
+function StudentNotes({ data, currentUser, language }: CommonViewProps) {
+  const notes = scopedNotes(data, currentUser).sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+
+  return (
+    <section className="content-grid">
+      <NotesList notes={notes} data={data} language={language} />
+    </section>
+  );
+}
+
+function NotesList({ notes, data, language }: { notes: TeacherNote[]; data: PlatformData; language: Language }) {
+  return (
+    <div className="panel">
+      <div className="panel-heading">
+        <div>
+          <p>{tr(language, 'scopedData')}</p>
+          <h2>{tr(language, 'teacherNotes')}</h2>
+        </div>
+        <MessageSquare size={24} aria-hidden="true" />
+      </div>
+      <div className="message-list">
+        {notes.length === 0 && <p className="empty-state">{tr(language, 'noNotes')}</p>}
+        {notes.map((note) => {
+          const teacher = data.users.find((user) => user.id === note.teacherId);
+          return (
+            <article className="message-card" key={note.id}>
+              <div className="message-card-head">
+                <h3>{note.title}</h3>
+                <small>{new Date(note.createdAt).toLocaleDateString(localeNames[language])}</small>
+              </div>
+              <div className="message-meta">
+                {note.subject && <span>{subjectNames[language][note.subject]}</span>}
+                {note.schoolYear && <span>{schoolYearLabel(language, note.stage, note.schoolYear)}</span>}
+                {note.stream && <span>{secondaryStreamLabel(language, note.stream, note.schoolYear)}</span>}
+                {note.classGroup && <span>{tr(language, 'classGroup')} {note.classGroup}</span>}
+              </div>
+              <p>{note.body}</p>
+              {note.attachment && <AttachmentPreview attachment={note.attachment} language={language} />}
+              <small>{teacher?.name ?? '-'}</small>
+            </article>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 

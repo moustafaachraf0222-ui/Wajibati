@@ -24,6 +24,8 @@ const seedData = {
     }
   ],
   exercises: [],
+  announcements: [],
+  notes: [],
   completions: {},
   completionDates: {},
   feedback: {},
@@ -65,6 +67,8 @@ function normalizeState(value) {
       : [],
     users: Array.isArray(value.users) ? value.users : seedData.users,
     exercises: Array.isArray(value.exercises) ? value.exercises : [],
+    announcements: Array.isArray(value.announcements) ? value.announcements : [],
+    notes: Array.isArray(value.notes) ? value.notes : [],
     completions: value.completions && typeof value.completions === 'object' ? value.completions : {},
     completionDates: value.completionDates && typeof value.completionDates === 'object' ? value.completionDates : {},
     feedback: value.feedback && typeof value.feedback === 'object' ? value.feedback : {},

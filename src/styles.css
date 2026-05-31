@@ -1537,6 +1537,80 @@ tbody tr.account-details-row:hover td {
   grid-template-columns: 1fr;
 }
 
+.message-list {
+  display: grid;
+  gap: 12px;
+}
+
+.message-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper-soft);
+  padding: 14px;
+  display: grid;
+  gap: 10px;
+  overflow: hidden;
+}
+
+.message-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 12px;
+}
+
+.message-card h3,
+.message-card p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.message-card h3 {
+  font-size: 1rem;
+  line-height: 1.45;
+}
+
+.message-card p {
+  color: var(--ink);
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+
+.message-card small {
+  color: var(--muted);
+}
+
+.message-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.message-meta span {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--muted);
+  padding: 4px 9px;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.attachment-preview {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+}
+
+.attachment-preview img {
+  width: min(100%, 520px);
+  max-height: 320px;
+  object-fit: contain;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+}
+
 .exercise-card {
   padding: 14px;
   display: grid;
