@@ -1,4 +1,5 @@
 const MAX_INPUT_LENGTH = 12000;
+const MAX_PDF_SIZE = 5_000_000;
 const MODEL = '@cf/meta/llama-3.1-8b-instruct';
 
 const subjects = [
@@ -114,6 +115,23 @@ function normalizeStage(value) {
 
 function normalizeLanguage(value) {
   return value === 'ar' || value === 'fr' || value === 'en' ? value : 'ar';
+}
+
+function parseJsonObject(value) {
+  if (!value) {
+    return {};
+  }
+
+  if (typeof value === 'object') {
+    return value;
+  }
+
+  try {
+    const parsed = JSON.parse(String(value));
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
 }
 
 function parseAiJson(result) {
@@ -300,7 +318,7 @@ function sanitizeAccounts(value) {
         return null;
       }
 
-      const assignments = Array.isArray(account.assignments)
+      let assignments = Array.isArray(account.assignments)
         ? account.assignments
             .map((assignment) => ({
               schoolYear: Number(assignment?.schoolYear) || 0,
@@ -312,6 +330,19 @@ function sanitizeAccounts(value) {
             .filter((assignment) => assignment.schoolYear > 0 && assignment.classGroups.length > 0)
             .slice(0, 12)
         : [];
+      const schoolYear = Number(account.schoolYear) || undefined;
+      const classGroup = cleanClassGroup(account.classGroup);
+      const stream = streams.includes(account.stream) ? account.stream : '';
+
+      if (role === 'teacher' && assignments.length === 0 && schoolYear && classGroup) {
+        assignments = [
+          {
+            schoolYear,
+            stream,
+            classGroups: [classGroup]
+          }
+        ];
+      }
 
       return {
         role,
@@ -319,9 +350,9 @@ function sanitizeAccounts(value) {
         email: String(account.email ?? '').trim(),
         password: String(account.password ?? '').trim(),
         subject: subjects.includes(account.subject) ? account.subject : '',
-        schoolYear: Number(account.schoolYear) || undefined,
-        classGroup: cleanClassGroup(account.classGroup),
-        stream: streams.includes(account.stream) ? account.stream : '',
+        schoolYear,
+        classGroup,
+        stream,
         assignments,
         confidence: typeof account.confidence === 'number' ? Math.max(0, Math.min(account.confidence, 1)) : undefined,
         warnings: Array.isArray(account.warnings) ? account.warnings.map(String).filter(Boolean).slice(0, 4) : [],
@@ -332,6 +363,71 @@ function sanitizeAccounts(value) {
     .slice(0, 40);
 }
 
+async function markdownFromPdf(env, file) {
+  if (!file || typeof file.arrayBuffer !== 'function') {
+    return '';
+  }
+
+  if (file.size > MAX_PDF_SIZE) {
+    throw new Error('PDF file is too large.');
+  }
+
+  const type = file.type || 'application/pdf';
+  const name = file.name || 'accounts.pdf';
+
+  if (type !== 'application/pdf' && !name.toLowerCase().endsWith('.pdf')) {
+    throw new Error('Only PDF files are supported.');
+  }
+
+  const result = await env.AI.toMarkdown(
+    {
+      name,
+      blob: new Blob([await file.arrayBuffer()], { type: 'application/pdf' })
+    },
+    {
+      conversionOptions: {
+        pdf: { metadata: false }
+      }
+    }
+  );
+
+  if (Array.isArray(result)) {
+    return result.map((item) => (item?.format === 'markdown' ? item.data ?? '' : '')).join('\n\n');
+  }
+
+  if (result?.format === 'error') {
+    throw new Error(result.error || 'PDF conversion failed.');
+  }
+
+  return result?.data ?? '';
+}
+
+async function readPayload(request, env) {
+  const contentType = request.headers.get('content-type') ?? '';
+
+  if (!contentType.includes('multipart/form-data')) {
+    const payload = await request.json();
+    return {
+      text: String(payload.text ?? '').trim(),
+      language: payload.language,
+      school: parseJsonObject(payload.school)
+    };
+  }
+
+  const formData = await request.formData();
+  const text = String(formData.get('text') ?? '').trim();
+  const language = String(formData.get('language') ?? '');
+  const school = parseJsonObject(formData.get('school'));
+  const file = formData.get('file');
+  const pdfText = file && typeof file === 'object' && typeof file.arrayBuffer === 'function' ? await markdownFromPdf(env, file) : '';
+
+  return {
+    text: [text, pdfText].filter(Boolean).join('\n\n'),
+    language,
+    school
+  };
+}
+
 export async function onRequestPost(context) {
   if (!context.env.AI) {
     return jsonResponse({ error: 'Workers AI binding AI is not configured.' }, { status: 503 });
@@ -339,9 +435,9 @@ export async function onRequestPost(context) {
 
   let payload;
   try {
-    payload = await context.request.json();
+    payload = await readPayload(context.request, context.env);
   } catch {
-    return jsonResponse({ error: 'Invalid JSON body.' }, { status: 400 });
+    return jsonResponse({ error: 'Invalid import request.' }, { status: 400 });
   }
 
   const text = String(payload.text ?? '').trim().slice(0, MAX_INPUT_LENGTH);

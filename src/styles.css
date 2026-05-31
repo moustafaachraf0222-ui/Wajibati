@@ -1711,6 +1711,32 @@ tbody tr.account-details-row:hover td {
   color: var(--muted);
 }
 
+.file-field small {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.ai-pdf-field {
+  background: var(--paper-soft);
+}
+
+.selected-file-row {
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper-soft);
+  color: var(--muted);
+  padding: 7px 8px 7px 11px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.selected-file-row span {
+  overflow-wrap: anywhere;
+}
+
 .file-field input {
   border: 0;
   padding: 0;

@@ -272,6 +272,7 @@ const REMEMBERED_ACCOUNTS_KEY = 'school_platform_remembered_accounts_v1';
 const REMOTE_STATE_ENDPOINT = '/api/state';
 const AI_IMPORT_ENDPOINT = '/api/ai/import-accounts';
 const MAX_ATTACHMENT_SIZE = 1_000_000;
+const MAX_AI_PDF_SIZE = 5_000_000;
 
 const languages: Language[] = ['ar', 'fr', 'en'];
 const primarySubjects: Subject[] = [
@@ -448,6 +449,11 @@ const copy: Record<Language, Record<string, string>> = {
     aiAccountImportText: 'الصق قائمة الأساتذة والتلاميذ، وسيحوّلها النظام إلى اقتراحات قابلة للمراجعة.',
     aiInputLabel: 'القائمة الخام',
     aiInputPlaceholder: 'مثال: أحمد أستاذ رياضيات السنة الأولى متوسط قسم 2\\nسارة تلميذة السنة الأولى متوسط قسم 2',
+    aiPdfUpload: 'رفع ملف PDF',
+    aiPdfHint: 'يمكنك رفع PDF يحتوي على قائمة الحسابات، وسيتم استخراج النص منه تلقائياً.',
+    aiPdfSelected: 'ملف PDF محدد',
+    aiPdfTooLarge: 'ملف PDF كبير. الحد الأقصى 5MB.',
+    aiPdfOnly: 'اختر ملف PDF فقط.',
     generateAccountsAi: 'توليد الاقتراحات',
     aiGenerating: 'جاري التوليد',
     aiUnavailableLocal: 'هذه الميزة تعمل على الموقع المنشور فقط لأنها تحتاج إلى Cloudflare Workers AI.',
@@ -667,6 +673,11 @@ const copy: Record<Language, Record<string, string>> = {
     aiAccountImportText: 'Collez une liste d’enseignants et d’élèves. Le système la transforme en propositions à vérifier.',
     aiInputLabel: 'Liste brute',
     aiInputPlaceholder: 'Exemple : Ahmed enseignant math première année moyenne classe 2\\nSara élève première année moyenne classe 2',
+    aiPdfUpload: 'Importer un PDF',
+    aiPdfHint: 'Vous pouvez importer un PDF contenant la liste. Le texte sera extrait automatiquement.',
+    aiPdfSelected: 'PDF sélectionné',
+    aiPdfTooLarge: 'Le PDF est trop volumineux. Maximum 5MB.',
+    aiPdfOnly: 'Choisissez uniquement un fichier PDF.',
     generateAccountsAi: 'Générer',
     aiGenerating: 'Génération',
     aiUnavailableLocal: 'Cette fonction marche seulement sur le site publié car elle utilise Cloudflare Workers AI.',
@@ -886,6 +897,11 @@ const copy: Record<Language, Record<string, string>> = {
     aiAccountImportText: 'Paste a list of teachers and students. The system turns it into reviewable account drafts.',
     aiInputLabel: 'Raw list',
     aiInputPlaceholder: 'Example: Ahmed teacher math first year middle class 2\\nSara student first year middle class 2',
+    aiPdfUpload: 'Upload PDF',
+    aiPdfHint: 'You can upload a PDF containing the account list, and its text will be extracted automatically.',
+    aiPdfSelected: 'Selected PDF',
+    aiPdfTooLarge: 'PDF is too large. Maximum is 5MB.',
+    aiPdfOnly: 'Choose a PDF file only.',
     generateAccountsAi: 'Generate drafts',
     aiGenerating: 'Generating',
     aiUnavailableLocal: 'This feature works on the deployed website only because it needs Cloudflare Workers AI.',
@@ -4867,17 +4883,44 @@ function DirectorAiAccountImport({
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
   const isLocalFile = typeof window !== 'undefined' && window.location.protocol === 'file:';
 
   const validateDraftForDisplay = (draft: AiAccountDraft) =>
     buildImportedAccountUser(draft, data, currentUser, school, language, new Set(data.users.map((user) => user.email.toLowerCase())));
+
+  const selectPdfFile = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] ?? null;
+
+    if (!file) {
+      setPdfFile(null);
+      return;
+    }
+
+    if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+      setPdfFile(null);
+      setError(tr(language, 'aiPdfOnly'));
+      event.target.value = '';
+      return;
+    }
+
+    if (file.size > MAX_AI_PDF_SIZE) {
+      setPdfFile(null);
+      setError(tr(language, 'aiPdfTooLarge'));
+      event.target.value = '';
+      return;
+    }
+
+    setPdfFile(file);
+    setError('');
+  };
 
   const generateDrafts = async () => {
     if (!school || !currentUser.stage) {
       return;
     }
 
-    if (!rawText.trim()) {
+    if (!rawText.trim() && !pdfFile) {
       setError(tr(language, 'aiImportEmpty'));
       setMessage('');
       return;
@@ -4888,23 +4931,37 @@ function DirectorAiAccountImport({
     setMessage('');
 
     try {
-      const response = await fetch(AI_IMPORT_ENDPOINT, {
-        method: 'POST',
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          text: rawText,
-          language,
-          school: {
-            name: school.name,
-            domain: school.domain,
-            stage: school.stage,
-            streams: school.streams ?? []
-          }
-        })
-      });
+      const schoolPayload = {
+        name: school.name,
+        domain: school.domain,
+        stage: school.stage,
+        streams: school.streams ?? []
+      };
+      const response = pdfFile
+        ? await fetch(AI_IMPORT_ENDPOINT, {
+            method: 'POST',
+            headers: { Accept: 'application/json' },
+            body: (() => {
+              const formData = new FormData();
+              formData.append('text', rawText);
+              formData.append('language', language);
+              formData.append('school', JSON.stringify(schoolPayload));
+              formData.append('file', pdfFile);
+              return formData;
+            })()
+          })
+        : await fetch(AI_IMPORT_ENDPOINT, {
+            method: 'POST',
+            headers: {
+              Accept: 'application/json',
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              text: rawText,
+              language,
+              school: schoolPayload
+            })
+          });
 
       if (!response.ok) {
         throw new Error(`AI import failed with ${response.status}`);
@@ -5052,6 +5109,22 @@ function DirectorAiAccountImport({
           onChange={(event) => setRawText(event.target.value)}
         />
       </label>
+      <label className="file-field ai-pdf-field">
+        <span>{tr(language, 'aiPdfUpload')}</span>
+        <small>{tr(language, 'aiPdfHint')}</small>
+        <input type="file" accept="application/pdf,.pdf" disabled={isGenerating || isLocalFile} onChange={selectPdfFile} />
+        <Upload size={18} aria-hidden="true" />
+      </label>
+      {pdfFile && (
+        <div className="selected-file-row">
+          <span>
+            {tr(language, 'aiPdfSelected')}: {pdfFile.name}
+          </span>
+          <button className="icon-button" type="button" title={tr(language, 'cancel')} disabled={isGenerating} onClick={() => setPdfFile(null)}>
+            <X size={15} aria-hidden="true" />
+          </button>
+        </div>
+      )}
       {isLocalFile && <p className="hint">{tr(language, 'aiUnavailableLocal')}</p>}
       <div className="button-row">
         <button className="button primary" type="button" disabled={isGenerating || isLocalFile} onClick={generateDrafts}>
