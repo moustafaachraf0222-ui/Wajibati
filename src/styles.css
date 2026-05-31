@@ -842,6 +842,11 @@ select option {
   box-shadow: 0 8px 18px rgba(0, 98, 51, 0.1);
 }
 
+.trash-panel .panel-heading > svg {
+  color: var(--rose);
+  background: var(--rose-soft);
+}
+
 .detail-list {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

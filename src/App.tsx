@@ -112,6 +112,7 @@ type SchoolRecord = {
   phone: string;
   directorId?: string;
   streams?: SecondaryStream[];
+  deletedAt?: string;
 };
 
 type PlatformUser = {
@@ -239,6 +240,7 @@ const THEME_KEY = 'school_platform_theme_v1';
 const REMEMBERED_ACCOUNTS_KEY = 'school_platform_remembered_accounts_v1';
 const REMOTE_STATE_ENDPOINT = '/api/state';
 const MAX_ATTACHMENT_SIZE = 1_000_000;
+const SCHOOL_TRASH_RETENTION_MS = 24 * 60 * 60 * 1000;
 
 const languages: Language[] = ['ar', 'fr', 'en'];
 const primarySubjects: Subject[] = [
@@ -438,8 +440,16 @@ const copy: Record<Language, Record<string, string>> = {
     deleteAccountWarning: 'سيتم حذف الحساب والبيانات المرتبطة به نهائياً، ولا يمكن التراجع عن هذا الإجراء.',
     deleteSchoolTitle: 'تأكيد حذف المدرسة',
     deleteSchoolQuestion: 'هل تريد حذف هذه المدرسة؟',
-    deleteSchoolWarning: 'سيتم حذف المدرسة وجميع حساباتها وتمارينها وإعلاناتها وملاحظاتها نهائياً، ولا يمكن التراجع عن هذا الإجراء.',
+    deleteSchoolWarning: 'سيتم نقل المدرسة إلى Trash لمدة 24 ساعة قبل حذفها نهائياً.',
+    forceDeleteSchoolTitle: 'حذف نهائي للمدرسة',
+    forceDeleteSchoolQuestion: 'هل تريد حذف هذه المدرسة نهائياً الآن؟',
+    forceDeleteSchoolWarning: 'سيتم حذف المدرسة وجميع حساباتها وتمارينها وإعلاناتها وملاحظاتها نهائياً، ولا يمكن التراجع عن هذا الإجراء.',
     linkedAccounts: 'الحسابات المرتبطة',
+    schoolTrash: 'Trash',
+    trashHint: 'تبقى المدارس المحذوفة هنا لمدة 24 ساعة قبل الحذف النهائي التلقائي.',
+    deletedAt: 'وقت الحذف',
+    deletesAt: 'الحذف النهائي',
+    forceDelete: 'حذف نهائي',
     editUser: 'تعديل الحساب',
     activate: 'تفعيل',
     disable: 'تعطيل',
@@ -647,8 +657,16 @@ const copy: Record<Language, Record<string, string>> = {
     deleteAccountWarning: 'Le compte et ses données liées seront supprimés définitivement. Cette action est irréversible.',
     deleteSchoolTitle: 'Confirmer la suppression de l’école',
     deleteSchoolQuestion: 'Voulez-vous supprimer cette école ?',
-    deleteSchoolWarning: 'L’école, tous ses comptes, exercices, annonces et notes seront supprimés définitivement. Cette action est irréversible.',
+    deleteSchoolWarning: 'L’école sera déplacée vers Trash pendant 24 heures avant suppression définitive.',
+    forceDeleteSchoolTitle: 'Suppression définitive de l’école',
+    forceDeleteSchoolQuestion: 'Voulez-vous supprimer définitivement cette école maintenant ?',
+    forceDeleteSchoolWarning: 'L’école, tous ses comptes, exercices, annonces et notes seront supprimés définitivement. Cette action est irréversible.',
     linkedAccounts: 'Comptes liés',
+    schoolTrash: 'Trash',
+    trashHint: 'Les écoles supprimées restent ici pendant 24 heures avant la suppression définitive automatique.',
+    deletedAt: 'Supprimée le',
+    deletesAt: 'Suppression définitive',
+    forceDelete: 'Supprimer définitivement',
     editUser: 'Modifier le compte',
     activate: 'Activer',
     disable: 'Désactiver',
@@ -856,8 +874,16 @@ const copy: Record<Language, Record<string, string>> = {
     deleteAccountWarning: 'The account and its related data will be permanently deleted. This action cannot be undone.',
     deleteSchoolTitle: 'Confirm school deletion',
     deleteSchoolQuestion: 'Do you want to delete this school?',
-    deleteSchoolWarning: 'The school and all linked accounts, exercises, announcements, notes, completions, and feedback will be permanently deleted. This action cannot be undone.',
+    deleteSchoolWarning: 'The school will move to Trash for 24 hours before it is permanently deleted.',
+    forceDeleteSchoolTitle: 'Permanently delete school',
+    forceDeleteSchoolQuestion: 'Do you want to permanently delete this school now?',
+    forceDeleteSchoolWarning: 'The school and all linked accounts, exercises, announcements, notes, completions, and feedback will be permanently deleted. This action cannot be undone.',
     linkedAccounts: 'Linked accounts',
+    schoolTrash: 'Trash',
+    trashHint: 'Deleted schools stay here for 24 hours before automatic permanent deletion.',
+    deletedAt: 'Deleted at',
+    deletesAt: 'Permanent deletion',
+    forceDelete: 'Force delete',
     editUser: 'Edit account',
     activate: 'Activate',
     disable: 'Disable',
@@ -2106,6 +2132,19 @@ function monthLabel(language: Language, key: string) {
   return new Intl.DateTimeFormat(localeNames[language], { month: 'long', year: 'numeric' }).format(new Date(year, month - 1, 1));
 }
 
+function formatDateTime(language: Language, value?: string | Date | null) {
+  if (!value) {
+    return '-';
+  }
+
+  const date = typeof value === 'string' ? new Date(value) : value;
+  if (Number.isNaN(date.getTime())) {
+    return '-';
+  }
+
+  return new Intl.DateTimeFormat(localeNames[language], { dateStyle: 'medium', timeStyle: 'short' }).format(date);
+}
+
 function isPastExercise(exercise: Exercise) {
   return Boolean(exercise.dueDate && exercise.dueDate < todayIso());
 }
@@ -2399,7 +2438,7 @@ function normalizePlatformData(value: Partial<PlatformData> | null | undefined):
   const fallback = cloneSeedData();
   const source = value ?? {};
 
-  return {
+  const normalized = {
     ...fallback,
     ...source,
     schools: Array.isArray(source.schools)
@@ -2422,6 +2461,8 @@ function normalizePlatformData(value: Partial<PlatformData> | null | undefined):
       ...(source.settings ?? {})
     }
   };
+
+  return purgeExpiredTrashedSchools(normalized);
 }
 
 async function fetchSharedData() {
@@ -2819,7 +2860,45 @@ function getSchool(data: PlatformData, user?: PlatformUser) {
   return data.schools.find((school) => school.id === user.schoolId);
 }
 
+function schoolIsTrashed(school?: SchoolRecord) {
+  return Boolean(school?.deletedAt);
+}
+
+function schoolTrashExpiresAt(school: SchoolRecord) {
+  if (!school.deletedAt) {
+    return null;
+  }
+
+  const deletedAt = Date.parse(school.deletedAt);
+  if (Number.isNaN(deletedAt)) {
+    return new Date();
+  }
+
+  return new Date(deletedAt + SCHOOL_TRASH_RETENTION_MS);
+}
+
+function schoolTrashIsExpired(school: SchoolRecord, now = Date.now()) {
+  const expiresAt = schoolTrashExpiresAt(school);
+  return Boolean(expiresAt && expiresAt.getTime() <= now);
+}
+
+function userSchoolIsTrashed(data: PlatformData, user: PlatformUser) {
+  if (!user.schoolId) {
+    return false;
+  }
+
+  return schoolIsTrashed(data.schools.find((school) => school.id === user.schoolId));
+}
+
+function canAuthenticateUser(data: PlatformData, user: PlatformUser) {
+  return user.status === 'active' && !userSchoolIsTrashed(data, user);
+}
+
 function userCanSeeSchool(user: PlatformUser, school: SchoolRecord) {
+  if (schoolIsTrashed(school)) {
+    return false;
+  }
+
   if (user.role === 'admin') {
     return true;
   }
@@ -3016,6 +3095,24 @@ function deleteSchoolRecords(previous: PlatformData, target: SchoolRecord): Plat
   };
 }
 
+function trashSchoolRecords(previous: PlatformData, target: SchoolRecord): PlatformData {
+  return {
+    ...previous,
+    schools: previous.schools.map((school) =>
+      school.id === target.id ? { ...school, deletedAt: school.deletedAt ?? new Date().toISOString() } : school
+    )
+  };
+}
+
+function purgeExpiredTrashedSchools(data: PlatformData, now = Date.now()): PlatformData {
+  const expiredSchools = data.schools.filter((school) => schoolIsTrashed(school) && schoolTrashIsExpired(school, now));
+  if (expiredSchools.length === 0) {
+    return data;
+  }
+
+  return expiredSchools.reduce((nextData, school) => deleteSchoolRecords(nextData, school), data);
+}
+
 function makeAccountEditState(target: PlatformUser, data: PlatformData): AccountEditState {
   const school = getSchool(data, target);
   const classGroup = target.classGroup?.trim() ?? '';
@@ -3063,7 +3160,7 @@ function App() {
   const remoteLoadedRef = useRef(false);
   const remoteEnabledRef = useRef(false);
 
-  const currentUser = data.users.find((user) => user.id === sessionUserId && user.status === 'active') ?? null;
+  const currentUser = data.users.find((user) => user.id === sessionUserId && canAuthenticateUser(data, user)) ?? null;
   const tabs = currentUser ? navItems[currentUser.role] : [];
   const safeView = tabs.some((tab) => tab.id === activeView) ? activeView : tabs[0]?.id ?? 'overview';
   const currentSchool = currentUser ? getSchool(data, currentUser) : undefined;
@@ -3157,6 +3254,16 @@ function App() {
 
     return () => window.clearTimeout(saveTimer);
   }, [data]);
+
+  useEffect(() => {
+    const purgeExpiredSchools = () => {
+      setData((previous) => purgeExpiredTrashedSchools(previous));
+    };
+
+    purgeExpiredSchools();
+    const purgeTimer = window.setInterval(purgeExpiredSchools, 60_000);
+    return () => window.clearInterval(purgeTimer);
+  }, []);
 
   useEffect(() => {
     localStorage.setItem(LANGUAGE_KEY, language);
@@ -3368,12 +3475,12 @@ function LoginPage({ data, language, theme, onLanguageChange, onThemeChange, onL
   const [isSubmitting, setIsSubmitting] = useState(false);
   const visibleRememberedAccounts = rememberedAccounts
     .map((remembered) => data.users.find((user) => user.id === remembered.id || user.email.toLowerCase() === remembered.email.toLowerCase()))
-    .filter((user): user is PlatformUser => Boolean(user));
+    .filter((user): user is PlatformUser => Boolean(user && canAuthenticateUser(data, user)));
 
   useEffect(() => {
     const next = pruneRememberedAccounts(data.users);
     setRememberedAccounts((previous) => (rememberedAccountListsEqual(previous, next) ? previous : next));
-  }, [data.users]);
+  }, [data]);
 
   const rememberAccount = (account: PlatformUser) => {
     const next = rememberStoredAccount(account);
@@ -3381,7 +3488,7 @@ function LoginPage({ data, language, theme, onLanguageChange, onThemeChange, onL
   };
 
   const loginWithRememberedAccount = (account: PlatformUser) => {
-    if (account.status === 'disabled') {
+    if (!canAuthenticateUser(data, account)) {
       setError(tr(language, 'disabledAccount'));
       return;
     }
@@ -3413,7 +3520,7 @@ function LoginPage({ data, language, theme, onLanguageChange, onThemeChange, onL
       return;
     }
 
-    if (account.status === 'disabled') {
+    if (!canAuthenticateUser(latestData, account)) {
       setError(tr(language, 'disabledAccount'));
       return;
     }
@@ -3637,9 +3744,12 @@ function DirectorWeeklyReport({ data, currentUser, language }: CommonViewProps) 
 
 function SchoolsView({ data, setData, currentUser, language }: CommonViewProps & { setData: DataSetter }) {
   const schools = data.schools.filter((school) => userCanSeeSchool(currentUser, school));
+  const trashedSchools = currentUser.role === 'admin' ? data.schools.filter(schoolIsTrashed) : [];
   const [pendingDeleteSchool, setPendingDeleteSchool] = useState<SchoolRecord | null>(null);
+  const [pendingForceDeleteSchool, setPendingForceDeleteSchool] = useState<SchoolRecord | null>(null);
   const canDeleteSchools = currentUser.role === 'admin';
   const columns = [tr(language, 'schoolName'), tr(language, 'stage'), tr(language, 'domain'), tr(language, 'city'), tr(language, 'director'), tr(language, 'users')];
+  const trashColumns = [...columns, tr(language, 'deletedAt'), tr(language, 'deletesAt'), tr(language, 'actions')];
 
   if (canDeleteSchools) {
     columns.push(tr(language, 'actions'));
@@ -3650,51 +3760,114 @@ function SchoolsView({ data, setData, currentUser, language }: CommonViewProps &
       return;
     }
 
-    setData((previous) => deleteSchoolRecords(previous, school));
+    setData((previous) => trashSchoolRecords(previous, school));
     setPendingDeleteSchool(null);
   };
 
+  const forceDeleteSchool = (school: SchoolRecord) => {
+    if (!canDeleteSchools) {
+      return;
+    }
+
+    setData((previous) => deleteSchoolRecords(previous, school));
+    setPendingForceDeleteSchool(null);
+  };
+
   return (
-    <section className="panel">
-      <div className="panel-heading">
-        <div>
-          <p>{tr(language, 'allSchools')}</p>
-          <h2>{tr(language, 'schools')}</h2>
+    <section className="content-grid">
+      <div className="panel">
+        <div className="panel-heading">
+          <div>
+            <p>{tr(language, 'allSchools')}</p>
+            <h2>{tr(language, 'schools')}</h2>
+          </div>
+          <School size={24} aria-hidden="true" />
         </div>
-        <School size={24} aria-hidden="true" />
+        <ResponsiveTable columns={columns} emptyText={tr(language, 'noRecords')}>
+          {schools.map((school) => {
+            const director = data.users.find((user) => user.id === school.directorId);
+            const userCount = data.users.filter((user) => user.schoolId === school.id).length;
+            return (
+              <tr key={school.id}>
+                <td>{school.name}</td>
+                <td>{stageNames[language][school.stage]}</td>
+                <td>{school.domain}</td>
+                <td>{school.city}</td>
+                <td>{director?.name ?? '-'}</td>
+                <td>{userCount}</td>
+                {canDeleteSchools && (
+                  <td>
+                    <div className="table-actions">
+                      <button className="icon-button danger" type="button" title={tr(language, 'delete')} onClick={() => setPendingDeleteSchool(school)}>
+                        <Trash2 size={16} aria-hidden="true" />
+                      </button>
+                    </div>
+                  </td>
+                )}
+              </tr>
+            );
+          })}
+        </ResponsiveTable>
       </div>
-      <ResponsiveTable columns={columns} emptyText={tr(language, 'noRecords')}>
-        {schools.map((school) => {
-          const director = data.users.find((user) => user.id === school.directorId);
-          const userCount = data.users.filter((user) => user.schoolId === school.id).length;
-          return (
-            <tr key={school.id}>
-              <td>{school.name}</td>
-              <td>{stageNames[language][school.stage]}</td>
-              <td>{school.domain}</td>
-              <td>{school.city}</td>
-              <td>{director?.name ?? '-'}</td>
-              <td>{userCount}</td>
-              {canDeleteSchools && (
-                <td>
-                  <div className="table-actions">
-                    <button className="icon-button danger" type="button" title={tr(language, 'delete')} onClick={() => setPendingDeleteSchool(school)}>
-                      <Trash2 size={16} aria-hidden="true" />
-                    </button>
-                  </div>
-                </td>
-              )}
-            </tr>
-          );
-        })}
-      </ResponsiveTable>
+      {canDeleteSchools && (
+        <div className="panel trash-panel">
+          <div className="panel-heading">
+            <div>
+              <p>{tr(language, 'trashHint')}</p>
+              <h2>{tr(language, 'schoolTrash')}</h2>
+            </div>
+            <Trash2 size={24} aria-hidden="true" />
+          </div>
+          <ResponsiveTable columns={trashColumns} emptyText={tr(language, 'noRecords')}>
+            {trashedSchools.map((school) => {
+              const director = data.users.find((user) => user.id === school.directorId);
+              const userCount = data.users.filter((user) => user.schoolId === school.id).length;
+              return (
+                <tr key={school.id}>
+                  <td>{school.name}</td>
+                  <td>{stageNames[language][school.stage]}</td>
+                  <td>{school.domain}</td>
+                  <td>{school.city}</td>
+                  <td>{director?.name ?? '-'}</td>
+                  <td>{userCount}</td>
+                  <td>{formatDateTime(language, school.deletedAt)}</td>
+                  <td>{formatDateTime(language, schoolTrashExpiresAt(school))}</td>
+                  <td>
+                    <div className="table-actions">
+                      <button
+                        className="icon-button danger"
+                        type="button"
+                        title={tr(language, 'forceDelete')}
+                        onClick={() => setPendingForceDeleteSchool(school)}
+                      >
+                        <Trash2 size={16} aria-hidden="true" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </ResponsiveTable>
+        </div>
+      )}
       {pendingDeleteSchool && (
         <SchoolDeleteDialog
           school={pendingDeleteSchool}
           userCount={data.users.filter((user) => user.schoolId === pendingDeleteSchool.id).length}
           language={language}
+          mode="trash"
           onCancel={() => setPendingDeleteSchool(null)}
           onConfirm={() => deleteSchool(pendingDeleteSchool)}
+        />
+      )}
+      {pendingForceDeleteSchool && (
+        <SchoolDeleteDialog
+          school={pendingForceDeleteSchool}
+          userCount={data.users.filter((user) => user.schoolId === pendingForceDeleteSchool.id).length}
+          language={language}
+          mode="permanent"
+          onCancel={() => setPendingForceDeleteSchool(null)}
+          onConfirm={() => forceDeleteSchool(pendingForceDeleteSchool)}
         />
       )}
     </section>
@@ -5552,15 +5725,19 @@ function SchoolDeleteDialog({
   school,
   userCount,
   language,
+  mode,
   onConfirm,
   onCancel
 }: {
   school: SchoolRecord;
   userCount: number;
   language: Language;
+  mode: 'trash' | 'permanent';
   onConfirm: () => void;
   onCancel: () => void;
 }) {
+  const isPermanent = mode === 'permanent';
+
   return (
     <div className="modal-backdrop" role="presentation">
       <div className="modal danger-modal" role="dialog" aria-modal="true" aria-labelledby="delete-school-title">
@@ -5569,8 +5746,8 @@ function SchoolDeleteDialog({
         </button>
         <Trash2 size={30} aria-hidden="true" />
         <div>
-          <h2 id="delete-school-title">{tr(language, 'deleteSchoolTitle')}</h2>
-          <p className="modal-copy">{tr(language, 'deleteSchoolQuestion')}</p>
+          <h2 id="delete-school-title">{tr(language, isPermanent ? 'forceDeleteSchoolTitle' : 'deleteSchoolTitle')}</h2>
+          <p className="modal-copy">{tr(language, isPermanent ? 'forceDeleteSchoolQuestion' : 'deleteSchoolQuestion')}</p>
         </div>
         <div className="delete-target-card">
           <strong>{school.name}</strong>
@@ -5579,11 +5756,11 @@ function SchoolDeleteDialog({
             {stageNames[language][school.stage]} - {tr(language, 'linkedAccounts')}: {userCount}
           </small>
         </div>
-        <p className="modal-warning">{tr(language, 'deleteSchoolWarning')}</p>
+        <p className="modal-warning">{tr(language, isPermanent ? 'forceDeleteSchoolWarning' : 'deleteSchoolWarning')}</p>
         <div className="button-row center">
           <button className="button danger" type="button" onClick={onConfirm}>
             <Trash2 size={17} aria-hidden="true" />
-            <span>{tr(language, 'delete')}</span>
+            <span>{tr(language, isPermanent ? 'forceDelete' : 'delete')}</span>
           </button>
           <button className="button ghost" type="button" onClick={onCancel}>
             <X size={17} aria-hidden="true" />
