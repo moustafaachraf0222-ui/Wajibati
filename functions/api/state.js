@@ -1,4 +1,15 @@
 const STATE_ID = 'main';
+const secondaryStreams = [
+  'experimental_science',
+  'mathematics',
+  'civil_engineering',
+  'electrical_engineering',
+  'mechanical_engineering',
+  'process_engineering',
+  'management_economics',
+  'literature_philosophy',
+  'foreign_languages'
+];
 
 const seedData = {
   schools: [],
@@ -45,7 +56,13 @@ function normalizeState(value) {
   return {
     ...structuredClone(seedData),
     ...value,
-    schools: Array.isArray(value.schools) ? value.schools : [],
+    schools: Array.isArray(value.schools)
+      ? value.schools.map((school) =>
+          school.stage === 'secondary' && (!Array.isArray(school.streams) || school.streams.length === 0)
+            ? { ...school, streams: [...secondaryStreams] }
+            : school
+        )
+      : [],
     users: Array.isArray(value.users) ? value.users : seedData.users,
     exercises: Array.isArray(value.exercises) ? value.exercises : [],
     completions: value.completions && typeof value.completions === 'object' ? value.completions : {},
@@ -91,8 +108,15 @@ export async function onRequestGet(context) {
   await ensureStateTable(db);
   const row = await db.prepare('SELECT data, updated_at FROM app_state WHERE id = ?').bind(STATE_ID).first();
   const data = row?.data ? normalizeState(JSON.parse(row.data)) : structuredClone(seedData);
+  const normalizedDataText = JSON.stringify(data);
+  let updatedAt = row?.updated_at ?? null;
 
-  return jsonResponse({ data, updatedAt: row?.updated_at ?? null });
+  if (row?.data && row.data !== normalizedDataText) {
+    updatedAt = new Date().toISOString();
+    await db.prepare('UPDATE app_state SET data = ?, updated_at = ? WHERE id = ?').bind(normalizedDataText, updatedAt, STATE_ID).run();
+  }
+
+  return jsonResponse({ data, updatedAt });
 }
 
 export async function onRequestPost(context) {

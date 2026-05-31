@@ -390,6 +390,7 @@ const copy: Record<Language, Record<string, string>> = {
     role: 'الدور',
     subject: 'المادة',
     subjectAfterYear: 'اختر سنة التدريس أولاً لتظهر المواد المناسبة.',
+    chooseStreamFirst: 'اختر الشعبة والقسم أولاً لتظهر مواد هذه السنة.',
     schoolYear: 'السنة الدراسية',
     schoolYears: 'سنوات التدريس',
     classGroup: 'القسم',
@@ -556,6 +557,7 @@ const copy: Record<Language, Record<string, string>> = {
     role: 'Rôle',
     subject: 'Matière',
     subjectAfterYear: 'Choisissez d’abord l’année enseignée pour afficher les matières adaptées.',
+    chooseStreamFirst: 'Choisissez d’abord la filière et la classe pour afficher les matières.',
     schoolYear: 'Année scolaire',
     schoolYears: 'Années enseignées',
     classGroup: 'Classe',
@@ -722,6 +724,7 @@ const copy: Record<Language, Record<string, string>> = {
     role: 'Role',
     subject: 'Subject',
     subjectAfterYear: 'Choose the teaching year first to show the matching subjects.',
+    chooseStreamFirst: 'Choose the stream and class first to show this year’s subjects.',
     schoolYear: 'School year',
     schoolYears: 'Teaching years',
     classGroup: 'Class',
@@ -1382,11 +1385,20 @@ function teacherSubjectsLabel(language: Language, user: PlatformUser) {
 
 function selectedStreamsForTeacherYear(yearStreamClassGroups: YearStreamClassGroups, school: SchoolRecord | undefined, schoolYear: number) {
   const selectedStreams = Object.keys(normalizeYearStreamClassGroups(yearStreamClassGroups)[String(schoolYear)] ?? {}) as SecondaryStream[];
+  if (school?.stage === 'secondary') {
+    return selectedStreams;
+  }
+
   return selectedStreams.length > 0 ? selectedStreams : secondaryStreamsForYear(school, schoolYear);
 }
 
 function subjectOptionsForTeacherYear(school: SchoolRecord | undefined, yearStreamClassGroups: YearStreamClassGroups, schoolYear: number) {
-  return subjectsForTeacherYear(school, selectedStreamsForTeacherYear(yearStreamClassGroups, school, schoolYear), schoolYear);
+  const selectedStreams = selectedStreamsForTeacherYear(yearStreamClassGroups, school, schoolYear);
+  if (school?.stage === 'secondary' && selectedStreams.length === 0) {
+    return [];
+  }
+
+  return subjectsForTeacherYear(school, selectedStreams, schoolYear);
 }
 
 function normalizeTeacherSubjectsByYear(
@@ -2213,7 +2225,13 @@ function normalizePlatformData(value: Partial<PlatformData> | null | undefined):
   return {
     ...fallback,
     ...source,
-    schools: Array.isArray(source.schools) ? source.schools : fallback.schools,
+    schools: Array.isArray(source.schools)
+      ? source.schools.map((school) =>
+          school.stage === 'secondary' && (!Array.isArray(school.streams) || school.streams.length === 0)
+            ? { ...school, streams: [...secondaryStreams] }
+            : school
+        )
+      : fallback.schools,
     users: Array.isArray(source.users) ? source.users : fallback.users,
     exercises: Array.isArray(source.exercises) ? source.exercises : fallback.exercises,
     completions: source.completions && typeof source.completions === 'object' ? source.completions : fallback.completions,
@@ -3267,7 +3285,7 @@ function AdminUsersPanel({ data, setData, currentUser, language }: CommonViewPro
           address: '',
           phone: '',
           directorId,
-          streams: form.stage === 'secondary' ? [] : undefined
+          streams: form.stage === 'secondary' ? [...secondaryStreams] : undefined
         }
       ],
       users: [
@@ -3333,7 +3351,7 @@ function AdminUsersPanel({ data, setData, currentUser, language }: CommonViewPro
               name: directorEdit.schoolName.trim(),
               stage: directorEdit.stage,
               domain: directorEdit.domain.replace(/^@/, '').trim(),
-              streams: directorEdit.stage === 'secondary' ? school.streams ?? [] : undefined
+              streams: directorEdit.stage === 'secondary' ? (school.streams?.length ? school.streams : [...secondaryStreams]) : undefined
             }
           : school
       ),
@@ -3510,18 +3528,12 @@ function DirectorUsersPanel({ data, setData, currentUser, language }: CommonView
 
     const teacherYearClassGroups = normalizeYearClassGroups(form.yearClassGroups);
     const teacherYearStreamClassGroups = normalizeYearStreamClassGroups(form.yearStreamClassGroups);
-    const teacherSelectedStreams = Object.values(teacherYearStreamClassGroups).flatMap((streams) => Object.keys(streams) as SecondaryStream[]);
     const teacherSubjectsByYear = normalizeTeacherSubjectsByYear(school, form.schoolYears, teacherYearStreamClassGroups, form.subjectsByYear, form.subject);
     const studentClassGroup = form.classChoice === 'custom' ? normalizeClassGroup(form.customClassGroup) : form.classChoice;
     const studentStreamsForYear = secondaryStreamsForYear(school, form.schoolYear);
 
     if (form.role === 'teacher' && form.schoolYears.length === 0) {
       setError(tr(language, 'yearRequired'));
-      return;
-    }
-
-    if (form.role === 'teacher' && form.schoolYears.some((year) => !teacherSubjectsByYear[String(year)])) {
-      setError(tr(language, 'subjectRequired'));
       return;
     }
 
@@ -3557,6 +3569,11 @@ function DirectorUsersPanel({ data, setData, currentUser, language }: CommonView
 
     if (form.role === 'teacher' && currentUser.stage !== 'secondary' && form.schoolYears.some((year) => (teacherYearClassGroups[String(year)] ?? []).length === 0)) {
       setError(tr(language, 'classesRequired'));
+      return;
+    }
+
+    if (form.role === 'teacher' && form.schoolYears.some((year) => !teacherSubjectsByYear[String(year)])) {
+      setError(tr(language, 'subjectRequired'));
       return;
     }
 
@@ -3637,7 +3654,6 @@ function DirectorUsersPanel({ data, setData, currentUser, language }: CommonView
 
   const schoolUsers = scopedUsers(data, currentUser);
   const availableYearLabels = currentUser.stage ? schoolYearNames[language][currentUser.stage] : [];
-  const secondaryStreamsForSchool = enabledSecondaryStreams(school);
   const studentStreamOptions = secondaryStreamsForYear(school, form.schoolYear);
   useEffect(() => {
     if (form.role !== 'teacher') {
@@ -3687,32 +3703,6 @@ function DirectorUsersPanel({ data, setData, currentUser, language }: CommonView
     }
   }, [currentUser.stage, form.role, form.schoolYear, form.stream, studentStreamOptions]);
 
-  useEffect(() => {
-    if (form.role !== 'teacher' || currentUser.stage !== 'secondary' || secondaryStreamsForSchool.length === 0) {
-      return;
-    }
-
-    const normalized = normalizeYearStreamClassGroups(form.yearStreamClassGroups);
-    const missingYear = form.schoolYears.find((year) => Object.keys(normalized[String(year)] ?? {}).length === 0);
-
-    if (missingYear === undefined) {
-      return;
-    }
-
-    setForm((previous) => {
-      const nextGroups = { ...previous.yearStreamClassGroups };
-      form.schoolYears.forEach((year) => {
-        const key = String(year);
-        const streamsForYear = secondaryStreamsForYear(school, year);
-        if (Object.keys(nextGroups[key] ?? {}).length === 0 && streamsForYear[0]) {
-          nextGroups[key] = { [streamsForYear[0]]: ['1'] };
-        }
-      });
-
-      return { ...previous, yearStreamClassGroups: nextGroups };
-    });
-  }, [currentUser.stage, form.role, form.schoolYears, form.yearStreamClassGroups, secondaryStreamsForSchool]);
-
   const toggleTeacherYear = (year: number) => {
     setForm((previous) => {
       const years = previous.schoolYears.includes(year)
@@ -3725,15 +3715,17 @@ function DirectorUsersPanel({ data, setData, currentUser, language }: CommonView
         yearClassGroups[String(year)] = ['1'];
       }
       const streamsForYear = secondaryStreamsForYear(school, year);
-      if (years.includes(year) && currentUser.stage === 'secondary' && !yearStreamClassGroups[String(year)] && streamsForYear[0]) {
-        yearStreamClassGroups[String(year)] = { [streamsForYear[0]]: ['1'] };
+      const streamChoiceByYear = { ...previous.streamChoiceByYear };
+      if (years.includes(year) && currentUser.stage === 'secondary' && streamsForYear[0] && !streamChoiceByYear[String(year)]) {
+        streamChoiceByYear[String(year)] = streamsForYear[0];
       }
       if (!years.includes(year)) {
         delete yearClassGroups[String(year)];
         delete yearStreamClassGroups[String(year)];
+        delete streamChoiceByYear[String(year)];
       }
 
-      return { ...previous, schoolYears: years, yearClassGroups, yearStreamClassGroups };
+      return { ...previous, schoolYears: years, yearClassGroups, yearStreamClassGroups, streamChoiceByYear };
     });
   };
 
@@ -3998,26 +3990,6 @@ function DirectorUsersPanel({ data, setData, currentUser, language }: CommonView
                   return (
                     <div className="year-class-row" key={year}>
                       <strong>{schoolYearLabel(language, currentUser.stage, year)}</strong>
-                      <label className="year-subject-select">
-                        <span>{tr(language, 'subject')}</span>
-                        <select
-                          value={subjectChoice}
-                          disabled={subjectOptionsForYear.length === 0}
-                          onChange={(event) =>
-                            setForm({
-                              ...form,
-                              subjectsByYear: { ...form.subjectsByYear, [key]: event.target.value as Subject }
-                            })
-                          }
-                        >
-                          {subjectOptionsForYear.length === 0 && <option value="">{tr(language, 'subjectRequired')}</option>}
-                          {subjectOptionsForYear.map((subject) => (
-                            <option value={subject} key={subject}>
-                              {subjectNames[language][subject]}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
                       {isSecondaryTeacher ? (
                         <>
                           <div className="class-picker-row">
@@ -4132,6 +4104,28 @@ function DirectorUsersPanel({ data, setData, currentUser, language }: CommonView
                           </div>
                         </>
                       )}
+                      <label className="year-subject-select">
+                        <span>{tr(language, 'subject')}</span>
+                        <select
+                          value={subjectChoice}
+                          disabled={subjectOptionsForYear.length === 0}
+                          onChange={(event) =>
+                            setForm({
+                              ...form,
+                              subjectsByYear: { ...form.subjectsByYear, [key]: event.target.value as Subject }
+                            })
+                          }
+                        >
+                          {subjectOptionsForYear.length === 0 && (
+                            <option value="">{tr(language, isSecondaryTeacher ? 'chooseStreamFirst' : 'subjectRequired')}</option>
+                          )}
+                          {subjectOptionsForYear.map((subject) => (
+                            <option value={subject} key={subject}>
+                              {subjectNames[language][subject]}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
                     </div>
                   );
                 })}
@@ -4282,15 +4276,17 @@ function AccountEditPanel({
         yearClassGroups[String(year)] = ['1'];
       }
       const streamsForYear = secondaryStreamsForYear(targetSchool, year);
-      if (years.includes(year) && editStage === 'secondary' && !yearStreamClassGroups[String(year)] && streamsForYear[0]) {
-        yearStreamClassGroups[String(year)] = { [streamsForYear[0]]: ['1'] };
+      const streamChoiceByYear = { ...previous.streamChoiceByYear };
+      if (years.includes(year) && editStage === 'secondary' && streamsForYear[0] && !streamChoiceByYear[String(year)]) {
+        streamChoiceByYear[String(year)] = streamsForYear[0];
       }
       if (!years.includes(year)) {
         delete yearClassGroups[String(year)];
         delete yearStreamClassGroups[String(year)];
+        delete streamChoiceByYear[String(year)];
       }
 
-      return { ...previous, schoolYears: years, yearClassGroups, yearStreamClassGroups };
+      return { ...previous, schoolYears: years, yearClassGroups, yearStreamClassGroups, streamChoiceByYear };
     });
   };
 
@@ -4394,10 +4390,6 @@ function AccountEditPanel({
         setError(tr(language, 'yearRequired'));
         return;
       }
-      if (edit.schoolYears.some((year) => !teacherSubjectsByYear[String(year)])) {
-        setError(tr(language, 'subjectRequired'));
-        return;
-      }
       if (
         editStage === 'secondary' &&
         edit.schoolYears.some((year) => secondaryStreamsForYear(targetSchool, year).length === 0)
@@ -4424,6 +4416,10 @@ function AccountEditPanel({
       }
       if (editStage !== 'secondary' && edit.schoolYears.some((year) => (teacherYearClassGroups[String(year)] ?? []).length === 0)) {
         setError(tr(language, 'classesRequired'));
+        return;
+      }
+      if (edit.schoolYears.some((year) => !teacherSubjectsByYear[String(year)])) {
+        setError(tr(language, 'subjectRequired'));
         return;
       }
     }
@@ -4463,7 +4459,7 @@ function AccountEditPanel({
               name: edit.schoolName.trim(),
               stage: edit.stage,
               domain: edit.domain.replace(/^@/, '').trim(),
-              streams: edit.stage === 'secondary' ? school.streams ?? [] : undefined
+              streams: edit.stage === 'secondary' ? (school.streams?.length ? school.streams : [...secondaryStreams]) : undefined
             }
           : school
       ),
@@ -4648,26 +4644,6 @@ function AccountEditPanel({
                 return (
                   <div className="year-class-row" key={year}>
                     <strong>{schoolYearLabel(language, editStage, year)}</strong>
-                    <label className="year-subject-select">
-                      <span>{tr(language, 'subject')}</span>
-                      <select
-                        value={subjectChoice}
-                        disabled={subjectOptionsForYear.length === 0}
-                        onChange={(event) =>
-                          setEdit({
-                            ...edit,
-                            subjectsByYear: { ...edit.subjectsByYear, [key]: event.target.value as Subject }
-                          })
-                        }
-                      >
-                        {subjectOptionsForYear.length === 0 && <option value="">{tr(language, 'subjectRequired')}</option>}
-                        {subjectOptionsForYear.map((subject) => (
-                          <option value={subject} key={subject}>
-                            {subjectNames[language][subject]}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
                     {isSecondaryTeacher ? (
                       <>
                         <div className="class-picker-row">
@@ -4761,6 +4737,28 @@ function AccountEditPanel({
                         </div>
                       </>
                     )}
+                    <label className="year-subject-select">
+                      <span>{tr(language, 'subject')}</span>
+                      <select
+                        value={subjectChoice}
+                        disabled={subjectOptionsForYear.length === 0}
+                        onChange={(event) =>
+                          setEdit({
+                            ...edit,
+                            subjectsByYear: { ...edit.subjectsByYear, [key]: event.target.value as Subject }
+                          })
+                        }
+                      >
+                        {subjectOptionsForYear.length === 0 && (
+                          <option value="">{tr(language, isSecondaryTeacher ? 'chooseStreamFirst' : 'subjectRequired')}</option>
+                        )}
+                        {subjectOptionsForYear.map((subject) => (
+                          <option value={subject} key={subject}>
+                            {subjectNames[language][subject]}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
                   </div>
                 );
               })}
