@@ -436,6 +436,10 @@ const copy: Record<Language, Record<string, string>> = {
     deleteAccountTitle: 'تأكيد حذف الحساب',
     deleteAccountQuestion: 'هل تريد حذف هذا الحساب؟',
     deleteAccountWarning: 'سيتم حذف الحساب والبيانات المرتبطة به نهائياً، ولا يمكن التراجع عن هذا الإجراء.',
+    deleteSchoolTitle: 'تأكيد حذف المدرسة',
+    deleteSchoolQuestion: 'هل تريد حذف هذه المدرسة؟',
+    deleteSchoolWarning: 'سيتم حذف المدرسة وجميع حساباتها وتمارينها وإعلاناتها وملاحظاتها نهائياً، ولا يمكن التراجع عن هذا الإجراء.',
+    linkedAccounts: 'الحسابات المرتبطة',
     editUser: 'تعديل الحساب',
     activate: 'تفعيل',
     disable: 'تعطيل',
@@ -641,6 +645,10 @@ const copy: Record<Language, Record<string, string>> = {
     deleteAccountTitle: 'Confirmer la suppression',
     deleteAccountQuestion: 'Voulez-vous supprimer ce compte ?',
     deleteAccountWarning: 'Le compte et ses données liées seront supprimés définitivement. Cette action est irréversible.',
+    deleteSchoolTitle: 'Confirmer la suppression de l’école',
+    deleteSchoolQuestion: 'Voulez-vous supprimer cette école ?',
+    deleteSchoolWarning: 'L’école, tous ses comptes, exercices, annonces et notes seront supprimés définitivement. Cette action est irréversible.',
+    linkedAccounts: 'Comptes liés',
     editUser: 'Modifier le compte',
     activate: 'Activer',
     disable: 'Désactiver',
@@ -846,6 +854,10 @@ const copy: Record<Language, Record<string, string>> = {
     deleteAccountTitle: 'Confirm account deletion',
     deleteAccountQuestion: 'Do you want to delete this account?',
     deleteAccountWarning: 'The account and its related data will be permanently deleted. This action cannot be undone.',
+    deleteSchoolTitle: 'Confirm school deletion',
+    deleteSchoolQuestion: 'Do you want to delete this school?',
+    deleteSchoolWarning: 'The school and all linked accounts, exercises, announcements, notes, completions, and feedback will be permanently deleted. This action cannot be undone.',
+    linkedAccounts: 'Linked accounts',
     editUser: 'Edit account',
     activate: 'Activate',
     disable: 'Disable',
@@ -2969,6 +2981,41 @@ function deleteUserRecords(previous: PlatformData, target: PlatformUser): Platfo
   };
 }
 
+function deleteSchoolRecords(previous: PlatformData, target: SchoolRecord): PlatformData {
+  const removedUserIds = new Set(previous.users.filter((user) => user.schoolId === target.id).map((user) => user.id));
+  const removedExerciseIds = new Set(previous.exercises.filter((exercise) => exercise.schoolId === target.id).map((exercise) => exercise.id));
+
+  return {
+    ...previous,
+    schools: previous.schools.filter((school) => school.id !== target.id),
+    users: previous.users.filter((user) => !removedUserIds.has(user.id)),
+    exercises: previous.exercises.filter((exercise) => !removedExerciseIds.has(exercise.id)),
+    announcements: previous.announcements.filter((announcement) => announcement.schoolId !== target.id),
+    notes: previous.notes.filter((note) => note.schoolId !== target.id),
+    completions: Object.fromEntries(
+      Object.entries(previous.completions)
+        .filter(([userId]) => !removedUserIds.has(userId))
+        .map(([userId, done]) => [userId, done.filter((exerciseId) => !removedExerciseIds.has(exerciseId))])
+    ),
+    completionDates: Object.fromEntries(
+      Object.entries(previous.completionDates)
+        .filter(([userId]) => !removedUserIds.has(userId))
+        .map(([userId, dates]) => [
+          userId,
+          Object.fromEntries(Object.entries(dates).filter(([exerciseId]) => !removedExerciseIds.has(exerciseId)))
+        ])
+    ),
+    feedback: Object.fromEntries(
+      Object.entries(previous.feedback)
+        .filter(([userId]) => !removedUserIds.has(userId))
+        .map(([userId, feedback]) => [
+          userId,
+          Object.fromEntries(Object.entries(feedback).filter(([exerciseId]) => !removedExerciseIds.has(exerciseId)))
+        ])
+    )
+  };
+}
+
 function makeAccountEditState(target: PlatformUser, data: PlatformData): AccountEditState {
   const school = getSchool(data, target);
   const classGroup = target.classGroup?.trim() ?? '';
@@ -3160,7 +3207,7 @@ function App() {
   const renderView = () => {
     switch (safeView) {
       case 'schools':
-        return <SchoolsView data={data} currentUser={currentUser} language={language} />;
+        return <SchoolsView data={data} setData={setData} currentUser={currentUser} language={language} />;
       case 'users':
         return <UsersView data={data} setData={setData} currentUser={currentUser} language={language} />;
       case 'school':
@@ -3588,8 +3635,24 @@ function DirectorWeeklyReport({ data, currentUser, language }: CommonViewProps) 
   );
 }
 
-function SchoolsView({ data, currentUser, language }: CommonViewProps) {
+function SchoolsView({ data, setData, currentUser, language }: CommonViewProps & { setData: DataSetter }) {
   const schools = data.schools.filter((school) => userCanSeeSchool(currentUser, school));
+  const [pendingDeleteSchool, setPendingDeleteSchool] = useState<SchoolRecord | null>(null);
+  const canDeleteSchools = currentUser.role === 'admin';
+  const columns = [tr(language, 'schoolName'), tr(language, 'stage'), tr(language, 'domain'), tr(language, 'city'), tr(language, 'director'), tr(language, 'users')];
+
+  if (canDeleteSchools) {
+    columns.push(tr(language, 'actions'));
+  }
+
+  const deleteSchool = (school: SchoolRecord) => {
+    if (!canDeleteSchools) {
+      return;
+    }
+
+    setData((previous) => deleteSchoolRecords(previous, school));
+    setPendingDeleteSchool(null);
+  };
 
   return (
     <section className="panel">
@@ -3600,10 +3663,7 @@ function SchoolsView({ data, currentUser, language }: CommonViewProps) {
         </div>
         <School size={24} aria-hidden="true" />
       </div>
-      <ResponsiveTable
-        columns={[tr(language, 'schoolName'), tr(language, 'stage'), tr(language, 'domain'), tr(language, 'city'), tr(language, 'director'), tr(language, 'users')]}
-        emptyText={tr(language, 'noRecords')}
-      >
+      <ResponsiveTable columns={columns} emptyText={tr(language, 'noRecords')}>
         {schools.map((school) => {
           const director = data.users.find((user) => user.id === school.directorId);
           const userCount = data.users.filter((user) => user.schoolId === school.id).length;
@@ -3615,10 +3675,28 @@ function SchoolsView({ data, currentUser, language }: CommonViewProps) {
               <td>{school.city}</td>
               <td>{director?.name ?? '-'}</td>
               <td>{userCount}</td>
+              {canDeleteSchools && (
+                <td>
+                  <div className="table-actions">
+                    <button className="icon-button danger" type="button" title={tr(language, 'delete')} onClick={() => setPendingDeleteSchool(school)}>
+                      <Trash2 size={16} aria-hidden="true" />
+                    </button>
+                  </div>
+                </td>
+              )}
             </tr>
           );
         })}
       </ResponsiveTable>
+      {pendingDeleteSchool && (
+        <SchoolDeleteDialog
+          school={pendingDeleteSchool}
+          userCount={data.users.filter((user) => user.schoolId === pendingDeleteSchool.id).length}
+          language={language}
+          onCancel={() => setPendingDeleteSchool(null)}
+          onConfirm={() => deleteSchool(pendingDeleteSchool)}
+        />
+      )}
     </section>
   );
 }
@@ -5455,6 +5533,53 @@ function AccountDeleteDialog({
           </small>
         </div>
         <p className="modal-warning">{tr(language, 'deleteAccountWarning')}</p>
+        <div className="button-row center">
+          <button className="button danger" type="button" onClick={onConfirm}>
+            <Trash2 size={17} aria-hidden="true" />
+            <span>{tr(language, 'delete')}</span>
+          </button>
+          <button className="button ghost" type="button" onClick={onCancel}>
+            <X size={17} aria-hidden="true" />
+            <span>{tr(language, 'cancel')}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SchoolDeleteDialog({
+  school,
+  userCount,
+  language,
+  onConfirm,
+  onCancel
+}: {
+  school: SchoolRecord;
+  userCount: number;
+  language: Language;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="modal-backdrop" role="presentation">
+      <div className="modal danger-modal" role="dialog" aria-modal="true" aria-labelledby="delete-school-title">
+        <button className="icon-button close" type="button" title={tr(language, 'cancel')} onClick={onCancel}>
+          <X size={18} aria-hidden="true" />
+        </button>
+        <Trash2 size={30} aria-hidden="true" />
+        <div>
+          <h2 id="delete-school-title">{tr(language, 'deleteSchoolTitle')}</h2>
+          <p className="modal-copy">{tr(language, 'deleteSchoolQuestion')}</p>
+        </div>
+        <div className="delete-target-card">
+          <strong>{school.name}</strong>
+          <span dir="ltr">{school.domain}</span>
+          <small>
+            {stageNames[language][school.stage]} - {tr(language, 'linkedAccounts')}: {userCount}
+          </small>
+        </div>
+        <p className="modal-warning">{tr(language, 'deleteSchoolWarning')}</p>
         <div className="button-row center">
           <button className="button danger" type="button" onClick={onConfirm}>
             <Trash2 size={17} aria-hidden="true" />
