@@ -3313,8 +3313,8 @@ type LoginProps = {
 };
 
 function LoginPage({ data, language, theme, onLanguageChange, onThemeChange, onLogin, onRefreshData, syncStatus }: LoginProps) {
-  const [email, setEmail] = useState('wajibati@admin.dz');
-  const [password, setPassword] = useState('LATTOUI1qaz0plm@7');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
   const [rememberedAccounts, setRememberedAccounts] = useState<RememberedAccount[]>(loadRememberedAccounts);
   const [error, setError] = useState('');
@@ -3433,11 +3433,11 @@ function LoginPage({ data, language, theme, onLanguageChange, onThemeChange, onL
           <form className="form-stack" onSubmit={submitLogin}>
             <label>
               <span>{tr(language, 'email')}</span>
-              <input value={email} onChange={(event) => setEmail(event.target.value)} type="email" autoComplete="email" />
+              <input value={email} onChange={(event) => setEmail(event.target.value)} type="email" autoComplete="off" />
             </label>
             <label>
               <span>{tr(language, 'password')}</span>
-              <input value={password} onChange={(event) => setPassword(event.target.value)} type="password" autoComplete="current-password" />
+              <input value={password} onChange={(event) => setPassword(event.target.value)} type="password" autoComplete="new-password" />
             </label>
             <label className="remember-row">
               <input name="remember" type="checkbox" checked={rememberMe} onChange={(event) => setRememberMe(event.target.checked)} />
