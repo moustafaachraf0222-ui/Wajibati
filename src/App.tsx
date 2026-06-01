@@ -245,6 +245,7 @@ const REMOTE_STATE_ENDPOINT = import.meta.env.VITE_REMOTE_STATE_ENDPOINT || '/ap
 const MAX_ATTACHMENT_SIZE = 1_000_000;
 const SCHOOL_TRASH_RETENTION_MS = 24 * 60 * 60 * 1000;
 const ANNOUNCEMENT_ACTIVE_MS = 72 * 60 * 60 * 1000;
+const NOTE_ACTIVE_MS = 72 * 60 * 60 * 1000;
 
 const languages: Language[] = ['ar', 'fr', 'en'];
 const primarySubjects: Subject[] = [
@@ -555,6 +556,10 @@ const copy: Record<Language, Record<string, string>> = {
     noteBody: 'نص الملاحظة',
     publishNote: 'نشر الملاحظة',
     teacherNotes: 'ملاحظات الأستاذ',
+    activeNotes: 'الملاحظات الحالية',
+    noteArchive: 'أرشيف الملاحظات',
+    noteArchiveHint: 'تظهر الملاحظات للتلميذ والأستاذ لمدة 72 ساعة، ثم تختفي من حساب التلميذ وتنتقل إلى أرشيف الأستاذ.',
+    noArchivedNotes: 'لا توجد ملاحظات مؤرشفة.',
     attachment: 'مرفق',
     downloadFile: 'تنزيل الملف',
     noNotes: 'لا توجد ملاحظات بعد.',
@@ -790,6 +795,10 @@ const copy: Record<Language, Record<string, string>> = {
     noteBody: 'Texte de la note',
     publishNote: 'Publier la note',
     teacherNotes: 'Notes du professeur',
+    activeNotes: 'Notes actives',
+    noteArchive: 'Archive des notes',
+    noteArchiveHint: 'Les notes restent visibles pour l’élève et l’enseignant pendant 72 heures, puis disparaissent du compte élève et passent dans l’archive de l’enseignant.',
+    noArchivedNotes: 'Aucune note archivée.',
     attachment: 'Pièce jointe',
     downloadFile: 'Télécharger',
     noNotes: 'Aucune note.',
@@ -1025,6 +1034,10 @@ const copy: Record<Language, Record<string, string>> = {
     noteBody: 'Note text',
     publishNote: 'Publish note',
     teacherNotes: 'Teacher notes',
+    activeNotes: 'Active notes',
+    noteArchive: 'Notes archive',
+    noteArchiveHint: 'Notes stay visible to the student and teacher for 72 hours, then disappear from the student account and move to the teacher archive.',
+    noArchivedNotes: 'No archived notes.',
     attachment: 'Attachment',
     downloadFile: 'Download file',
     noNotes: 'No notes yet.',
@@ -2242,6 +2255,20 @@ function isAnnouncementArchived(announcement: Announcement, now = Date.now()) {
 
 function canViewAnnouncementArchive(user: PlatformUser) {
   return user.role === 'admin' || user.role === 'director';
+}
+
+function noteExpiresAt(note: TeacherNote) {
+  const createdAt = Date.parse(note.createdAt);
+  if (Number.isNaN(createdAt)) {
+    return null;
+  }
+
+  return new Date(createdAt + NOTE_ACTIVE_MS);
+}
+
+function isNoteArchived(note: TeacherNote, now = Date.now()) {
+  const expiresAt = noteExpiresAt(note);
+  return Boolean(expiresAt && expiresAt.getTime() <= now);
 }
 
 function isPastExercise(exercise: Exercise) {
@@ -6038,6 +6065,17 @@ function AttachmentPreview({ attachment, language }: { attachment: UploadedAttac
   );
 }
 
+function useTimeTick(intervalMs = 60_000) {
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), intervalMs);
+    return () => window.clearInterval(timer);
+  }, [intervalMs]);
+
+  return now;
+}
+
 function AnnouncementsView({ data, setData, currentUser, language }: CommonViewProps & { setData: DataSetter }) {
   const school = getSchool(data, currentUser);
   const scopedAnnouncementList = scopedAnnouncements(data, currentUser);
@@ -6187,6 +6225,7 @@ function NotesView({ data, setData, currentUser, language }: CommonViewProps & {
 
 function TeacherNotes({ data, setData, currentUser, language }: CommonViewProps & { setData: DataSetter }) {
   const school = getSchool(data, currentUser);
+  const now = useTimeTick();
   const teacherYearClassGroups = assignedYearClassGroups(currentUser);
   const teacherYearStreamClassGroups = assignedYearStreamClassGroups(currentUser);
   const hasStreamAssignments = Object.keys(teacherYearStreamClassGroups).length > 0;
@@ -6211,6 +6250,8 @@ function TeacherNotes({ data, setData, currentUser, language }: CommonViewProps 
   });
   const [error, setError] = useState('');
   const notes = scopedNotes(data, currentUser).sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+  const activeNotes = notes.filter((note) => !isNoteArchived(note, now));
+  const archivedNotes = notes.filter((note) => isNoteArchived(note, now));
   const streamOptionsForSelectedYear = teacherStreamsForYear(form.targetSchoolYear);
   const streamRequired = currentUser.stage === 'secondary';
 
@@ -6358,46 +6399,75 @@ function TeacherNotes({ data, setData, currentUser, language }: CommonViewProps 
           </button>
         </form>
       </div>
-      <NotesList notes={notes} data={data} language={language} />
+      <NotesList notes={activeNotes} data={data} language={language} titleKey="activeNotes" emptyKey="noNotes" archived={false} />
+      <NotesList
+        notes={archivedNotes}
+        data={data}
+        language={language}
+        titleKey="noteArchive"
+        subtitleKey="noteArchiveHint"
+        emptyKey="noArchivedNotes"
+        archived
+      />
     </section>
   );
 }
 
 function StudentNotes({ data, currentUser, language }: CommonViewProps) {
-  const notes = scopedNotes(data, currentUser).sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+  const now = useTimeTick();
+  const notes = scopedNotes(data, currentUser)
+    .filter((note) => !isNoteArchived(note, now))
+    .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
 
   return (
     <section className="content-grid">
-      <NotesList notes={notes} data={data} language={language} />
+      <NotesList notes={notes} data={data} language={language} titleKey="activeNotes" emptyKey="noNotes" archived={false} />
     </section>
   );
 }
 
-function NotesList({ notes, data, language }: { notes: TeacherNote[]; data: PlatformData; language: Language }) {
+function NotesList({
+  notes,
+  data,
+  language,
+  titleKey = 'teacherNotes',
+  subtitleKey = 'scopedData',
+  emptyKey = 'noNotes',
+  archived = false
+}: {
+  notes: TeacherNote[];
+  data: PlatformData;
+  language: Language;
+  titleKey?: string;
+  subtitleKey?: string;
+  emptyKey?: string;
+  archived?: boolean;
+}) {
   return (
     <div className="panel">
       <div className="panel-heading">
         <div>
-          <p>{tr(language, 'scopedData')}</p>
-          <h2>{tr(language, 'teacherNotes')}</h2>
+          <p>{tr(language, subtitleKey)}</p>
+          <h2>{tr(language, titleKey)}</h2>
         </div>
-        <MessageSquare size={24} aria-hidden="true" />
+        {archived ? <Archive size={24} aria-hidden="true" /> : <MessageSquare size={24} aria-hidden="true" />}
       </div>
       <div className="message-list">
-        {notes.length === 0 && <p className="empty-state">{tr(language, 'noNotes')}</p>}
+        {notes.length === 0 && <p className="empty-state">{tr(language, emptyKey)}</p>}
         {notes.map((note) => {
           const teacher = data.users.find((user) => user.id === note.teacherId);
           return (
-            <article className="message-card" key={note.id}>
+            <article className={archived ? 'message-card archived-message-card' : 'message-card'} key={note.id}>
               <div className="message-card-head">
                 <h3>{note.title}</h3>
-                <small>{new Date(note.createdAt).toLocaleDateString(localeNames[language])}</small>
+                <small>{formatDateTime(language, note.createdAt)}</small>
               </div>
               <div className="message-meta">
                 {note.subject && <span>{subjectNames[language][note.subject]}</span>}
                 {note.schoolYear && <span>{schoolYearLabel(language, note.stage, note.schoolYear)}</span>}
                 {note.stream && <span>{secondaryStreamLabel(language, note.stream, note.schoolYear)}</span>}
                 {note.classGroup && <span>{tr(language, 'classGroup')} {note.classGroup}</span>}
+                <span>{tr(language, archived ? 'archivedAt' : 'visibleUntil')}: {formatDateTime(language, noteExpiresAt(note))}</span>
               </div>
               <p>{note.body}</p>
               {note.attachment && <AttachmentPreview attachment={note.attachment} language={language} />}
