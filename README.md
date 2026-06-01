@@ -65,8 +65,9 @@ If the binding is missing, the app falls back to local browser storage and accou
 
 ## Android APK
 
-The Android project is configured as a WebView shell for `https://wajibati.pages.dev`.
+The Android project is configured as a live WebView shell for `https://wajibati.pages.dev`.
 After installing the APK, normal website updates appear in the app after the site is redeployed, without rebuilding the APK each time. The APK requires an internet connection.
+The live APK uses package id `dz.wajibati.live` and disables the WebView cache on launch so it does not keep an old bundled website view.
 
 ## Current Storage Note
 

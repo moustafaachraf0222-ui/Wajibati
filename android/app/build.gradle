@@ -1,10 +1,10 @@
 apply plugin: 'com.android.application'
 
 android {
-    namespace = "dz.wajibati.app"
+    namespace = "dz.wajibati.live"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "dz.wajibati.app"
+        applicationId "dz.wajibati.live"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
