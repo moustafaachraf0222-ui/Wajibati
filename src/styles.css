@@ -271,25 +271,7 @@ img {
 
 .login-hero-title span {
   display: inline-block;
-  color: transparent;
-  background: linear-gradient(90deg, #006233 0 38%, #ffffff 38% 58%, #d21034 58% 100%);
-  background-clip: text;
-  -webkit-background-clip: text;
-  -webkit-text-stroke: 1px rgba(0, 98, 51, 0.2);
-  filter: drop-shadow(0 10px 18px rgba(0, 98, 51, 0.14));
-}
-
-:root[data-theme="dark"] .login-hero-title span {
-  -webkit-text-stroke-color: rgba(255, 255, 255, 0.28);
-  filter: drop-shadow(0 12px 22px rgba(0, 0, 0, 0.34));
-}
-
-.login-flag-strip {
-  width: min(220px, 74%);
-  height: 6px;
-  border-radius: 999px;
-  background: linear-gradient(90deg, #006233 0 42%, #ffffff 42% 58%, #d21034 58% 100%);
-  box-shadow: 0 8px 18px rgba(0, 98, 51, 0.12);
+  color: var(--ink);
 }
 
 .login-hero-lead {
@@ -2489,10 +2471,6 @@ summary.subject-group-heading:hover .subject-icon svg {
 
   .login-hero {
     gap: 8px;
-  }
-
-  .login-flag-strip {
-    width: min(180px, 70%);
   }
 
   .login-hero-lead {

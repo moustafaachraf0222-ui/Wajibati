@@ -633,7 +633,7 @@ const copy: Record<Language, Record<string, string>> = {
     appInfoWhyText: 'Parce que la communication entre la famille et l’école est la base de la réussite de l’élève. Wajibati rend cette communication simple, transparente et accessible à tous.',
     loginTitle: 'Connexion',
     loginSubtitle: 'Connectez-vous pour suivre les devoirs des élèves.',
-    loginHeroTitle: 'واجباتي',
+    loginHeroTitle: 'Wajibati',
     loginHeroSubtitle: 'Commencez le parcours de votre enfant vers un avenir scolaire brillant',
     loginHeroText: 'Suivez ses devoirs, surveillez ses progrès et devenez un vrai partenaire de sa réussite',
     email: 'E-mail',
@@ -875,7 +875,7 @@ const copy: Record<Language, Record<string, string>> = {
     appInfoWhyText: 'Because communication between family and school is the foundation of student success. Wajibati makes that communication simple, transparent, and accessible to everyone.',
     loginTitle: 'Sign in',
     loginSubtitle: 'Sign in to follow student homework.',
-    loginHeroTitle: 'واجباتي',
+    loginHeroTitle: 'Wajibati',
     loginHeroSubtitle: 'Start your child’s journey toward a bright academic future',
     loginHeroText: 'Follow your child’s homework, track progress, and become a real partner in their success',
     email: 'Email',
@@ -3733,7 +3733,6 @@ function LoginPage({ data, language, theme, onLanguageChange, onThemeChange, onL
             <h1 className="login-hero-title">
               <span>{tr(language, 'loginHeroTitle')}</span>
             </h1>
-            <span className="login-flag-strip" aria-hidden="true" />
             <p className="login-hero-lead">{tr(language, 'loginHeroSubtitle')}</p>
             <p className="login-hero-copy">{tr(language, 'loginHeroText')}</p>
           </div>
