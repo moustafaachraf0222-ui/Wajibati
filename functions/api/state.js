@@ -29,6 +29,7 @@ const seedData = {
   completions: {},
   completionDates: {},
   feedback: {},
+  pushTokens: {},
   deletedSchoolIds: [],
   settings: {
     allowExerciseImages: true,
@@ -81,7 +82,8 @@ function applyDeletedSchoolTombstones(data) {
         userId,
         feedback && typeof feedback === 'object' ? Object.fromEntries(Object.entries(feedback).filter(([exerciseId]) => !removedExerciseIds.has(exerciseId))) : {}
       ])
-    )
+    ),
+    pushTokens: Object.fromEntries(Object.entries(data.pushTokens).filter(([userId]) => !removedUserIds.has(userId)))
   };
 }
 
@@ -117,6 +119,7 @@ function normalizeState(value) {
     completions: value.completions && typeof value.completions === 'object' ? value.completions : {},
     completionDates: value.completionDates && typeof value.completionDates === 'object' ? value.completionDates : {},
     feedback: value.feedback && typeof value.feedback === 'object' ? value.feedback : {},
+    pushTokens: value.pushTokens && typeof value.pushTokens === 'object' ? value.pushTokens : {},
     deletedSchoolIds: Array.isArray(value.deletedSchoolIds) ? uniqueStrings(value.deletedSchoolIds) : [],
     settings: {
       ...seedData.settings,
@@ -149,6 +152,243 @@ async function ensureStateTable(db) {
 
 function getDb(context) {
   return context.env.DB;
+}
+
+const subjectNames = {
+  math: 'الرياضيات',
+  arabic: 'اللغة العربية',
+  science: 'العلوم الطبيعية',
+  physics: 'الفيزياء',
+  history: 'التاريخ والجغرافيا',
+  primary_history: 'التاريخ والجغرافيا',
+  geography: 'الجغرافيا',
+  french: 'اللغة الفرنسية',
+  english: 'اللغة الإنجليزية',
+  islamic_education: 'التربية الإسلامية',
+  civic_education: 'التربية المدنية',
+  scientific_technology: 'التربية العلمية والتكنولوجية',
+  art_education: 'التربية الفنية',
+  music_education: 'التربية الموسيقية',
+  arabic_literature: 'اللغة العربية وآدابها',
+  life_science: 'علوم الطبيعة والحياة',
+  physical_science_technology: 'العلوم الفيزيائية والتكنولوجيا',
+  islamic_science: 'العلوم الإسلامية',
+  philosophy: 'الفلسفة',
+  computer_science: 'الإعلام الآلي',
+  physical_education: 'التربية البدنية والرياضية',
+  tamazight: 'الأمازيغية',
+  civil_engineering_subject: 'هندسة مدنية',
+  electrical_engineering_subject: 'هندسة كهربائية',
+  mechanical_engineering_subject: 'هندسة ميكانيكية',
+  process_engineering_subject: 'هندسة الطرائق',
+  physical_sciences: 'العلوم الفيزيائية',
+  technology: 'التكنولوجيا',
+  spanish: 'اللغة الإسبانية',
+  german: 'اللغة الألمانية',
+  italian: 'اللغة الإيطالية'
+};
+
+function sameClassGroup(left, right) {
+  return String(left ?? '').trim().toLowerCase() === String(right ?? '').trim().toLowerCase();
+}
+
+function studentMatchesTarget(target, student) {
+  if (
+    student.role !== 'student' ||
+    student.status !== 'active' ||
+    student.schoolId !== target.schoolId ||
+    student.stage !== target.stage ||
+    student.schoolYear !== target.schoolYear ||
+    !sameClassGroup(student.classGroup, target.classGroup)
+  ) {
+    return false;
+  }
+
+  return target.stage === 'secondary' ? Boolean(student.stream && target.stream && student.stream === target.stream) : true;
+}
+
+function createdRecords(previousRecords, nextRecords) {
+  const previousIds = new Set(previousRecords.map((record) => record.id));
+  return nextRecords.filter((record) => record.id && !previousIds.has(record.id));
+}
+
+function targetUsersForExercise(data, exercise) {
+  return data.users.filter((user) => studentMatchesTarget(exercise, user));
+}
+
+function targetUsersForNote(data, note) {
+  return data.users.filter((user) => studentMatchesTarget(note, user));
+}
+
+function targetUsersForAnnouncement(data, announcement) {
+  return data.users.filter(
+    (user) =>
+      user.status === 'active' &&
+      user.schoolId === announcement.schoolId &&
+      (user.role === 'teacher' || user.role === 'student')
+  );
+}
+
+function tokensForUsers(data, users) {
+  const tokenSet = new Set();
+  users.forEach((user) => {
+    const records = data.pushTokens[user.id] ?? [];
+    records.forEach((record) => {
+      if (record?.token) {
+        tokenSet.add(record.token);
+      }
+    });
+  });
+  return [...tokenSet];
+}
+
+function base64UrlEncode(input) {
+  const bytes = typeof input === 'string' ? new TextEncoder().encode(input) : new Uint8Array(input);
+  let binary = '';
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+}
+
+function pemToArrayBuffer(pem) {
+  const normalized = pem.replace(/\\n/g, '\n').replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\s/g, '');
+  const binary = atob(normalized);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes.buffer;
+}
+
+function firebaseServiceAccount(env) {
+  if (env.FIREBASE_SERVICE_ACCOUNT) {
+    return JSON.parse(env.FIREBASE_SERVICE_ACCOUNT);
+  }
+
+  if (env.FIREBASE_PROJECT_ID && env.FIREBASE_CLIENT_EMAIL && env.FIREBASE_PRIVATE_KEY) {
+    return {
+      project_id: env.FIREBASE_PROJECT_ID,
+      client_email: env.FIREBASE_CLIENT_EMAIL,
+      private_key: env.FIREBASE_PRIVATE_KEY
+    };
+  }
+
+  return null;
+}
+
+async function firebaseAccessToken(serviceAccount) {
+  const issuedAt = Math.floor(Date.now() / 1000);
+  const header = base64UrlEncode(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
+  const claim = base64UrlEncode(
+    JSON.stringify({
+      iss: serviceAccount.client_email,
+      scope: 'https://www.googleapis.com/auth/firebase.messaging',
+      aud: 'https://oauth2.googleapis.com/token',
+      iat: issuedAt,
+      exp: issuedAt + 3600
+    })
+  );
+  const unsignedToken = `${header}.${claim}`;
+  const key = await crypto.subtle.importKey(
+    'pkcs8',
+    pemToArrayBuffer(serviceAccount.private_key),
+    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const signature = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', key, new TextEncoder().encode(unsignedToken));
+  const assertion = `${unsignedToken}.${base64UrlEncode(signature)}`;
+
+  const response = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+      assertion
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error(`Firebase access token failed with ${response.status}`);
+  }
+
+  const payload = await response.json();
+  return payload.access_token;
+}
+
+async function sendFirebaseNotification(env, tokens, notification, data = {}) {
+  const serviceAccount = firebaseServiceAccount(env);
+  if (!serviceAccount || tokens.length === 0) {
+    return;
+  }
+
+  const accessToken = await firebaseAccessToken(serviceAccount);
+  const endpoint = `https://fcm.googleapis.com/v1/projects/${serviceAccount.project_id}/messages:send`;
+  await Promise.allSettled(
+    tokens.map((token) =>
+      fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          message: {
+            token,
+            notification,
+            data: Object.fromEntries(Object.entries(data).map(([key, value]) => [key, String(value)])),
+            android: {
+              priority: 'HIGH'
+            }
+          }
+        })
+      })
+    )
+  );
+}
+
+async function sendNotificationsForChanges(env, previousData, nextData) {
+  const notifications = [];
+
+  createdRecords(previousData.exercises, nextData.exercises).forEach((exercise) => {
+    const subjectName = subjectNames[exercise.subject] ?? 'مادة';
+    notifications.push({
+      users: targetUsersForExercise(nextData, exercise),
+      notification: {
+        title: `تمرين ${subjectName} جديد`,
+        body: exercise.title || 'تم نشر تمرين جديد لك.'
+      },
+      data: { type: 'exercise', id: exercise.id }
+    });
+  });
+
+  createdRecords(previousData.notes, nextData.notes).forEach((note) => {
+    const subjectName = note.subject ? subjectNames[note.subject] : '';
+    notifications.push({
+      users: targetUsersForNote(nextData, note),
+      notification: {
+        title: subjectName ? `ملاحظة ${subjectName} جديدة` : 'ملاحظة جديدة',
+        body: note.title || 'تم نشر ملاحظة جديدة لك.'
+      },
+      data: { type: 'note', id: note.id }
+    });
+  });
+
+  createdRecords(previousData.announcements, nextData.announcements).forEach((announcement) => {
+    notifications.push({
+      users: targetUsersForAnnouncement(nextData, announcement),
+      notification: {
+        title: 'إعلان مدرسي',
+        body: announcement.title || 'تم نشر إعلان جديد.'
+      },
+      data: { type: 'announcement', id: announcement.id }
+    });
+  });
+
+  await Promise.allSettled(
+    notifications.map((item) => sendFirebaseNotification(env, tokensForUsers(nextData, item.users), item.notification, item.data))
+  );
 }
 
 export async function onRequestGet(context) {
@@ -205,6 +445,13 @@ export async function onRequestPost(context) {
     .prepare('UPDATE app_state SET data = ?, updated_at = ? WHERE id = ?')
     .bind(JSON.stringify(data), updatedAt, STATE_ID)
     .run();
+
+  const notificationTask = sendNotificationsForChanges(context.env, existingData, data).catch(() => undefined);
+  if (typeof context.waitUntil === 'function') {
+    context.waitUntil(notificationTask);
+  } else {
+    await notificationTask;
+  }
 
   return jsonResponse({ ok: true, updatedAt });
 }

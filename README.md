@@ -69,6 +69,16 @@ The Android project is configured as a live WebView shell for `https://wajibati.
 After installing the APK, normal website updates appear in the app after the site is redeployed, without rebuilding the APK each time. The APK requires an internet connection.
 The live APK uses package id `dz.wajibati.live` and disables the WebView cache on launch so it does not keep an old bundled website view.
 
+## Push Notifications
+
+The Android app uses Firebase Cloud Messaging. Keep these files out of Git:
+
+- `android/app/google-services.json`
+- `firebase-service-account.json`
+
+To let Cloudflare send notifications, save the Firebase service account JSON as a Pages secret named `FIREBASE_SERVICE_ACCOUNT`.
+The app sends notifications for new teacher exercises, teacher notes, and school announcements.
+
 ## Current Storage Note
 
 `localStorage` is now only used as a local fallback/cache. The online shared data source is Cloudflare D1.

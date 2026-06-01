@@ -43,6 +43,8 @@ import {
   Users,
   X
 } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
+import { PushNotifications, type Token } from '@capacitor/push-notifications';
 import { useEffect, useRef, useState, type ChangeEvent, type Dispatch, type FormEvent, type ReactNode, type SetStateAction } from 'react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -186,6 +188,12 @@ type HomeworkFeedback = {
   updatedAt: string;
 };
 
+type PushTokenRecord = {
+  token: string;
+  platform: string;
+  updatedAt: string;
+};
+
 type PlatformData = {
   schools: SchoolRecord[];
   users: PlatformUser[];
@@ -195,6 +203,7 @@ type PlatformData = {
   completions: Record<string, string[]>;
   completionDates: Record<string, Record<string, string>>;
   feedback: Record<string, Record<string, HomeworkFeedback>>;
+  pushTokens: Record<string, PushTokenRecord[]>;
   deletedSchoolIds: string[];
   settings: {
     allowExerciseImages: boolean;
@@ -1353,6 +1362,7 @@ const seedData: PlatformData = {
   completions: {},
   completionDates: {},
   feedback: {},
+  pushTokens: {},
   deletedSchoolIds: [],
   settings: {
     allowExerciseImages: true,
@@ -2569,6 +2579,29 @@ function cloneSeedData(): PlatformData {
   return JSON.parse(JSON.stringify(seedData)) as PlatformData;
 }
 
+function upsertPushToken(data: PlatformData, userId: string, token: string): PlatformData {
+  const trimmedToken = token.trim();
+  if (!trimmedToken) {
+    return data;
+  }
+
+  const nextRecord: PushTokenRecord = {
+    token: trimmedToken,
+    platform: Capacitor.getPlatform(),
+    updatedAt: new Date().toISOString()
+  };
+  const currentTokens = data.pushTokens[userId] ?? [];
+  const nextTokens = [nextRecord, ...currentTokens.filter((record) => record.token !== trimmedToken)].slice(0, 5);
+
+  return {
+    ...data,
+    pushTokens: {
+      ...data.pushTokens,
+      [userId]: nextTokens
+    }
+  };
+}
+
 function normalizePlatformData(value: Partial<PlatformData> | null | undefined): PlatformData {
   const fallback = cloneSeedData();
   const source = value ?? {};
@@ -2591,6 +2624,7 @@ function normalizePlatformData(value: Partial<PlatformData> | null | undefined):
     completionDates:
       source.completionDates && typeof source.completionDates === 'object' ? source.completionDates : fallback.completionDates,
     feedback: source.feedback && typeof source.feedback === 'object' ? source.feedback : fallback.feedback,
+    pushTokens: source.pushTokens && typeof source.pushTokens === 'object' ? source.pushTokens : fallback.pushTokens,
     deletedSchoolIds: Array.isArray(source.deletedSchoolIds) ? uniqueStrings(source.deletedSchoolIds.filter((id): id is string => typeof id === 'string')) : fallback.deletedSchoolIds,
     settings: {
       ...fallback.settings,
@@ -3201,7 +3235,8 @@ function deleteUserRecords(previous: PlatformData, target: PlatformUser): Platfo
           userId,
           Object.fromEntries(Object.entries(feedback).filter(([exerciseId]) => !removedExerciseIds.includes(exerciseId)))
         ])
-    )
+    ),
+    pushTokens: Object.fromEntries(Object.entries(previous.pushTokens).filter(([userId]) => userId !== target.id))
   };
 }
 
@@ -3241,7 +3276,8 @@ function applyDeletedSchoolTombstones(data: PlatformData): PlatformData {
           userId,
           Object.fromEntries(Object.entries(feedback).filter(([exerciseId]) => !removedExerciseIds.has(exerciseId)))
         ])
-    )
+    ),
+    pushTokens: Object.fromEntries(Object.entries(data.pushTokens).filter(([userId]) => !removedUserIds.has(userId)))
   };
 }
 
@@ -3454,6 +3490,51 @@ function App() {
       localStorage.removeItem(SESSION_KEY);
     }
   }, [sessionUserId]);
+
+  useEffect(() => {
+    if (!currentUser || syncStatus === 'checking' || !Capacitor.isNativePlatform()) {
+      return;
+    }
+
+    let cancelled = false;
+    const listenerHandles: Array<{ remove: () => Promise<void> }> = [];
+
+    const registerForPush = async () => {
+      try {
+        let permissions = await PushNotifications.checkPermissions();
+        if (permissions.receive === 'prompt') {
+          permissions = await PushNotifications.requestPermissions();
+        }
+
+        if (permissions.receive !== 'granted') {
+          return;
+        }
+
+        const registrationHandle = await PushNotifications.addListener('registration', (token: Token) => {
+          if (!cancelled) {
+            setData((previous) => upsertPushToken(previous, currentUser.id, token.value));
+          }
+        });
+        listenerHandles.push(registrationHandle);
+
+        const errorHandle = await PushNotifications.addListener('registrationError', () => undefined);
+        listenerHandles.push(errorHandle);
+
+        await PushNotifications.register();
+      } catch {
+        // Push registration is best effort; the website must still work normally without it.
+      }
+    };
+
+    registerForPush();
+
+    return () => {
+      cancelled = true;
+      listenerHandles.forEach((handle) => {
+        handle.remove().catch(() => undefined);
+      });
+    };
+  }, [currentUser?.id, syncStatus]);
 
   useEffect(() => {
     if (currentUser) {

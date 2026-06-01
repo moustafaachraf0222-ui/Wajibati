@@ -5,6 +5,8 @@ dist/
 *.log
 *.tsbuildinfo
 *.local
+firebase-service-account.json
+android/app/google-services.json
 
 .DS_Store
 Thumbs.db
