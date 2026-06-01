@@ -207,6 +207,7 @@ type PlatformData = {
   pushTokens: Record<string, PushTokenRecord[]>;
   deletedSchoolIds: string[];
   deletedExerciseIds: string[];
+  deletedNoteIds: string[];
   settings: {
     allowExerciseImages: boolean;
     maintenanceMode: boolean;
@@ -1373,6 +1374,7 @@ const seedData: PlatformData = {
   pushTokens: {},
   deletedSchoolIds: [],
   deletedExerciseIds: [],
+  deletedNoteIds: [],
   settings: {
     allowExerciseImages: true,
     maintenanceMode: false
@@ -2644,6 +2646,9 @@ function normalizePlatformData(value: Partial<PlatformData> | null | undefined):
     deletedExerciseIds: Array.isArray(source.deletedExerciseIds)
       ? uniqueStrings(source.deletedExerciseIds.filter((id): id is string => typeof id === 'string'))
       : fallback.deletedExerciseIds,
+    deletedNoteIds: Array.isArray(source.deletedNoteIds)
+      ? uniqueStrings(source.deletedNoteIds.filter((id): id is string => typeof id === 'string'))
+      : fallback.deletedNoteIds,
     settings: {
       ...fallback.settings,
       ...(source.settings ?? {})
@@ -2722,7 +2727,8 @@ function mergeDeletionTombstones(baseData: PlatformData, sourceData: PlatformDat
   return applyDeletionTombstones({
     ...baseData,
     deletedSchoolIds: uniqueStrings([...baseData.deletedSchoolIds, ...sourceData.deletedSchoolIds]),
-    deletedExerciseIds: uniqueStrings([...baseData.deletedExerciseIds, ...sourceData.deletedExerciseIds])
+    deletedExerciseIds: uniqueStrings([...baseData.deletedExerciseIds, ...sourceData.deletedExerciseIds]),
+    deletedNoteIds: uniqueStrings([...baseData.deletedNoteIds, ...sourceData.deletedNoteIds])
   });
 }
 
@@ -2735,6 +2741,7 @@ function hasUserData(data: PlatformData) {
     data.notes.length > 0 ||
     data.deletedSchoolIds.length > 0 ||
     data.deletedExerciseIds.length > 0 ||
+    data.deletedNoteIds.length > 0 ||
     Object.keys(data.completions).length > 0 ||
     Object.keys(data.completionDates).length > 0 ||
     Object.keys(data.feedback).length > 0
@@ -2751,6 +2758,7 @@ function isSeedOnlyData(data: PlatformData) {
     data.users[0]?.id === seedData.users[0].id &&
     data.deletedSchoolIds.length === 0 &&
     data.deletedExerciseIds.length === 0 &&
+    data.deletedNoteIds.length === 0 &&
     Object.keys(data.completions).length === 0 &&
     Object.keys(data.completionDates).length === 0 &&
     Object.keys(data.feedback).length === 0
@@ -2766,7 +2774,8 @@ async function promoteLocalDataIfRemoteIsEmpty(sharedData: PlatformData, localDa
   const mergedData = mergeDeletionTombstones(sharedData, localData);
   if (
     mergedData.deletedSchoolIds.length !== sharedData.deletedSchoolIds.length ||
-    mergedData.deletedExerciseIds.length !== sharedData.deletedExerciseIds.length
+    mergedData.deletedExerciseIds.length !== sharedData.deletedExerciseIds.length ||
+    mergedData.deletedNoteIds.length !== sharedData.deletedNoteIds.length
   ) {
     await saveSharedData(mergedData);
     return mergedData;
@@ -3263,6 +3272,7 @@ function canDeleteUser(currentUser: PlatformUser, target: PlatformUser) {
 function deleteUserRecords(previous: PlatformData, target: PlatformUser): PlatformData {
   const removedExerciseIds =
     target.role === 'teacher' ? previous.exercises.filter((exercise) => exercise.teacherId === target.id).map((exercise) => exercise.id) : [];
+  const removedNoteIds = target.role === 'teacher' ? previous.notes.filter((note) => note.teacherId === target.id).map((note) => note.id) : [];
 
   return {
     ...previous,
@@ -3293,7 +3303,8 @@ function deleteUserRecords(previous: PlatformData, target: PlatformUser): Platfo
         ])
     ),
     pushTokens: Object.fromEntries(Object.entries(previous.pushTokens).filter(([userId]) => userId !== target.id)),
-    deletedExerciseIds: uniqueStrings([...previous.deletedExerciseIds, ...removedExerciseIds])
+    deletedExerciseIds: uniqueStrings([...previous.deletedExerciseIds, ...removedExerciseIds]),
+    deletedNoteIds: uniqueStrings([...previous.deletedNoteIds, ...removedNoteIds])
   };
 }
 
@@ -3365,8 +3376,20 @@ function applyDeletedExerciseTombstones(data: PlatformData): PlatformData {
   };
 }
 
+function applyDeletedNoteTombstones(data: PlatformData): PlatformData {
+  const deletedNoteIds = new Set(data.deletedNoteIds);
+  if (deletedNoteIds.size === 0) {
+    return data;
+  }
+
+  return {
+    ...data,
+    notes: data.notes.filter((note) => !deletedNoteIds.has(note.id))
+  };
+}
+
 function applyDeletionTombstones(data: PlatformData): PlatformData {
-  return applyDeletedExerciseTombstones(applyDeletedSchoolTombstones(data));
+  return applyDeletedNoteTombstones(applyDeletedExerciseTombstones(applyDeletedSchoolTombstones(data)));
 }
 
 function deleteSchoolRecords(previous: PlatformData, target: SchoolRecord): PlatformData {
@@ -6597,6 +6620,19 @@ function TeacherNotes({ data, setData, currentUser, language }: CommonViewProps 
     setError('');
   };
 
+  const deleteNote = (note: TeacherNote) => {
+    if (note.teacherId !== currentUser.id) {
+      return;
+    }
+
+    setData((previous) =>
+      applyDeletedNoteTombstones({
+        ...previous,
+        deletedNoteIds: uniqueStrings([...previous.deletedNoteIds, note.id])
+      })
+    );
+  };
+
   return (
     <section className="content-grid">
       <div className="panel">
@@ -6678,7 +6714,7 @@ function TeacherNotes({ data, setData, currentUser, language }: CommonViewProps 
           </button>
         </form>
       </div>
-      <NotesList notes={activeNotes} data={data} language={language} titleKey="activeNotes" emptyKey="noNotes" archived={false} />
+      <NotesList notes={activeNotes} data={data} language={language} titleKey="activeNotes" emptyKey="noNotes" archived={false} onDelete={deleteNote} />
       <NotesList
         notes={archivedNotes}
         data={data}
@@ -6687,6 +6723,7 @@ function TeacherNotes({ data, setData, currentUser, language }: CommonViewProps 
         subtitleKey="noteArchiveHint"
         emptyKey="noArchivedNotes"
         archived
+        onDelete={deleteNote}
       />
     </section>
   );
@@ -6712,7 +6749,8 @@ function NotesList({
   titleKey = 'teacherNotes',
   subtitleKey = 'scopedData',
   emptyKey = 'noNotes',
-  archived = false
+  archived = false,
+  onDelete
 }: {
   notes: TeacherNote[];
   data: PlatformData;
@@ -6721,6 +6759,7 @@ function NotesList({
   subtitleKey?: string;
   emptyKey?: string;
   archived?: boolean;
+  onDelete?: (note: TeacherNote) => void;
 }) {
   return (
     <div className="panel">
@@ -6751,6 +6790,14 @@ function NotesList({
               <p>{note.body}</p>
               {note.attachment && <AttachmentPreview attachment={note.attachment} language={language} />}
               <small>{teacher?.name ?? '-'}</small>
+              {onDelete && (
+                <div className="button-row">
+                  <button className="button danger" type="button" onClick={() => onDelete(note)}>
+                    <Trash2 size={16} aria-hidden="true" />
+                    <span>{tr(language, 'delete')}</span>
+                  </button>
+                </div>
+              )}
             </article>
           );
         })}

@@ -32,6 +32,7 @@ const seedData = {
   pushTokens: {},
   deletedSchoolIds: [],
   deletedExerciseIds: [],
+  deletedNoteIds: [],
   settings: {
     allowExerciseImages: true,
     maintenanceMode: false
@@ -118,8 +119,20 @@ function applyDeletedExerciseTombstones(data) {
   };
 }
 
+function applyDeletedNoteTombstones(data) {
+  const deletedNoteIds = new Set(data.deletedNoteIds ?? []);
+  if (deletedNoteIds.size === 0) {
+    return data;
+  }
+
+  return {
+    ...data,
+    notes: data.notes.filter((note) => !deletedNoteIds.has(note.id))
+  };
+}
+
 function applyDeletionTombstones(data) {
-  return applyDeletedExerciseTombstones(applyDeletedSchoolTombstones(data));
+  return applyDeletedNoteTombstones(applyDeletedExerciseTombstones(applyDeletedSchoolTombstones(data)));
 }
 
 function jsonResponse(body, init = {}) {
@@ -157,6 +170,7 @@ function normalizeState(value) {
     pushTokens: value.pushTokens && typeof value.pushTokens === 'object' ? value.pushTokens : {},
     deletedSchoolIds: Array.isArray(value.deletedSchoolIds) ? uniqueStrings(value.deletedSchoolIds) : [],
     deletedExerciseIds: Array.isArray(value.deletedExerciseIds) ? uniqueStrings(value.deletedExerciseIds) : [],
+    deletedNoteIds: Array.isArray(value.deletedNoteIds) ? uniqueStrings(value.deletedNoteIds) : [],
     settings: {
       ...seedData.settings,
       ...(value.settings ?? {})
@@ -306,7 +320,8 @@ function mergeState(existingData, incomingData) {
     feedback: mergeNestedMaps(existingData.feedback, incomingData.feedback, chooseLatestFeedback),
     pushTokens: mergePushTokens(existingData.pushTokens, incomingData.pushTokens),
     deletedSchoolIds: uniqueStrings([...(existingData.deletedSchoolIds ?? []), ...(incomingData.deletedSchoolIds ?? [])]),
-    deletedExerciseIds: uniqueStrings([...(existingData.deletedExerciseIds ?? []), ...(incomingData.deletedExerciseIds ?? [])])
+    deletedExerciseIds: uniqueStrings([...(existingData.deletedExerciseIds ?? []), ...(incomingData.deletedExerciseIds ?? [])]),
+    deletedNoteIds: uniqueStrings([...(existingData.deletedNoteIds ?? []), ...(incomingData.deletedNoteIds ?? [])])
   });
 }
 
