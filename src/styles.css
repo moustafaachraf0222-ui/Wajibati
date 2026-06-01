@@ -1747,6 +1747,7 @@ tbody tr.account-details-row:hover td {
 
 .homework-subject-groups,
 .teacher-exercise-groups,
+.teacher-year-group,
 .teacher-exercise-stream {
   display: grid;
   gap: 16px;
@@ -1755,24 +1756,51 @@ tbody tr.account-details-row:hover td {
 .homework-subject-group,
 .teacher-class-group {
   display: grid;
-  gap: 12px;
+  gap: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  overflow: hidden;
+}
+
+.teacher-year-group {
   padding-top: 14px;
   border-top: 1px solid var(--line);
 }
 
-.homework-subject-group:first-child,
-.teacher-class-group:first-child {
+.teacher-year-group:first-child {
   padding-top: 0;
   border-top: 0;
 }
 
 .subject-group-heading,
+.teacher-year-heading,
 .teacher-stream-heading,
 .teacher-class-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+summary.subject-group-heading,
+summary.teacher-class-heading {
+  min-height: 58px;
+  padding: 10px 12px;
+  background: var(--paper-soft);
+  cursor: pointer;
+  list-style: none;
+}
+
+summary.subject-group-heading::-webkit-details-marker,
+summary.teacher-class-heading::-webkit-details-marker {
+  display: none;
+}
+
+.homework-subject-group > .exercise-grid,
+.teacher-class-group > .exercise-grid {
+  padding: 12px;
+  border-top: 1px solid var(--line);
 }
 
 .subject-title {
@@ -1789,6 +1817,7 @@ tbody tr.account-details-row:hover td {
 }
 
 .subject-title strong,
+.teacher-year-heading span,
 .teacher-stream-heading span,
 .teacher-class-heading span {
   color: var(--ink);
@@ -1818,18 +1847,19 @@ tbody tr.account-details-row:hover td {
 }
 
 .subject-title:hover .subject-icon,
-.homework-subject-group:hover .subject-icon {
+summary.subject-group-heading:hover .subject-icon {
   transform: translateY(-1px);
   box-shadow: 0 8px 18px rgba(0, 98, 51, 0.1);
 }
 
 .subject-title:hover .subject-icon svg,
-.homework-subject-group:hover .subject-icon svg {
+summary.subject-group-heading:hover .subject-icon svg {
   transform: scale(1.12) rotate(-4deg);
   stroke-width: 2.5;
 }
 
 .subject-count,
+.teacher-year-heading strong,
 .teacher-stream-heading strong,
 .teacher-class-heading small {
   min-width: 30px;
@@ -1842,6 +1872,30 @@ tbody tr.account-details-row:hover td {
   place-items: center;
   font-size: 0.86rem;
   font-weight: 800;
+}
+
+.subject-summary-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  flex: 0 0 auto;
+}
+
+.subject-summary-actions svg {
+  transition: transform 0.18s ease;
+}
+
+.homework-subject-group[open] > summary .subject-summary-actions svg,
+.teacher-class-group[open] > summary .subject-summary-actions svg {
+  transform: rotate(180deg);
+}
+
+.teacher-year-heading {
+  min-height: 44px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  background: var(--teal-soft);
 }
 
 .teacher-exercise-stream {
@@ -2299,7 +2353,7 @@ tbody tr.account-details-row:hover td {
   .stat-card:hover > svg,
   .brand:hover .brand-mark svg,
   .subject-title:hover .subject-icon svg,
-  .homework-subject-group:hover .subject-icon svg,
+  summary.subject-group-heading:hover .subject-icon svg,
   .panel:hover > .panel-heading > svg {
     transform: none;
   }

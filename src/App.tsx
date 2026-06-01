@@ -2111,26 +2111,43 @@ function streamIndex(stream: SecondaryStream | '') {
   return index === -1 ? Number.MAX_SAFE_INTEGER : index;
 }
 
-function groupExercisesByStreamAndClass(exercises: Exercise[]) {
-  const streamMap = new Map<SecondaryStream | '', Map<string, Exercise[]>>();
+function yearIndex(year: number | '') {
+  return year === '' ? Number.MAX_SAFE_INTEGER : year;
+}
+
+function groupExercisesByTeacherTarget(exercises: Exercise[]) {
+  const yearMap = new Map<number | '', Map<SecondaryStream | '', Map<string, Exercise[]>>>();
 
   [...exercises].sort(sortExercises).forEach((exercise) => {
+    const year = exercise.schoolYear ?? '';
     const stream = exercise.stream ?? '';
     const classGroup = exercise.classGroup?.trim() || '-';
+    const streamMap = yearMap.get(year) ?? new Map<SecondaryStream | '', Map<string, Exercise[]>>();
     const classMap = streamMap.get(stream) ?? new Map<string, Exercise[]>();
     classMap.set(classGroup, [...(classMap.get(classGroup) ?? []), exercise]);
     streamMap.set(stream, classMap);
+    yearMap.set(year, streamMap);
   });
 
-  return [...streamMap.entries()]
-    .sort(([left], [right]) => streamIndex(left) - streamIndex(right))
-    .map(([stream, classMap]) => ({
-      stream,
-      count: [...classMap.values()].reduce((total, groupExercises) => total + groupExercises.length, 0),
-      classes: [...classMap.entries()]
-        .sort(([left], [right]) => left.localeCompare(right, undefined, { numeric: true, sensitivity: 'base' }))
-        .map(([classGroup, classExercises]) => ({ classGroup, exercises: classExercises }))
-    }));
+  return [...yearMap.entries()]
+    .sort(([left], [right]) => yearIndex(left) - yearIndex(right))
+    .map(([schoolYear, streamMap]) => {
+      const streams = [...streamMap.entries()]
+        .sort(([left], [right]) => streamIndex(left) - streamIndex(right))
+        .map(([stream, classMap]) => ({
+          stream,
+          count: [...classMap.values()].reduce((total, groupExercises) => total + groupExercises.length, 0),
+          classes: [...classMap.entries()]
+            .sort(([left], [right]) => left.localeCompare(right, undefined, { numeric: true, sensitivity: 'base' }))
+            .map(([classGroup, classExercises]) => ({ classGroup, exercises: classExercises }))
+        }));
+
+      return {
+        schoolYear,
+        count: streams.reduce((total, streamGroup) => total + streamGroup.count, 0),
+        streams
+      };
+    });
 }
 
 function todayIso() {
@@ -6862,8 +6879,8 @@ function StudentExercises({ data, setData, currentUser, language }: CommonViewPr
             )
           ];
           return (
-            <section className="homework-subject-group" key={group.subject}>
-              <div className="subject-group-heading">
+            <details className="homework-subject-group" key={group.subject}>
+              <summary className="subject-group-heading">
                 <div className="subject-title">
                   <span className="subject-icon">
                     <Icon size={19} aria-hidden="true" />
@@ -6876,8 +6893,11 @@ function StudentExercises({ data, setData, currentUser, language }: CommonViewPr
                     </small>
                   </div>
                 </div>
-                <span className="subject-count">{group.exercises.length}</span>
-              </div>
+                <span className="subject-summary-actions">
+                  <span className="subject-count">{group.exercises.length}</span>
+                  <ChevronDown size={17} aria-hidden="true" />
+                </span>
+              </summary>
               <div className="exercise-grid">
                 {group.exercises.map((exercise) => {
                   const teacher = data.users.find((user) => user.id === exercise.teacherId);
@@ -6913,7 +6933,7 @@ function StudentExercises({ data, setData, currentUser, language }: CommonViewPr
                   );
                 })}
               </div>
-            </section>
+            </details>
           );
         })}
       </div>
@@ -6984,7 +7004,7 @@ function ExerciseList({
 }) {
   const activeTeacherExercises = currentUser.role === 'teacher' ? exercises.filter((exercise) => !isPastExercise(exercise)) : exercises;
   const archivedTeacherExercises = currentUser.role === 'teacher' ? exercises.filter(isPastExercise) : [];
-  const teacherGroups = currentUser.role === 'teacher' ? groupExercisesByStreamAndClass(activeTeacherExercises) : [];
+  const teacherGroups = currentUser.role === 'teacher' ? groupExercisesByTeacherTarget(activeTeacherExercises) : [];
   const archiveGroups = currentUser.role === 'teacher' ? groupExercisesByMonth(archivedTeacherExercises, language) : [];
   const renderExerciseCard = (exercise: Exercise) => {
     const teacher = data.users.find((user) => user.id === exercise.teacherId);
@@ -7073,23 +7093,37 @@ function ExerciseList({
         <div className="teacher-exercise-groups">
           {exercises.length === 0 && <p className="empty-state">{tr(language, 'noRecords')}</p>}
           {activeTeacherExercises.length === 0 && exercises.length > 0 && <p className="empty-state">{tr(language, 'homeworkArchive')}</p>}
-          {teacherGroups.map((streamGroup) => {
-            const firstExercise = streamGroup.classes.flatMap((classGroup) => classGroup.exercises)[0];
+          {teacherGroups.map((yearGroup) => {
+            const firstExercise = yearGroup.streams.flatMap((streamGroup) => streamGroup.classes.flatMap((classGroup) => classGroup.exercises))[0];
             return (
-              <section className="teacher-exercise-stream" key={streamGroup.stream || 'no-stream'}>
-                {currentUser.stage === 'secondary' && (
-                  <div className="teacher-stream-heading">
-                    <span>{streamGroup.stream ? secondaryStreamLabel(language, streamGroup.stream, firstExercise?.schoolYear) : '-'}</span>
-                    <strong>{streamGroup.count}</strong>
-                  </div>
-                )}
-                {streamGroup.classes.map((classGroup) => (
-                  <section className="teacher-class-group" key={`${streamGroup.stream || 'no-stream'}-${classGroup.classGroup}`}>
-                    <div className="teacher-class-heading">
-                      <span>{tr(language, 'classGroup')} {classGroup.classGroup}</span>
-                      <small>{classGroup.exercises.length}</small>
-                    </div>
-                    <div className="exercise-grid compact-list">{classGroup.exercises.map(renderExerciseCard)}</div>
+              <section className="teacher-year-group" key={String(yearGroup.schoolYear || 'no-year')}>
+                <div className="teacher-year-heading">
+                  <span>{yearGroup.schoolYear ? schoolYearLabel(language, firstExercise?.stage, yearGroup.schoolYear) : '-'}</span>
+                  <strong>{yearGroup.count}</strong>
+                </div>
+                {yearGroup.streams.map((streamGroup) => (
+                  <section className="teacher-exercise-stream" key={`${yearGroup.schoolYear || 'no-year'}-${streamGroup.stream || 'no-stream'}`}>
+                    {currentUser.stage === 'secondary' && (
+                      <div className="teacher-stream-heading">
+                        <span>{streamGroup.stream ? secondaryStreamLabel(language, streamGroup.stream, firstExercise?.schoolYear) : '-'}</span>
+                        <strong>{streamGroup.count}</strong>
+                      </div>
+                    )}
+                    {streamGroup.classes.map((classGroup) => (
+                      <details
+                        className="teacher-class-group"
+                        key={`${yearGroup.schoolYear || 'no-year'}-${streamGroup.stream || 'no-stream'}-${classGroup.classGroup}`}
+                      >
+                        <summary className="teacher-class-heading">
+                          <span>{tr(language, 'classGroup')} {classGroup.classGroup}</span>
+                          <span className="subject-summary-actions">
+                            <small>{classGroup.exercises.length}</small>
+                            <ChevronDown size={17} aria-hidden="true" />
+                          </span>
+                        </summary>
+                        <div className="exercise-grid compact-list">{classGroup.exercises.map(renderExerciseCard)}</div>
+                      </details>
+                    ))}
                   </section>
                 ))}
               </section>
