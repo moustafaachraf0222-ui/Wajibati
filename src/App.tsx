@@ -377,8 +377,8 @@ const subjectIcons: Record<Subject, LucideIcon> = {
 
 const copy: Record<Language, Record<string, string>> = {
   ar: {
-    appTitle: 'نظام إدارة منصة مدرسية',
-    appSubtitle: 'لوحة تشغيل بصلاحيات مدرسية واضحة',
+    appTitle: 'واجباتي',
+    appSubtitle: 'منصة تربط الأسرة بالمدرسة',
     appInfo: 'معلومات عن المنصة',
     appInfoTitle: 'واجباتي 📚',
     appInfoText: 'منصة واجباتي هي منصة تعليمية تربط الأسرة بالمدرسة، تتيح للأساتذة والإدارة نشر التمارين والواجبات مباشرةً، بحيث يستطيع ولي الأمر متابعة مسيرة تعلّم ابنه بكل سهولة ووضوح.',
@@ -390,7 +390,10 @@ const copy: Record<Language, Record<string, string>> = {
     appInfoWhyTitle: '💡 لماذا واجباتي؟',
     appInfoWhyText: 'لأن التواصل بين الأسرة والمدرسة هو أساس نجاح التلميذ. واجباتي تجعل هذا التواصل بسيطاً وشفافاً وفي متناول الجميع.',
     loginTitle: 'تسجيل الدخول',
-    loginSubtitle: 'ابدأ بحساب المشرف العام الوحيد في النظام.',
+    loginSubtitle: 'ادخل إلى حسابك لمتابعة واجبات التلاميذ.',
+    loginHeroTitle: 'واجباتي',
+    loginHeroSubtitle: 'ابدأ رحلتك مع ابنك نحو مستقبل أكاديمي مشرق',
+    loginHeroText: 'تابع واجبات طفلك، راقب تقدمه الدراسي، وكن شريكًا حقيقيًا في نجاحه',
     email: 'البريد الإلكتروني',
     password: 'كلمة المرور',
     signIn: 'دخول',
@@ -616,8 +619,8 @@ const copy: Record<Language, Record<string, string>> = {
     weeklyReportSummary: 'ملخص الأسبوع'
   },
   fr: {
-    appTitle: 'Système de gestion scolaire',
-    appSubtitle: 'Tableau de bord avec permissions par rôle',
+    appTitle: 'واجباتي',
+    appSubtitle: 'Plateforme famille-école',
     appInfo: 'Informations sur la plateforme',
     appInfoTitle: 'Wajibati 📚',
     appInfoText: 'Wajibati est une plateforme éducative qui relie la famille à l’école. Elle permet aux enseignants et à l’administration de publier directement exercices et devoirs, afin que le parent puisse suivre le parcours d’apprentissage de son enfant avec simplicité et clarté.',
@@ -629,7 +632,10 @@ const copy: Record<Language, Record<string, string>> = {
     appInfoWhyTitle: '💡 Pourquoi Wajibati ?',
     appInfoWhyText: 'Parce que la communication entre la famille et l’école est la base de la réussite de l’élève. Wajibati rend cette communication simple, transparente et accessible à tous.',
     loginTitle: 'Connexion',
-    loginSubtitle: 'Connectez-vous avec le seul compte administrateur initial.',
+    loginSubtitle: 'Connectez-vous pour suivre les devoirs des élèves.',
+    loginHeroTitle: 'واجباتي',
+    loginHeroSubtitle: 'Commencez le parcours de votre enfant vers un avenir scolaire brillant',
+    loginHeroText: 'Suivez ses devoirs, surveillez ses progrès et devenez un vrai partenaire de sa réussite',
     email: 'E-mail',
     password: 'Mot de passe',
     signIn: 'Se connecter',
@@ -855,8 +861,8 @@ const copy: Record<Language, Record<string, string>> = {
     weeklyReportSummary: 'Résumé de la semaine'
   },
   en: {
-    appTitle: 'School Platform Management System',
-    appSubtitle: 'Role-based operational dashboard',
+    appTitle: 'واجباتي',
+    appSubtitle: 'Family-school homework platform',
     appInfo: 'About the platform',
     appInfoTitle: 'Wajibati 📚',
     appInfoText: 'Wajibati is an educational platform that connects families with the school. It allows teachers and administration to publish exercises and homework directly, so parents can follow their child’s learning path with clarity and ease.',
@@ -868,7 +874,10 @@ const copy: Record<Language, Record<string, string>> = {
     appInfoWhyTitle: '💡 Why Wajibati?',
     appInfoWhyText: 'Because communication between family and school is the foundation of student success. Wajibati makes that communication simple, transparent, and accessible to everyone.',
     loginTitle: 'Sign in',
-    loginSubtitle: 'Start with the only initial administrator account.',
+    loginSubtitle: 'Sign in to follow student homework.',
+    loginHeroTitle: 'واجباتي',
+    loginHeroSubtitle: 'Start your child’s journey toward a bright academic future',
+    loginHeroText: 'Follow your child’s homework, track progress, and become a real partner in their success',
     email: 'Email',
     password: 'Password',
     signIn: 'Sign in',
@@ -3720,18 +3729,15 @@ function LoginPage({ data, language, theme, onLanguageChange, onThemeChange, onL
           </button>
         </div>
         <div className="login-copy">
-          <div className="brand compact">
-            <div className="brand-mark">
-              <School size={24} aria-hidden="true" />
-            </div>
-            <div>
-              <strong>{tr(language, 'appTitle')}</strong>
-              <span>{tr(language, 'appSubtitle')}</span>
-            </div>
+          <div className="login-hero">
+            <h1 className="login-hero-title">
+              <span>{tr(language, 'loginHeroTitle')}</span>
+            </h1>
+            <span className="login-flag-strip" aria-hidden="true" />
+            <p className="login-hero-lead">{tr(language, 'loginHeroSubtitle')}</p>
+            <p className="login-hero-copy">{tr(language, 'loginHeroText')}</p>
           </div>
 
-          <h1>{tr(language, 'loginTitle')}</h1>
-          <p>{tr(language, 'loginSubtitle')}</p>
           <SyncIndicator status={syncStatus} language={language} compact />
 
           {visibleRememberedAccounts.length > 0 && (
