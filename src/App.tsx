@@ -241,7 +241,7 @@ const SESSION_KEY = 'school_platform_session_v2';
 const LANGUAGE_KEY = 'school_platform_language_v1';
 const THEME_KEY = 'school_platform_theme_v1';
 const REMEMBERED_ACCOUNTS_KEY = 'school_platform_remembered_accounts_v1';
-const REMOTE_STATE_ENDPOINT = '/api/state';
+const REMOTE_STATE_ENDPOINT = import.meta.env.VITE_REMOTE_STATE_ENDPOINT || '/api/state';
 const MAX_ATTACHMENT_SIZE = 1_000_000;
 const SCHOOL_TRASH_RETENTION_MS = 24 * 60 * 60 * 1000;
 
@@ -2511,7 +2511,7 @@ function normalizePlatformData(value: Partial<PlatformData> | null | undefined):
 }
 
 async function fetchSharedData() {
-  if (window.location.protocol === 'file:') {
+  if (window.location.protocol === 'file:' && !REMOTE_STATE_ENDPOINT.startsWith('http')) {
     return null;
   }
 
@@ -2529,7 +2529,7 @@ async function fetchSharedData() {
 }
 
 async function saveSharedData(data: PlatformData) {
-  if (window.location.protocol === 'file:') {
+  if (window.location.protocol === 'file:' && !REMOTE_STATE_ENDPOINT.startsWith('http')) {
     return;
   }
 

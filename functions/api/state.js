@@ -38,7 +38,10 @@ const seedData = {
 
 const jsonHeaders = {
   'Content-Type': 'application/json; charset=utf-8',
-  'Cache-Control': 'no-store'
+  'Cache-Control': 'no-store',
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Accept, Content-Type'
 };
 
 function uniqueStrings(values) {
@@ -166,6 +169,13 @@ export async function onRequestGet(context) {
   }
 
   return jsonResponse({ data, updatedAt });
+}
+
+export async function onRequestOptions() {
+  return new Response(null, {
+    status: 204,
+    headers: jsonHeaders
+  });
 }
 
 export async function onRequestPost(context) {
