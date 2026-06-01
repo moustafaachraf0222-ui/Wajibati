@@ -2179,12 +2179,53 @@ tbody tr.account-details-row:hover td {
   color: var(--teal);
 }
 
+.modal.app-info-modal {
+  width: min(560px, 100%);
+  max-height: min(720px, calc(100vh - 40px));
+  overflow-y: auto;
+  justify-items: stretch;
+  text-align: start;
+}
+
 .modal.app-info-modal > svg {
   width: 46px;
   height: 46px;
   padding: 9px;
   border-radius: 50%;
   background: var(--teal-soft);
+  justify-self: center;
+}
+
+.modal.app-info-modal h2 {
+  text-align: center;
+}
+
+.app-info-content {
+  display: grid;
+  gap: 16px;
+}
+
+.app-info-section {
+  display: grid;
+  gap: 8px;
+}
+
+.app-info-section h3 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.app-info-list {
+  margin: 0;
+  padding-inline-start: 22px;
+  color: var(--muted);
+  line-height: 1.75;
+}
+
+.app-info-modal .button.primary {
+  justify-self: center;
 }
 
 .modal.danger-modal > svg {

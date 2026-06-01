@@ -378,9 +378,15 @@ const copy: Record<Language, Record<string, string>> = {
     appTitle: 'نظام إدارة منصة مدرسية',
     appSubtitle: 'لوحة تشغيل بصلاحيات مدرسية واضحة',
     appInfo: 'معلومات عن المنصة',
-    appInfoTitle: 'عن منصة واجباتي',
-    appInfoText: 'منصة واجباتي تساعد المدارس على إدارة الحسابات والواجبات والإعلانات والملاحظات حسب صلاحيات المشرف والمدير والأستاذ والتلميذ.',
-    appInfoPrivacy: 'تحتاج إلى حساب مفعل من المدرسة للدخول إلى المنصة.',
+    appInfoTitle: 'واجباتي 📚',
+    appInfoText: 'منصة واجباتي هي منصة تعليمية تربط الأسرة بالمدرسة، تتيح للأساتذة والإدارة نشر التمارين والواجبات مباشرةً، بحيث يستطيع ولي الأمر متابعة مسيرة تعلّم ابنه بكل سهولة ووضوح.',
+    appInfoOfferTitle: '🎯 ماذا تقدم المنصة؟',
+    appInfoOfferText: 'يقوم الأستاذ أو الإدارة بنشر التمارين على المنصة، فتصبح متاحة لولي الأمر ليطّلع على ما يدرسه التلميذ، ويكتشف النقاط التي تحتاج إلى تطوير، ويساعد ابنه في حلّها بشكل مباشر وفعّال.',
+    appInfoAudienceTitle: '👨‍👩‍👧 لمن هي المنصة؟',
+    appInfoStudentAudience: 'التلاميذ — لمتابعة واجباتهم وتمارينهم في مكان واحد',
+    appInfoParentAudience: 'أولياء الأمور — لمعرفة مستوى أبنائهم ودعمهم في المنزل',
+    appInfoWhyTitle: '💡 لماذا واجباتي؟',
+    appInfoWhyText: 'لأن التواصل بين الأسرة والمدرسة هو أساس نجاح التلميذ. واجباتي تجعل هذا التواصل بسيطاً وشفافاً وفي متناول الجميع.',
     loginTitle: 'تسجيل الدخول',
     loginSubtitle: 'ابدأ بحساب المشرف العام الوحيد في النظام.',
     email: 'البريد الإلكتروني',
@@ -601,9 +607,15 @@ const copy: Record<Language, Record<string, string>> = {
     appTitle: 'Système de gestion scolaire',
     appSubtitle: 'Tableau de bord avec permissions par rôle',
     appInfo: 'Informations sur la plateforme',
-    appInfoTitle: 'À propos de Wajibati',
-    appInfoText: 'Wajibati aide les écoles à gérer les comptes, devoirs, annonces et notes selon les rôles administrateur, directeur, enseignant et élève.',
-    appInfoPrivacy: 'Un compte actif fourni par l’école est nécessaire pour accéder à la plateforme.',
+    appInfoTitle: 'Wajibati 📚',
+    appInfoText: 'Wajibati est une plateforme éducative qui relie la famille à l’école. Elle permet aux enseignants et à l’administration de publier directement exercices et devoirs, afin que le parent puisse suivre le parcours d’apprentissage de son enfant avec simplicité et clarté.',
+    appInfoOfferTitle: '🎯 Que propose la plateforme ?',
+    appInfoOfferText: 'L’enseignant ou l’administration publie les exercices sur la plateforme. Ils deviennent accessibles au parent, qui peut voir ce que l’élève étudie, repérer les points à améliorer et aider son enfant de manière directe et efficace.',
+    appInfoAudienceTitle: '👨‍👩‍👧 À qui s’adresse la plateforme ?',
+    appInfoStudentAudience: 'Élèves — suivre leurs devoirs et exercices au même endroit',
+    appInfoParentAudience: 'Parents — connaître le niveau de leurs enfants et les accompagner à la maison',
+    appInfoWhyTitle: '💡 Pourquoi Wajibati ?',
+    appInfoWhyText: 'Parce que la communication entre la famille et l’école est la base de la réussite de l’élève. Wajibati rend cette communication simple, transparente et accessible à tous.',
     loginTitle: 'Connexion',
     loginSubtitle: 'Connectez-vous avec le seul compte administrateur initial.',
     email: 'E-mail',
@@ -824,9 +836,15 @@ const copy: Record<Language, Record<string, string>> = {
     appTitle: 'School Platform Management System',
     appSubtitle: 'Role-based operational dashboard',
     appInfo: 'About the platform',
-    appInfoTitle: 'About Wajibati',
-    appInfoText: 'Wajibati helps schools manage accounts, homework, announcements, and notes through administrator, director, teacher, and student roles.',
-    appInfoPrivacy: 'You need an active account from the school to access the platform.',
+    appInfoTitle: 'Wajibati 📚',
+    appInfoText: 'Wajibati is an educational platform that connects families with the school. It allows teachers and administration to publish exercises and homework directly, so parents can follow their child’s learning path with clarity and ease.',
+    appInfoOfferTitle: '🎯 What does the platform offer?',
+    appInfoOfferText: 'Teachers or administration publish exercises on the platform, making them available to parents. Parents can see what the student is studying, discover points that need improvement, and help their child directly and effectively.',
+    appInfoAudienceTitle: '👨‍👩‍👧 Who is it for?',
+    appInfoStudentAudience: 'Students — follow their homework and exercises in one place',
+    appInfoParentAudience: 'Parents — understand their children’s level and support them at home',
+    appInfoWhyTitle: '💡 Why Wajibati?',
+    appInfoWhyText: 'Because communication between family and school is the foundation of student success. Wajibati makes that communication simple, transparent, and accessible to everyone.',
     loginTitle: 'Sign in',
     loginSubtitle: 'Start with the only initial administrator account.',
     email: 'Email',
@@ -7247,8 +7265,24 @@ function AppInfoDialog({ language, onClose }: { language: Language; onClose: () 
         </button>
         <Info size={30} aria-hidden="true" />
         <h2 id="app-info-title">{tr(language, 'appInfoTitle')}</h2>
-        <p className="modal-copy">{tr(language, 'appInfoText')}</p>
-        <p className="modal-copy">{tr(language, 'appInfoPrivacy')}</p>
+        <div className="app-info-content">
+          <p className="modal-copy">{tr(language, 'appInfoText')}</p>
+          <section className="app-info-section">
+            <h3>{tr(language, 'appInfoOfferTitle')}</h3>
+            <p className="modal-copy">{tr(language, 'appInfoOfferText')}</p>
+          </section>
+          <section className="app-info-section">
+            <h3>{tr(language, 'appInfoAudienceTitle')}</h3>
+            <ul className="app-info-list">
+              <li>{tr(language, 'appInfoStudentAudience')}</li>
+              <li>{tr(language, 'appInfoParentAudience')}</li>
+            </ul>
+          </section>
+          <section className="app-info-section">
+            <h3>{tr(language, 'appInfoWhyTitle')}</h3>
+            <p className="modal-copy">{tr(language, 'appInfoWhyText')}</p>
+          </section>
+        </div>
         <button className="button primary" type="button" onClick={onClose}>
           <CheckCircle2 size={17} aria-hidden="true" />
           <span>{tr(language, 'close')}</span>
