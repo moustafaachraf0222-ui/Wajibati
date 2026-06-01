@@ -17,6 +17,7 @@ import {
   Database,
   Globe2,
   GraduationCap,
+  Info,
   Landmark,
   Languages,
   Leaf,
@@ -376,6 +377,10 @@ const copy: Record<Language, Record<string, string>> = {
   ar: {
     appTitle: 'نظام إدارة منصة مدرسية',
     appSubtitle: 'لوحة تشغيل بصلاحيات مدرسية واضحة',
+    appInfo: 'معلومات عن المنصة',
+    appInfoTitle: 'عن منصة واجباتي',
+    appInfoText: 'منصة واجباتي تساعد المدارس على إدارة الحسابات والواجبات والإعلانات والملاحظات حسب صلاحيات المشرف والمدير والأستاذ والتلميذ.',
+    appInfoPrivacy: 'تحتاج إلى حساب مفعل من المدرسة للدخول إلى المنصة.',
     loginTitle: 'تسجيل الدخول',
     loginSubtitle: 'ابدأ بحساب المشرف العام الوحيد في النظام.',
     email: 'البريد الإلكتروني',
@@ -409,6 +414,7 @@ const copy: Record<Language, Record<string, string>> = {
     logoutQuestion: 'هل تريد حقاً تسجيل الخروج؟',
     yes: 'نعم',
     cancel: 'إلغاء',
+    close: 'إغلاق',
     adminPower: 'إدارة المنصة',
     createDirector: 'إنشاء حساب مدير',
     createAccountTab: 'إنشاء حساب',
@@ -594,6 +600,10 @@ const copy: Record<Language, Record<string, string>> = {
   fr: {
     appTitle: 'Système de gestion scolaire',
     appSubtitle: 'Tableau de bord avec permissions par rôle',
+    appInfo: 'Informations sur la plateforme',
+    appInfoTitle: 'À propos de Wajibati',
+    appInfoText: 'Wajibati aide les écoles à gérer les comptes, devoirs, annonces et notes selon les rôles administrateur, directeur, enseignant et élève.',
+    appInfoPrivacy: 'Un compte actif fourni par l’école est nécessaire pour accéder à la plateforme.',
     loginTitle: 'Connexion',
     loginSubtitle: 'Connectez-vous avec le seul compte administrateur initial.',
     email: 'E-mail',
@@ -627,6 +637,7 @@ const copy: Record<Language, Record<string, string>> = {
     logoutQuestion: 'هل تريد حقاً تسجيل الخروج؟',
     yes: 'نعم',
     cancel: 'إلغاء',
+    close: 'Fermer',
     adminPower: 'Administration',
     createDirector: 'Créer un directeur',
     createAccountTab: 'Créer compte',
@@ -812,6 +823,10 @@ const copy: Record<Language, Record<string, string>> = {
   en: {
     appTitle: 'School Platform Management System',
     appSubtitle: 'Role-based operational dashboard',
+    appInfo: 'About the platform',
+    appInfoTitle: 'About Wajibati',
+    appInfoText: 'Wajibati helps schools manage accounts, homework, announcements, and notes through administrator, director, teacher, and student roles.',
+    appInfoPrivacy: 'You need an active account from the school to access the platform.',
     loginTitle: 'Sign in',
     loginSubtitle: 'Start with the only initial administrator account.',
     email: 'Email',
@@ -845,6 +860,7 @@ const copy: Record<Language, Record<string, string>> = {
     logoutQuestion: 'هل تريد حقاً تسجيل الخروج؟',
     yes: 'نعم',
     cancel: 'إلغاء',
+    close: 'Close',
     adminPower: 'Platform administration',
     createDirector: 'Create director account',
     createAccountTab: 'Create account',
@@ -3519,6 +3535,7 @@ function LoginPage({ data, language, theme, onLanguageChange, onThemeChange, onL
   const [rememberedAccounts, setRememberedAccounts] = useState<RememberedAccount[]>(loadRememberedAccounts);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [infoOpen, setInfoOpen] = useState(false);
   const visibleRememberedAccounts = rememberedAccounts
     .map((remembered) => data.users.find((user) => user.id === remembered.id || user.email.toLowerCase() === remembered.email.toLowerCase()))
     .filter((user): user is PlatformUser => Boolean(user && canAuthenticateUser(data, user)));
@@ -3583,6 +3600,15 @@ function LoginPage({ data, language, theme, onLanguageChange, onThemeChange, onL
     <main className="login-screen">
       <section className="login-panel">
         <div className="login-corner-actions">
+          <button
+            className="corner-icon-button info-button"
+            type="button"
+            title={tr(language, 'appInfo')}
+            aria-label={tr(language, 'appInfo')}
+            onClick={() => setInfoOpen(true)}
+          >
+            <Info size={18} aria-hidden="true" />
+          </button>
           <LanguageMenu language={language} onLanguageChange={onLanguageChange} variant="corner" />
           <button
             className="corner-icon-button"
@@ -3651,6 +3677,7 @@ function LoginPage({ data, language, theme, onLanguageChange, onThemeChange, onL
           </form>
         </div>
       </section>
+      {infoOpen && <AppInfoDialog language={language} onClose={() => setInfoOpen(false)} />}
     </main>
   );
 }
@@ -7199,6 +7226,33 @@ function ConfirmDialog({ language, onConfirm, onCancel }: { language: Language; 
             <span>{tr(language, 'cancel')}</span>
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function AppInfoDialog({ language, onClose }: { language: Language; onClose: () => void }) {
+  return (
+    <div className="modal-backdrop" role="presentation" onClick={onClose}>
+      <div
+        className="modal app-info-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="app-info-title"
+        dir={language === 'ar' ? 'rtl' : 'ltr'}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <button className="icon-button close" type="button" title={tr(language, 'close')} onClick={onClose}>
+          <X size={18} aria-hidden="true" />
+        </button>
+        <Info size={30} aria-hidden="true" />
+        <h2 id="app-info-title">{tr(language, 'appInfoTitle')}</h2>
+        <p className="modal-copy">{tr(language, 'appInfoText')}</p>
+        <p className="modal-copy">{tr(language, 'appInfoPrivacy')}</p>
+        <button className="button primary" type="button" onClick={onClose}>
+          <CheckCircle2 size={17} aria-hidden="true" />
+          <span>{tr(language, 'close')}</span>
+        </button>
       </div>
     </div>
   );

@@ -233,6 +233,16 @@ img {
   box-shadow: 0 0 0 3px var(--focus);
 }
 
+.corner-icon-button.info-button {
+  border-radius: 50%;
+  color: var(--teal);
+  background: var(--teal-soft);
+}
+
+.corner-icon-button.info-button:hover {
+  background: var(--paper);
+}
+
 .login-copy h1 {
   margin: 0;
   font-size: clamp(1.75rem, 3vw, 2.2rem);
@@ -2167,6 +2177,14 @@ tbody tr.account-details-row:hover td {
 
 .modal > svg {
   color: var(--teal);
+}
+
+.modal.app-info-modal > svg {
+  width: 46px;
+  height: 46px;
+  padding: 9px;
+  border-radius: 50%;
+  background: var(--teal-soft);
 }
 
 .modal.danger-modal > svg {
