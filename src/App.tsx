@@ -255,6 +255,7 @@ const MAX_ATTACHMENT_SIZE = 1_000_000;
 const SCHOOL_TRASH_RETENTION_MS = 24 * 60 * 60 * 1000;
 const ANNOUNCEMENT_ACTIVE_MS = 72 * 60 * 60 * 1000;
 const NOTE_ACTIVE_MS = 72 * 60 * 60 * 1000;
+const SHARED_DATA_REFRESH_MS = 10_000;
 
 const languages: Language[] = ['ar', 'fr', 'en'];
 const primarySubjects: Subject[] = [
@@ -3366,6 +3367,7 @@ function App() {
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('checking');
   const remoteLoadedRef = useRef(false);
   const remoteEnabledRef = useRef(false);
+  const skipNextSharedSaveRef = useRef(false);
 
   const currentUser = data.users.find((user) => user.id === sessionUserId && canAuthenticateUser(data, user)) ?? null;
   const tabs = currentUser ? navItems[currentUser.role] : [];
@@ -3382,6 +3384,17 @@ function App() {
     setSessionUserId(null);
   };
 
+  const applySharedData = (nextData: PlatformData) => {
+    setData((previous) => {
+      if (JSON.stringify(previous) === JSON.stringify(nextData)) {
+        return previous;
+      }
+
+      skipNextSharedSaveRef.current = true;
+      return nextData;
+    });
+  };
+
   const refreshSharedData = async () => {
     try {
       setSyncStatus('checking');
@@ -3396,7 +3409,7 @@ function App() {
       const nextData = await promoteLocalDataIfRemoteIsEmpty(sharedData, data);
       remoteEnabledRef.current = true;
       remoteLoadedRef.current = true;
-      setData(nextData);
+      applySharedData(nextData);
       setSyncStatus('shared');
       return nextData;
     } catch {
@@ -3425,7 +3438,7 @@ function App() {
 
         const nextData = await promoteLocalDataIfRemoteIsEmpty(sharedData, data);
         remoteEnabledRef.current = true;
-        setData(nextData);
+        applySharedData(nextData);
         setSyncStatus('shared');
       } catch {
         if (!cancelled) {
@@ -3448,6 +3461,11 @@ function App() {
 
   useEffect(() => {
     localStorage.setItem(DATA_KEY, JSON.stringify(data));
+    if (skipNextSharedSaveRef.current) {
+      skipNextSharedSaveRef.current = false;
+      return;
+    }
+
     if (!remoteLoadedRef.current || !remoteEnabledRef.current) {
       return;
     }
@@ -3461,6 +3479,54 @@ function App() {
 
     return () => window.clearTimeout(saveTimer);
   }, [data]);
+
+  useEffect(() => {
+    if (!currentUser || syncStatus === 'checking' || syncStatus === 'saving') {
+      return;
+    }
+
+    let cancelled = false;
+
+    const refreshLatestSharedData = async () => {
+      if (cancelled || !remoteEnabledRef.current || document.visibilityState === 'hidden') {
+        return;
+      }
+
+      try {
+        const sharedData = await fetchSharedData();
+        if (!cancelled && sharedData) {
+          remoteEnabledRef.current = true;
+          remoteLoadedRef.current = true;
+          applySharedData(sharedData);
+          setSyncStatus('shared');
+        }
+      } catch {
+        if (!cancelled) {
+          setSyncStatus('error');
+        }
+      }
+    };
+
+    const refreshOnFocus = () => {
+      refreshLatestSharedData();
+    };
+    const refreshOnVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        refreshLatestSharedData();
+      }
+    };
+
+    const refreshTimer = window.setInterval(refreshLatestSharedData, SHARED_DATA_REFRESH_MS);
+    window.addEventListener('focus', refreshOnFocus);
+    document.addEventListener('visibilitychange', refreshOnVisibility);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(refreshTimer);
+      window.removeEventListener('focus', refreshOnFocus);
+      document.removeEventListener('visibilitychange', refreshOnVisibility);
+    };
+  }, [currentUser?.id, syncStatus]);
 
   useEffect(() => {
     const purgeExpiredSchools = () => {
