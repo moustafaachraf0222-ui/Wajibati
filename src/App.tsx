@@ -205,6 +205,7 @@ type PlatformData = {
   feedback: Record<string, Record<string, HomeworkFeedback>>;
   pushTokens: Record<string, PushTokenRecord[]>;
   deletedSchoolIds: string[];
+  deletedExerciseIds: string[];
   settings: {
     allowExerciseImages: boolean;
     maintenanceMode: boolean;
@@ -1365,6 +1366,7 @@ const seedData: PlatformData = {
   feedback: {},
   pushTokens: {},
   deletedSchoolIds: [],
+  deletedExerciseIds: [],
   settings: {
     allowExerciseImages: true,
     maintenanceMode: false
@@ -2633,13 +2635,16 @@ function normalizePlatformData(value: Partial<PlatformData> | null | undefined):
     feedback: source.feedback && typeof source.feedback === 'object' ? source.feedback : fallback.feedback,
     pushTokens: source.pushTokens && typeof source.pushTokens === 'object' ? source.pushTokens : fallback.pushTokens,
     deletedSchoolIds: Array.isArray(source.deletedSchoolIds) ? uniqueStrings(source.deletedSchoolIds.filter((id): id is string => typeof id === 'string')) : fallback.deletedSchoolIds,
+    deletedExerciseIds: Array.isArray(source.deletedExerciseIds)
+      ? uniqueStrings(source.deletedExerciseIds.filter((id): id is string => typeof id === 'string'))
+      : fallback.deletedExerciseIds,
     settings: {
       ...fallback.settings,
       ...(source.settings ?? {})
     }
   };
 
-  return applyDeletedSchoolTombstones(purgeExpiredTrashedSchools(normalized));
+  return applyDeletionTombstones(purgeExpiredTrashedSchools(normalized));
 }
 
 async function fetchSharedData() {
@@ -2679,6 +2684,14 @@ async function saveSharedData(data: PlatformData) {
   }
 }
 
+function mergeDeletionTombstones(baseData: PlatformData, sourceData: PlatformData): PlatformData {
+  return applyDeletionTombstones({
+    ...baseData,
+    deletedSchoolIds: uniqueStrings([...baseData.deletedSchoolIds, ...sourceData.deletedSchoolIds]),
+    deletedExerciseIds: uniqueStrings([...baseData.deletedExerciseIds, ...sourceData.deletedExerciseIds])
+  });
+}
+
 function hasUserData(data: PlatformData) {
   return (
     data.schools.length > 0 ||
@@ -2687,6 +2700,7 @@ function hasUserData(data: PlatformData) {
     data.announcements.length > 0 ||
     data.notes.length > 0 ||
     data.deletedSchoolIds.length > 0 ||
+    data.deletedExerciseIds.length > 0 ||
     Object.keys(data.completions).length > 0 ||
     Object.keys(data.completionDates).length > 0 ||
     Object.keys(data.feedback).length > 0
@@ -2702,6 +2716,7 @@ function isSeedOnlyData(data: PlatformData) {
     data.users.length === 1 &&
     data.users[0]?.id === seedData.users[0].id &&
     data.deletedSchoolIds.length === 0 &&
+    data.deletedExerciseIds.length === 0 &&
     Object.keys(data.completions).length === 0 &&
     Object.keys(data.completionDates).length === 0 &&
     Object.keys(data.feedback).length === 0
@@ -2714,9 +2729,11 @@ async function promoteLocalDataIfRemoteIsEmpty(sharedData: PlatformData, localDa
     return localData;
   }
 
-  const deletedSchoolIds = uniqueStrings([...sharedData.deletedSchoolIds, ...localData.deletedSchoolIds]);
-  if (deletedSchoolIds.length !== sharedData.deletedSchoolIds.length) {
-    const mergedData = applyDeletedSchoolTombstones({ ...sharedData, deletedSchoolIds });
+  const mergedData = mergeDeletionTombstones(sharedData, localData);
+  if (
+    mergedData.deletedSchoolIds.length !== sharedData.deletedSchoolIds.length ||
+    mergedData.deletedExerciseIds.length !== sharedData.deletedExerciseIds.length
+  ) {
     await saveSharedData(mergedData);
     return mergedData;
   }
@@ -3241,7 +3258,8 @@ function deleteUserRecords(previous: PlatformData, target: PlatformUser): Platfo
           Object.fromEntries(Object.entries(feedback).filter(([exerciseId]) => !removedExerciseIds.includes(exerciseId)))
         ])
     ),
-    pushTokens: Object.fromEntries(Object.entries(previous.pushTokens).filter(([userId]) => userId !== target.id))
+    pushTokens: Object.fromEntries(Object.entries(previous.pushTokens).filter(([userId]) => userId !== target.id)),
+    deletedExerciseIds: uniqueStrings([...previous.deletedExerciseIds, ...removedExerciseIds])
   };
 }
 
@@ -3286,8 +3304,39 @@ function applyDeletedSchoolTombstones(data: PlatformData): PlatformData {
   };
 }
 
+function applyDeletedExerciseTombstones(data: PlatformData): PlatformData {
+  const deletedExerciseIds = new Set(data.deletedExerciseIds);
+  if (deletedExerciseIds.size === 0) {
+    return data;
+  }
+
+  return {
+    ...data,
+    exercises: data.exercises.filter((exercise) => !deletedExerciseIds.has(exercise.id)),
+    completions: Object.fromEntries(
+      Object.entries(data.completions).map(([userId, done]) => [userId, done.filter((exerciseId) => !deletedExerciseIds.has(exerciseId))])
+    ),
+    completionDates: Object.fromEntries(
+      Object.entries(data.completionDates).map(([userId, dates]) => [
+        userId,
+        Object.fromEntries(Object.entries(dates).filter(([exerciseId]) => !deletedExerciseIds.has(exerciseId)))
+      ])
+    ),
+    feedback: Object.fromEntries(
+      Object.entries(data.feedback).map(([userId, feedback]) => [
+        userId,
+        Object.fromEntries(Object.entries(feedback).filter(([exerciseId]) => !deletedExerciseIds.has(exerciseId)))
+      ])
+    )
+  };
+}
+
+function applyDeletionTombstones(data: PlatformData): PlatformData {
+  return applyDeletedExerciseTombstones(applyDeletedSchoolTombstones(data));
+}
+
 function deleteSchoolRecords(previous: PlatformData, target: SchoolRecord): PlatformData {
-  return applyDeletedSchoolTombstones({
+  return applyDeletionTombstones({
     ...previous,
     deletedSchoolIds: uniqueStrings([...previous.deletedSchoolIds, target.id])
   });
@@ -3390,12 +3439,13 @@ function App() {
 
   const applySharedData = (nextData: PlatformData) => {
     setData((previous) => {
-      if (JSON.stringify(previous) === JSON.stringify(nextData)) {
+      const mergedData = mergeDeletionTombstones(nextData, previous);
+      if (JSON.stringify(previous) === JSON.stringify(mergedData)) {
         return previous;
       }
 
-      skipNextSharedSaveRef.current = true;
-      return nextData;
+      skipNextSharedSaveRef.current = JSON.stringify(mergedData) === JSON.stringify(nextData);
+      return mergedData;
     });
   };
 
@@ -6835,25 +6885,12 @@ function TeacherExercises({ data, setData, currentUser, language }: CommonViewPr
       return;
     }
 
-    setData((previous) => ({
-      ...previous,
-      exercises: previous.exercises.filter((record) => record.id !== exercise.id),
-      completions: Object.fromEntries(
-        Object.entries(previous.completions).map(([userId, done]) => [userId, done.filter((exerciseId) => exerciseId !== exercise.id)])
-      ),
-      completionDates: Object.fromEntries(
-        Object.entries(previous.completionDates).map(([userId, dates]) => [
-          userId,
-          Object.fromEntries(Object.entries(dates).filter(([exerciseId]) => exerciseId !== exercise.id))
-        ])
-      ),
-      feedback: Object.fromEntries(
-        Object.entries(previous.feedback).map(([userId, feedback]) => [
-          userId,
-          Object.fromEntries(Object.entries(feedback).filter(([exerciseId]) => exerciseId !== exercise.id))
-        ])
-      )
-    }));
+    setData((previous) =>
+      applyDeletedExerciseTombstones({
+        ...previous,
+        deletedExerciseIds: uniqueStrings([...previous.deletedExerciseIds, exercise.id])
+      })
+    );
   };
 
   return (

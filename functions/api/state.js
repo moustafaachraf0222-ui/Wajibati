@@ -31,6 +31,7 @@ const seedData = {
   feedback: {},
   pushTokens: {},
   deletedSchoolIds: [],
+  deletedExerciseIds: [],
   settings: {
     allowExerciseImages: true,
     maintenanceMode: false
@@ -87,6 +88,40 @@ function applyDeletedSchoolTombstones(data) {
   };
 }
 
+function applyDeletedExerciseTombstones(data) {
+  const deletedExerciseIds = new Set(data.deletedExerciseIds ?? []);
+  if (deletedExerciseIds.size === 0) {
+    return data;
+  }
+
+  return {
+    ...data,
+    exercises: data.exercises.filter((exercise) => !deletedExerciseIds.has(exercise.id)),
+    completions: Object.fromEntries(
+      Object.entries(data.completions).map(([userId, done]) => [
+        userId,
+        Array.isArray(done) ? done.filter((exerciseId) => !deletedExerciseIds.has(exerciseId)) : []
+      ])
+    ),
+    completionDates: Object.fromEntries(
+      Object.entries(data.completionDates).map(([userId, dates]) => [
+        userId,
+        dates && typeof dates === 'object' ? Object.fromEntries(Object.entries(dates).filter(([exerciseId]) => !deletedExerciseIds.has(exerciseId))) : {}
+      ])
+    ),
+    feedback: Object.fromEntries(
+      Object.entries(data.feedback).map(([userId, feedback]) => [
+        userId,
+        feedback && typeof feedback === 'object' ? Object.fromEntries(Object.entries(feedback).filter(([exerciseId]) => !deletedExerciseIds.has(exerciseId))) : {}
+      ])
+    )
+  };
+}
+
+function applyDeletionTombstones(data) {
+  return applyDeletedExerciseTombstones(applyDeletedSchoolTombstones(data));
+}
+
 function jsonResponse(body, init = {}) {
   return new Response(JSON.stringify(body), {
     ...init,
@@ -121,13 +156,14 @@ function normalizeState(value) {
     feedback: value.feedback && typeof value.feedback === 'object' ? value.feedback : {},
     pushTokens: value.pushTokens && typeof value.pushTokens === 'object' ? value.pushTokens : {},
     deletedSchoolIds: Array.isArray(value.deletedSchoolIds) ? uniqueStrings(value.deletedSchoolIds) : [],
+    deletedExerciseIds: Array.isArray(value.deletedExerciseIds) ? uniqueStrings(value.deletedExerciseIds) : [],
     settings: {
       ...seedData.settings,
       ...(value.settings ?? {})
     }
   };
 
-  return applyDeletedSchoolTombstones(normalized);
+  return applyDeletionTombstones(normalized);
 }
 
 async function ensureStateTable(db) {
@@ -435,9 +471,10 @@ export async function onRequestPost(context) {
   const existing = await db.prepare('SELECT data FROM app_state WHERE id = ?').bind(STATE_ID).first();
   const existingData = existing?.data ? normalizeState(JSON.parse(existing.data)) : structuredClone(seedData);
   const incomingData = normalizeState(payload.data ?? payload);
-  const data = applyDeletedSchoolTombstones({
+  const data = applyDeletionTombstones({
     ...incomingData,
-    deletedSchoolIds: uniqueStrings([...(existingData.deletedSchoolIds ?? []), ...(incomingData.deletedSchoolIds ?? [])])
+    deletedSchoolIds: uniqueStrings([...(existingData.deletedSchoolIds ?? []), ...(incomingData.deletedSchoolIds ?? [])]),
+    deletedExerciseIds: uniqueStrings([...(existingData.deletedExerciseIds ?? []), ...(incomingData.deletedExerciseIds ?? [])])
   });
   const updatedAt = new Date().toISOString();
 
