@@ -250,7 +250,7 @@ const SESSION_KEY = 'school_platform_session_v2';
 const LANGUAGE_KEY = 'school_platform_language_v1';
 const THEME_KEY = 'school_platform_theme_v1';
 const REMEMBERED_ACCOUNTS_KEY = 'school_platform_remembered_accounts_v1';
-const REMOTE_STATE_ENDPOINT = import.meta.env.VITE_REMOTE_STATE_ENDPOINT || '/api/state';
+const REMOTE_STATE_ENDPOINT = import.meta.env.VITE_REMOTE_STATE_ENDPOINT || 'https://wajibati.pages.dev/api/state';
 const MAX_ATTACHMENT_SIZE = 1_000_000;
 const SCHOOL_TRASH_RETENTION_MS = 24 * 60 * 60 * 1000;
 const ANNOUNCEMENT_ACTIVE_MS = 72 * 60 * 60 * 1000;
@@ -1871,12 +1871,20 @@ function sameClassGroup(left?: string, right?: string) {
   return (left ?? '').trim().toLowerCase() === (right ?? '').trim().toLowerCase();
 }
 
-function exerciseMatchesYearAndClass(exercise: Exercise, user: PlatformUser) {
-  if (!user.schoolYear || !user.classGroup?.trim() || exercise.schoolYear !== user.schoolYear || !sameClassGroup(exercise.classGroup, user.classGroup)) {
+function exerciseMatchesStudent(exercise: Exercise, user: PlatformUser) {
+  if (user.role !== 'student' || !user.schoolId || !user.stage || !user.schoolYear || !user.classGroup?.trim()) {
     return false;
   }
 
-  if (exercise.stage === 'secondary') {
+  if (exercise.schoolId !== user.schoolId || exercise.stage !== user.stage || exercise.schoolYear !== user.schoolYear) {
+    return false;
+  }
+
+  if (!sameClassGroup(exercise.classGroup, user.classGroup)) {
+    return false;
+  }
+
+  if (user.stage === 'secondary') {
     return Boolean(exercise.stream && user.stream && exercise.stream === user.stream);
   }
 
@@ -2314,9 +2322,7 @@ function targetStudentsForExercise(data: PlatformData, exercise: Exercise) {
     (user) =>
       user.role === 'student' &&
       user.status === 'active' &&
-      user.schoolId === exercise.schoolId &&
-      user.stage === exercise.stage &&
-      exerciseMatchesYearAndClass(exercise, user)
+      exerciseMatchesStudent(exercise, user)
   );
 }
 
@@ -3116,9 +3122,7 @@ function scopedExercises(data: PlatformData, user: PlatformUser) {
     );
   }
 
-  return data.exercises.filter(
-    (exercise) => exercise.schoolId === user.schoolId && exercise.stage === user.stage && exerciseMatchesYearAndClass(exercise, user)
-  );
+  return data.exercises.filter((exercise) => exerciseMatchesStudent(exercise, user));
 }
 
 function scopedAnnouncements(data: PlatformData, user: PlatformUser) {
@@ -7170,7 +7174,7 @@ function StudentExercises({ data, setData, currentUser, language }: CommonViewPr
             )
           ];
           return (
-            <details className="homework-subject-group" key={group.subject}>
+            <details className="homework-subject-group" key={group.subject} open>
               <summary className="subject-group-heading">
                 <div className="subject-title">
                   <span className="subject-icon">
