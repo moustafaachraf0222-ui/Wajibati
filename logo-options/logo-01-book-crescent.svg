@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" role="img" aria-labelledby="title desc">
+  <title id="title">Wajibati logo option 1 - book crescent</title>
+  <desc id="desc">A green rounded school badge with an open book, red crescent, and bilingual Wajibati wordmark.</desc>
+  <defs>
+    <linearGradient id="g1" x1="120" y1="90" x2="315" y2="330" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#00843d"/>
+      <stop offset="1" stop-color="#006233"/>
+    </linearGradient>
+    <filter id="shadow1" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#003f22" flood-opacity=".18"/>
+    </filter>
+  </defs>
+  <rect x="96" y="78" width="258" height="258" rx="64" fill="url(#g1)" filter="url(#shadow1)"/>
+  <path d="M160 185c44-18 78-11 101 12v108c-25-22-59-29-101-12z" fill="#fff"/>
+  <path d="M266 197c27-23 64-30 105-12v108c-42-17-77-10-105 12z" fill="#fff"/>
+  <path d="M160 185c44-18 78-11 101 12v108c-25-22-59-29-101-12z" fill="none" stroke="#e6f4ec" stroke-width="8" stroke-linejoin="round"/>
+  <path d="M266 197c27-23 64-30 105-12v108c-42-17-77-10-105 12z" fill="none" stroke="#e6f4ec" stroke-width="8" stroke-linejoin="round"/>
+  <path d="M260 190v114" stroke="#006233" stroke-width="8" stroke-linecap="round"/>
+  <path d="M284 132c-24 18-32 53-16 81 18 33 60 45 93 27-15 27-45 44-79 40-44-6-76-46-71-90 4-31 25-54 73-58z" fill="#d21034"/>
+  <path d="M333 137l7 15 16 2-12 11 3 16-14-8-14 8 3-16-12-11 16-2z" fill="#fff"/>
+  <text x="590" y="208" text-anchor="middle" direction="rtl" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="78" font-weight="800" fill="#006233">واجباتي</text>
+  <text x="590" y="270" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="34" font-weight="700" letter-spacing="0" fill="#111f18">Wajibati</text>
+  <path d="M486 306h210" stroke="#d21034" stroke-width="10" stroke-linecap="round"/>
+</svg>
