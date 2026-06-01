@@ -435,6 +435,11 @@ export async function onRequestGet(context) {
 
   await ensureStateTable(db);
   const row = await db.prepare('SELECT data, updated_at FROM app_state WHERE id = ?').bind(STATE_ID).first();
+
+  if (new URL(context.request.url).searchParams.get('meta') === '1') {
+    return jsonResponse({ updatedAt: row?.updated_at ?? null });
+  }
+
   const data = row?.data ? normalizeState(JSON.parse(row.data)) : structuredClone(seedData);
   const normalizedDataText = JSON.stringify(data);
   let updatedAt = row?.updated_at ?? null;

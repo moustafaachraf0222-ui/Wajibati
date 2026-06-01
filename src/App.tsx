@@ -212,6 +212,11 @@ type PlatformData = {
   };
 };
 
+type SharedDataSnapshot = {
+  data: PlatformData;
+  updatedAt: string | null;
+};
+
 type DataSetter = Dispatch<SetStateAction<PlatformData>>;
 type SyncStatus = 'checking' | 'shared' | 'saving' | 'local' | 'error';
 
@@ -256,7 +261,7 @@ const MAX_ATTACHMENT_SIZE = 1_000_000;
 const SCHOOL_TRASH_RETENTION_MS = 24 * 60 * 60 * 1000;
 const ANNOUNCEMENT_ACTIVE_MS = 72 * 60 * 60 * 1000;
 const NOTE_ACTIVE_MS = 72 * 60 * 60 * 1000;
-const SHARED_DATA_REFRESH_MS = 10_000;
+const SHARED_DATA_REFRESH_MS = 2_000;
 
 const languages: Language[] = ['ar', 'fr', 'en'];
 const primarySubjects: Subject[] = [
@@ -2647,7 +2652,7 @@ function normalizePlatformData(value: Partial<PlatformData> | null | undefined):
   return applyDeletionTombstones(purgeExpiredTrashedSchools(normalized));
 }
 
-async function fetchSharedData() {
+async function fetchSharedData(): Promise<SharedDataSnapshot | null> {
   if (window.location.protocol === 'file:' && !REMOTE_STATE_ENDPOINT.startsWith('http')) {
     return null;
   }
@@ -2661,13 +2666,35 @@ async function fetchSharedData() {
     throw new Error(`Shared data request failed with ${response.status}`);
   }
 
-  const payload = (await response.json()) as { data?: PlatformData };
-  return normalizePlatformData(payload.data);
+  const payload = (await response.json()) as { data?: PlatformData; updatedAt?: string | null };
+  return {
+    data: normalizePlatformData(payload.data),
+    updatedAt: payload.updatedAt ?? null
+  };
 }
 
-async function saveSharedData(data: PlatformData) {
+async function fetchSharedDataUpdatedAt(): Promise<string | null> {
   if (window.location.protocol === 'file:' && !REMOTE_STATE_ENDPOINT.startsWith('http')) {
-    return;
+    return null;
+  }
+
+  const separator = REMOTE_STATE_ENDPOINT.includes('?') ? '&' : '?';
+  const response = await fetch(`${REMOTE_STATE_ENDPOINT}${separator}meta=1`, {
+    headers: { Accept: 'application/json' },
+    cache: 'no-store'
+  });
+
+  if (!response.ok) {
+    throw new Error(`Shared data metadata request failed with ${response.status}`);
+  }
+
+  const payload = (await response.json()) as { updatedAt?: string | null };
+  return payload.updatedAt ?? null;
+}
+
+async function saveSharedData(data: PlatformData): Promise<string | null> {
+  if (window.location.protocol === 'file:' && !REMOTE_STATE_ENDPOINT.startsWith('http')) {
+    return null;
   }
 
   const response = await fetch(REMOTE_STATE_ENDPOINT, {
@@ -2682,6 +2709,9 @@ async function saveSharedData(data: PlatformData) {
   if (!response.ok) {
     throw new Error(`Shared data save failed with ${response.status}`);
   }
+
+  const payload = (await response.json()) as { updatedAt?: string | null };
+  return payload.updatedAt ?? null;
 }
 
 function mergeDeletionTombstones(baseData: PlatformData, sourceData: PlatformData): PlatformData {
@@ -3421,6 +3451,9 @@ function App() {
   const remoteLoadedRef = useRef(false);
   const remoteEnabledRef = useRef(false);
   const skipNextSharedSaveRef = useRef(false);
+  const remoteUpdatedAtRef = useRef<string | null>(null);
+  const sharedSaveInFlightRef = useRef(false);
+  const sharedRefreshInFlightRef = useRef(false);
 
   const currentUser = data.users.find((user) => user.id === sessionUserId && canAuthenticateUser(data, user)) ?? null;
   const tabs = currentUser ? navItems[currentUser.role] : [];
@@ -3452,15 +3485,16 @@ function App() {
   const refreshSharedData = async () => {
     try {
       setSyncStatus('checking');
-      const sharedData = await fetchSharedData();
-      if (!sharedData) {
+      const sharedSnapshot = await fetchSharedData();
+      if (!sharedSnapshot) {
         remoteEnabledRef.current = false;
         remoteLoadedRef.current = true;
         setSyncStatus('local');
         return data;
       }
 
-      const nextData = await promoteLocalDataIfRemoteIsEmpty(sharedData, data);
+      remoteUpdatedAtRef.current = sharedSnapshot.updatedAt;
+      const nextData = await promoteLocalDataIfRemoteIsEmpty(sharedSnapshot.data, data);
       remoteEnabledRef.current = true;
       remoteLoadedRef.current = true;
       applySharedData(nextData);
@@ -3479,18 +3513,19 @@ function App() {
 
     const loadSharedData = async () => {
       try {
-        const sharedData = await fetchSharedData();
+        const sharedSnapshot = await fetchSharedData();
         if (cancelled) {
           return;
         }
 
-        if (!sharedData) {
+        if (!sharedSnapshot) {
           remoteEnabledRef.current = false;
           setSyncStatus('local');
           return;
         }
 
-        const nextData = await promoteLocalDataIfRemoteIsEmpty(sharedData, data);
+        remoteUpdatedAtRef.current = sharedSnapshot.updatedAt;
+        const nextData = await promoteLocalDataIfRemoteIsEmpty(sharedSnapshot.data, data);
         remoteEnabledRef.current = true;
         applySharedData(nextData);
         setSyncStatus('shared');
@@ -3526,38 +3561,67 @@ function App() {
 
     setSyncStatus('saving');
     const saveTimer = window.setTimeout(() => {
+      sharedSaveInFlightRef.current = true;
       saveSharedData(data)
-        .then(() => setSyncStatus('shared'))
-        .catch(() => setSyncStatus('error'));
+        .then((updatedAt) => {
+          remoteUpdatedAtRef.current = updatedAt ?? remoteUpdatedAtRef.current;
+          setSyncStatus('shared');
+        })
+        .catch(() => setSyncStatus('error'))
+        .finally(() => {
+          sharedSaveInFlightRef.current = false;
+        });
     }, 500);
 
-    return () => window.clearTimeout(saveTimer);
+    return () => {
+      window.clearTimeout(saveTimer);
+    };
   }, [data]);
 
   useEffect(() => {
-    if (!currentUser || syncStatus === 'checking' || syncStatus === 'saving') {
+    if (!currentUser) {
       return;
     }
 
     let cancelled = false;
 
     const refreshLatestSharedData = async () => {
-      if (cancelled || !remoteEnabledRef.current || document.visibilityState === 'hidden') {
+      if (
+        cancelled ||
+        !remoteEnabledRef.current ||
+        document.visibilityState === 'hidden' ||
+        sharedSaveInFlightRef.current ||
+        sharedRefreshInFlightRef.current
+      ) {
         return;
       }
 
+      sharedRefreshInFlightRef.current = true;
       try {
-        const sharedData = await fetchSharedData();
-        if (!cancelled && sharedData) {
+        const updatedAt = await fetchSharedDataUpdatedAt();
+        if (cancelled) {
+          return;
+        }
+
+        if (updatedAt && updatedAt === remoteUpdatedAtRef.current) {
+          setSyncStatus('shared');
+          return;
+        }
+
+        const sharedSnapshot = await fetchSharedData();
+        if (!cancelled && sharedSnapshot) {
+          remoteUpdatedAtRef.current = sharedSnapshot.updatedAt;
           remoteEnabledRef.current = true;
           remoteLoadedRef.current = true;
-          applySharedData(sharedData);
+          applySharedData(sharedSnapshot.data);
           setSyncStatus('shared');
         }
       } catch {
         if (!cancelled) {
           setSyncStatus('error');
         }
+      } finally {
+        sharedRefreshInFlightRef.current = false;
       }
     };
 
@@ -3580,7 +3644,7 @@ function App() {
       window.removeEventListener('focus', refreshOnFocus);
       document.removeEventListener('visibilitychange', refreshOnVisibility);
     };
-  }, [currentUser?.id, syncStatus]);
+  }, [currentUser?.id]);
 
   useEffect(() => {
     const purgeExpiredSchools = () => {
