@@ -155,6 +155,7 @@ type Exercise = {
   image?: string;
   isVacation?: boolean;
   createdAt: string;
+  updatedAt?: string;
 };
 
 type Announcement = {
@@ -2692,7 +2693,7 @@ async function fetchSharedDataUpdatedAt(): Promise<string | null> {
   return payload.updatedAt ?? null;
 }
 
-async function saveSharedData(data: PlatformData): Promise<string | null> {
+async function saveSharedData(data: PlatformData): Promise<SharedDataSnapshot | null> {
   if (window.location.protocol === 'file:' && !REMOTE_STATE_ENDPOINT.startsWith('http')) {
     return null;
   }
@@ -2710,8 +2711,11 @@ async function saveSharedData(data: PlatformData): Promise<string | null> {
     throw new Error(`Shared data save failed with ${response.status}`);
   }
 
-  const payload = (await response.json()) as { updatedAt?: string | null };
-  return payload.updatedAt ?? null;
+  const payload = (await response.json()) as { data?: PlatformData; updatedAt?: string | null };
+  return {
+    data: normalizePlatformData(payload.data ?? data),
+    updatedAt: payload.updatedAt ?? null
+  };
 }
 
 function mergeDeletionTombstones(baseData: PlatformData, sourceData: PlatformData): PlatformData {
@@ -3552,19 +3556,24 @@ function App() {
     localStorage.setItem(DATA_KEY, JSON.stringify(data));
     if (skipNextSharedSaveRef.current) {
       skipNextSharedSaveRef.current = false;
+      sharedSaveInFlightRef.current = false;
       return;
     }
 
     if (!remoteLoadedRef.current || !remoteEnabledRef.current) {
+      sharedSaveInFlightRef.current = false;
       return;
     }
 
+    sharedSaveInFlightRef.current = true;
     setSyncStatus('saving');
     const saveTimer = window.setTimeout(() => {
-      sharedSaveInFlightRef.current = true;
       saveSharedData(data)
-        .then((updatedAt) => {
-          remoteUpdatedAtRef.current = updatedAt ?? remoteUpdatedAtRef.current;
+        .then((snapshot) => {
+          remoteUpdatedAtRef.current = snapshot?.updatedAt ?? remoteUpdatedAtRef.current;
+          if (snapshot) {
+            applySharedData(snapshot.data);
+          }
           setSyncStatus('shared');
         })
         .catch(() => setSyncStatus('error'))
@@ -6838,6 +6847,7 @@ function TeacherExercises({ data, setData, currentUser, language }: CommonViewPr
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    const savedAt = new Date().toISOString();
     const classGroup = form.targetClassGroup.trim();
     const targetSubject = teacherSubjectForYear(currentUser, form.targetSchoolYear);
     const targetStream =
@@ -6877,7 +6887,8 @@ function TeacherExercises({ data, setData, currentUser, language }: CommonViewPr
                 schoolYear: form.targetSchoolYear,
                 classGroup,
                 stream: targetStream,
-                isVacation: form.isVacation || undefined
+                isVacation: form.isVacation || undefined,
+                updatedAt: savedAt
               }
             : exercise
         )
@@ -6902,7 +6913,8 @@ function TeacherExercises({ data, setData, currentUser, language }: CommonViewPr
             stream: targetStream,
             teacherId: currentUser.id,
             isVacation: form.isVacation || undefined,
-            createdAt: new Date().toISOString().slice(0, 10)
+            createdAt: savedAt.slice(0, 10),
+            updatedAt: savedAt
           }
       ]
     }));

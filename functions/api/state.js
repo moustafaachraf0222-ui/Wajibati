@@ -166,6 +166,150 @@ function normalizeState(value) {
   return applyDeletionTombstones(normalized);
 }
 
+function timestampValue(record) {
+  const value = Date.parse(record?.updatedAt ?? record?.createdAt ?? '');
+  return Number.isFinite(value) ? value : 0;
+}
+
+function chooseLatestRecord(existingRecord, incomingRecord) {
+  const existingTime = timestampValue(existingRecord);
+  const incomingTime = timestampValue(incomingRecord);
+
+  if (existingTime > incomingTime) {
+    return existingRecord;
+  }
+
+  return { ...existingRecord, ...incomingRecord };
+}
+
+function mergeRecordsById(existingRecords = [], incomingRecords = [], chooseRecord = (_existingRecord, incomingRecord) => incomingRecord) {
+  const merged = new Map();
+
+  existingRecords.forEach((record) => {
+    if (record?.id) {
+      merged.set(record.id, record);
+    }
+  });
+
+  incomingRecords.forEach((record) => {
+    if (!record?.id) {
+      return;
+    }
+
+    const existingRecord = merged.get(record.id);
+    merged.set(record.id, existingRecord ? chooseRecord(existingRecord, record) : record);
+  });
+
+  return [...merged.values()];
+}
+
+function mergeCompletions(existingCompletions = {}, incomingCompletions = {}) {
+  const userIds = uniqueStrings([...Object.keys(existingCompletions), ...Object.keys(incomingCompletions)]);
+
+  return Object.fromEntries(
+    userIds.map((userId) => [
+      userId,
+      uniqueStrings([...(Array.isArray(existingCompletions[userId]) ? existingCompletions[userId] : []), ...(Array.isArray(incomingCompletions[userId]) ? incomingCompletions[userId] : [])])
+    ])
+  );
+}
+
+function mergeNestedMaps(existingMap = {}, incomingMap = {}, chooseValue = (_existingValue, incomingValue) => incomingValue) {
+  const userIds = uniqueStrings([...Object.keys(existingMap), ...Object.keys(incomingMap)]);
+
+  return Object.fromEntries(
+    userIds.map((userId) => {
+      const existingValues = existingMap[userId] && typeof existingMap[userId] === 'object' ? existingMap[userId] : {};
+      const incomingValues = incomingMap[userId] && typeof incomingMap[userId] === 'object' ? incomingMap[userId] : {};
+      const entryIds = uniqueStrings([...Object.keys(existingValues), ...Object.keys(incomingValues)]);
+
+      return [
+        userId,
+        Object.fromEntries(
+          entryIds.map((entryId) => {
+            if (!(entryId in existingValues)) {
+              return [entryId, incomingValues[entryId]];
+            }
+
+            if (!(entryId in incomingValues)) {
+              return [entryId, existingValues[entryId]];
+            }
+
+            return [entryId, chooseValue(existingValues[entryId], incomingValues[entryId])];
+          })
+        )
+      ];
+    })
+  );
+}
+
+function chooseLatestFeedback(existingFeedback, incomingFeedback) {
+  const existingTime = Date.parse(existingFeedback?.updatedAt ?? '');
+  const incomingTime = Date.parse(incomingFeedback?.updatedAt ?? '');
+
+  if (Number.isFinite(existingTime) && Number.isFinite(incomingTime) && existingTime > incomingTime) {
+    return existingFeedback;
+  }
+
+  if (Number.isFinite(existingTime) && !Number.isFinite(incomingTime)) {
+    return existingFeedback;
+  }
+
+  return incomingFeedback;
+}
+
+function chooseCompletionDate(existingDate, incomingDate) {
+  return String(incomingDate ?? '') > String(existingDate ?? '') ? incomingDate : existingDate;
+}
+
+function mergePushTokens(existingTokens = {}, incomingTokens = {}) {
+  const userIds = uniqueStrings([...Object.keys(existingTokens), ...Object.keys(incomingTokens)]);
+
+  return Object.fromEntries(
+    userIds.map((userId) => {
+      const byToken = new Map();
+      [...(Array.isArray(existingTokens[userId]) ? existingTokens[userId] : []), ...(Array.isArray(incomingTokens[userId]) ? incomingTokens[userId] : [])].forEach((record) => {
+        if (!record?.token) {
+          return;
+        }
+
+        const currentRecord = byToken.get(record.token);
+        if (!currentRecord || Date.parse(record.updatedAt ?? '') >= Date.parse(currentRecord.updatedAt ?? '')) {
+          byToken.set(record.token, record);
+        }
+      });
+
+      return [
+        userId,
+        [...byToken.values()]
+          .sort((left, right) => Date.parse(right.updatedAt ?? '') - Date.parse(left.updatedAt ?? ''))
+          .slice(0, 5)
+      ];
+    })
+  );
+}
+
+function mergeState(existingData, incomingData) {
+  return applyDeletionTombstones({
+    ...existingData,
+    settings: {
+      ...(existingData.settings ?? {}),
+      ...(incomingData.settings ?? {})
+    },
+    schools: mergeRecordsById(existingData.schools, incomingData.schools),
+    users: mergeRecordsById(existingData.users, incomingData.users),
+    exercises: mergeRecordsById(existingData.exercises, incomingData.exercises, chooseLatestRecord),
+    announcements: mergeRecordsById(existingData.announcements, incomingData.announcements),
+    notes: mergeRecordsById(existingData.notes, incomingData.notes),
+    completions: mergeCompletions(existingData.completions, incomingData.completions),
+    completionDates: mergeNestedMaps(existingData.completionDates, incomingData.completionDates, chooseCompletionDate),
+    feedback: mergeNestedMaps(existingData.feedback, incomingData.feedback, chooseLatestFeedback),
+    pushTokens: mergePushTokens(existingData.pushTokens, incomingData.pushTokens),
+    deletedSchoolIds: uniqueStrings([...(existingData.deletedSchoolIds ?? []), ...(incomingData.deletedSchoolIds ?? [])]),
+    deletedExerciseIds: uniqueStrings([...(existingData.deletedExerciseIds ?? []), ...(incomingData.deletedExerciseIds ?? [])])
+  });
+}
+
 async function ensureStateTable(db) {
   await db
     .prepare(
@@ -476,11 +620,7 @@ export async function onRequestPost(context) {
   const existing = await db.prepare('SELECT data FROM app_state WHERE id = ?').bind(STATE_ID).first();
   const existingData = existing?.data ? normalizeState(JSON.parse(existing.data)) : structuredClone(seedData);
   const incomingData = normalizeState(payload.data ?? payload);
-  const data = applyDeletionTombstones({
-    ...incomingData,
-    deletedSchoolIds: uniqueStrings([...(existingData.deletedSchoolIds ?? []), ...(incomingData.deletedSchoolIds ?? [])]),
-    deletedExerciseIds: uniqueStrings([...(existingData.deletedExerciseIds ?? []), ...(incomingData.deletedExerciseIds ?? [])])
-  });
+  const data = mergeState(existingData, incomingData);
   const updatedAt = new Date().toISOString();
 
   await db
@@ -495,5 +635,5 @@ export async function onRequestPost(context) {
     await notificationTask;
   }
 
-  return jsonResponse({ ok: true, updatedAt });
+  return jsonResponse({ ok: true, data, updatedAt });
 }
