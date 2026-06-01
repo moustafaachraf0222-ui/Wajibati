@@ -63,6 +63,11 @@ If the binding is missing, the app falls back to local browser storage and accou
 
 `Website.html` is a standalone version that can be opened directly from the desktop without a dev server.
 
+## Android APK
+
+The Android project is configured as a WebView shell for `https://wajibati.pages.dev`.
+After installing the APK, normal website updates appear in the app after the site is redeployed, without rebuilding the APK each time. The APK requires an internet connection.
+
 ## Current Storage Note
 
 `localStorage` is now only used as a local fallback/cache. The online shared data source is Cloudflare D1.

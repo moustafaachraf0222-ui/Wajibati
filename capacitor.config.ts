@@ -5,6 +5,7 @@ const config: CapacitorConfig = {
   appName: 'Wajibati',
   webDir: 'dist',
   server: {
+    url: 'https://wajibati.pages.dev',
     androidScheme: 'https'
   }
 };
