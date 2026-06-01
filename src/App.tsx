@@ -194,6 +194,7 @@ type PlatformData = {
   completions: Record<string, string[]>;
   completionDates: Record<string, Record<string, string>>;
   feedback: Record<string, Record<string, HomeworkFeedback>>;
+  deletedSchoolIds: string[];
   settings: {
     allowExerciseImages: boolean;
     maintenanceMode: boolean;
@@ -1276,6 +1277,7 @@ const seedData: PlatformData = {
   completions: {},
   completionDates: {},
   feedback: {},
+  deletedSchoolIds: [],
   settings: {
     allowExerciseImages: true,
     maintenanceMode: false
@@ -1296,6 +1298,10 @@ function schoolYearLabel(language: Language, stage: Stage | undefined, schoolYea
 
 function uniqueNumbers(values: number[]) {
   return [...new Set(values)].sort((left, right) => left - right);
+}
+
+function uniqueStrings(values: string[]) {
+  return [...new Set(values.filter(Boolean))];
 }
 
 function parseClassGroups(value: string) {
@@ -2460,13 +2466,14 @@ function normalizePlatformData(value: Partial<PlatformData> | null | undefined):
     completionDates:
       source.completionDates && typeof source.completionDates === 'object' ? source.completionDates : fallback.completionDates,
     feedback: source.feedback && typeof source.feedback === 'object' ? source.feedback : fallback.feedback,
+    deletedSchoolIds: Array.isArray(source.deletedSchoolIds) ? uniqueStrings(source.deletedSchoolIds.filter((id): id is string => typeof id === 'string')) : fallback.deletedSchoolIds,
     settings: {
       ...fallback.settings,
       ...(source.settings ?? {})
     }
   };
 
-  return purgeExpiredTrashedSchools(normalized);
+  return applyDeletedSchoolTombstones(purgeExpiredTrashedSchools(normalized));
 }
 
 async function fetchSharedData() {
@@ -2513,6 +2520,7 @@ function hasUserData(data: PlatformData) {
     data.exercises.length > 0 ||
     data.announcements.length > 0 ||
     data.notes.length > 0 ||
+    data.deletedSchoolIds.length > 0 ||
     Object.keys(data.completions).length > 0 ||
     Object.keys(data.completionDates).length > 0 ||
     Object.keys(data.feedback).length > 0
@@ -2527,6 +2535,7 @@ function isSeedOnlyData(data: PlatformData) {
     data.notes.length === 0 &&
     data.users.length === 1 &&
     data.users[0]?.id === seedData.users[0].id &&
+    data.deletedSchoolIds.length === 0 &&
     Object.keys(data.completions).length === 0 &&
     Object.keys(data.completionDates).length === 0 &&
     Object.keys(data.feedback).length === 0
@@ -2537,6 +2546,13 @@ async function promoteLocalDataIfRemoteIsEmpty(sharedData: PlatformData, localDa
   if (isSeedOnlyData(sharedData) && hasUserData(localData)) {
     await saveSharedData(localData);
     return localData;
+  }
+
+  const deletedSchoolIds = uniqueStrings([...sharedData.deletedSchoolIds, ...localData.deletedSchoolIds]);
+  if (deletedSchoolIds.length !== sharedData.deletedSchoolIds.length) {
+    const mergedData = applyDeletedSchoolTombstones({ ...sharedData, deletedSchoolIds });
+    await saveSharedData(mergedData);
+    return mergedData;
   }
 
   return sharedData;
@@ -3064,24 +3080,29 @@ function deleteUserRecords(previous: PlatformData, target: PlatformUser): Platfo
   };
 }
 
-function deleteSchoolRecords(previous: PlatformData, target: SchoolRecord): PlatformData {
-  const removedUserIds = new Set(previous.users.filter((user) => user.schoolId === target.id).map((user) => user.id));
-  const removedExerciseIds = new Set(previous.exercises.filter((exercise) => exercise.schoolId === target.id).map((exercise) => exercise.id));
+function applyDeletedSchoolTombstones(data: PlatformData): PlatformData {
+  const deletedSchoolIds = new Set(data.deletedSchoolIds);
+  if (deletedSchoolIds.size === 0) {
+    return data;
+  }
+
+  const removedUserIds = new Set(data.users.filter((user) => user.schoolId && deletedSchoolIds.has(user.schoolId)).map((user) => user.id));
+  const removedExerciseIds = new Set(data.exercises.filter((exercise) => deletedSchoolIds.has(exercise.schoolId)).map((exercise) => exercise.id));
 
   return {
-    ...previous,
-    schools: previous.schools.filter((school) => school.id !== target.id),
-    users: previous.users.filter((user) => !removedUserIds.has(user.id)),
-    exercises: previous.exercises.filter((exercise) => !removedExerciseIds.has(exercise.id)),
-    announcements: previous.announcements.filter((announcement) => announcement.schoolId !== target.id),
-    notes: previous.notes.filter((note) => note.schoolId !== target.id),
+    ...data,
+    schools: data.schools.filter((school) => !deletedSchoolIds.has(school.id)),
+    users: data.users.filter((user) => !user.schoolId || !deletedSchoolIds.has(user.schoolId)),
+    exercises: data.exercises.filter((exercise) => !deletedSchoolIds.has(exercise.schoolId)),
+    announcements: data.announcements.filter((announcement) => !deletedSchoolIds.has(announcement.schoolId)),
+    notes: data.notes.filter((note) => !deletedSchoolIds.has(note.schoolId)),
     completions: Object.fromEntries(
-      Object.entries(previous.completions)
+      Object.entries(data.completions)
         .filter(([userId]) => !removedUserIds.has(userId))
         .map(([userId, done]) => [userId, done.filter((exerciseId) => !removedExerciseIds.has(exerciseId))])
     ),
     completionDates: Object.fromEntries(
-      Object.entries(previous.completionDates)
+      Object.entries(data.completionDates)
         .filter(([userId]) => !removedUserIds.has(userId))
         .map(([userId, dates]) => [
           userId,
@@ -3089,7 +3110,7 @@ function deleteSchoolRecords(previous: PlatformData, target: SchoolRecord): Plat
         ])
     ),
     feedback: Object.fromEntries(
-      Object.entries(previous.feedback)
+      Object.entries(data.feedback)
         .filter(([userId]) => !removedUserIds.has(userId))
         .map(([userId, feedback]) => [
           userId,
@@ -3097,6 +3118,13 @@ function deleteSchoolRecords(previous: PlatformData, target: SchoolRecord): Plat
         ])
     )
   };
+}
+
+function deleteSchoolRecords(previous: PlatformData, target: SchoolRecord): PlatformData {
+  return applyDeletedSchoolTombstones({
+    ...previous,
+    deletedSchoolIds: uniqueStrings([...previous.deletedSchoolIds, target.id])
+  });
 }
 
 function trashSchoolRecords(previous: PlatformData, target: SchoolRecord): PlatformData {

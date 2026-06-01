@@ -29,6 +29,7 @@ const seedData = {
   completions: {},
   completionDates: {},
   feedback: {},
+  deletedSchoolIds: [],
   settings: {
     allowExerciseImages: true,
     maintenanceMode: false
@@ -39,6 +40,47 @@ const jsonHeaders = {
   'Content-Type': 'application/json; charset=utf-8',
   'Cache-Control': 'no-store'
 };
+
+function uniqueStrings(values) {
+  return [...new Set(values.filter((value) => typeof value === 'string' && value.length > 0))];
+}
+
+function applyDeletedSchoolTombstones(data) {
+  const deletedSchoolIds = new Set(data.deletedSchoolIds ?? []);
+  if (deletedSchoolIds.size === 0) {
+    return data;
+  }
+
+  const removedUserIds = new Set(data.users.filter((user) => user.schoolId && deletedSchoolIds.has(user.schoolId)).map((user) => user.id));
+  const removedExerciseIds = new Set(data.exercises.filter((exercise) => deletedSchoolIds.has(exercise.schoolId)).map((exercise) => exercise.id));
+
+  return {
+    ...data,
+    schools: data.schools.filter((school) => !deletedSchoolIds.has(school.id)),
+    users: data.users.filter((user) => !user.schoolId || !deletedSchoolIds.has(user.schoolId)),
+    exercises: data.exercises.filter((exercise) => !deletedSchoolIds.has(exercise.schoolId)),
+    announcements: data.announcements.filter((announcement) => !deletedSchoolIds.has(announcement.schoolId)),
+    notes: data.notes.filter((note) => !deletedSchoolIds.has(note.schoolId)),
+    completions: Object.fromEntries(
+      Object.entries(data.completions).filter(([userId]) => !removedUserIds.has(userId)).map(([userId, done]) => [
+        userId,
+        Array.isArray(done) ? done.filter((exerciseId) => !removedExerciseIds.has(exerciseId)) : []
+      ])
+    ),
+    completionDates: Object.fromEntries(
+      Object.entries(data.completionDates).filter(([userId]) => !removedUserIds.has(userId)).map(([userId, dates]) => [
+        userId,
+        dates && typeof dates === 'object' ? Object.fromEntries(Object.entries(dates).filter(([exerciseId]) => !removedExerciseIds.has(exerciseId))) : {}
+      ])
+    ),
+    feedback: Object.fromEntries(
+      Object.entries(data.feedback).filter(([userId]) => !removedUserIds.has(userId)).map(([userId, feedback]) => [
+        userId,
+        feedback && typeof feedback === 'object' ? Object.fromEntries(Object.entries(feedback).filter(([exerciseId]) => !removedExerciseIds.has(exerciseId))) : {}
+      ])
+    )
+  };
+}
 
 function jsonResponse(body, init = {}) {
   return new Response(JSON.stringify(body), {
@@ -55,7 +97,7 @@ function normalizeState(value) {
     return structuredClone(seedData);
   }
 
-  return {
+  const normalized = {
     ...structuredClone(seedData),
     ...value,
     schools: Array.isArray(value.schools)
@@ -72,11 +114,14 @@ function normalizeState(value) {
     completions: value.completions && typeof value.completions === 'object' ? value.completions : {},
     completionDates: value.completionDates && typeof value.completionDates === 'object' ? value.completionDates : {},
     feedback: value.feedback && typeof value.feedback === 'object' ? value.feedback : {},
+    deletedSchoolIds: Array.isArray(value.deletedSchoolIds) ? uniqueStrings(value.deletedSchoolIds) : [],
     settings: {
       ...seedData.settings,
       ...(value.settings ?? {})
     }
   };
+
+  return applyDeletedSchoolTombstones(normalized);
 }
 
 async function ensureStateTable(db) {
@@ -136,10 +181,16 @@ export async function onRequestPost(context) {
     return jsonResponse({ error: 'Invalid JSON body.' }, { status: 400 });
   }
 
-  const data = normalizeState(payload.data ?? payload);
+  await ensureStateTable(db);
+  const existing = await db.prepare('SELECT data FROM app_state WHERE id = ?').bind(STATE_ID).first();
+  const existingData = existing?.data ? normalizeState(JSON.parse(existing.data)) : structuredClone(seedData);
+  const incomingData = normalizeState(payload.data ?? payload);
+  const data = applyDeletedSchoolTombstones({
+    ...incomingData,
+    deletedSchoolIds: uniqueStrings([...(existingData.deletedSchoolIds ?? []), ...(incomingData.deletedSchoolIds ?? [])])
+  });
   const updatedAt = new Date().toISOString();
 
-  await ensureStateTable(db);
   await db
     .prepare('UPDATE app_state SET data = ?, updated_at = ? WHERE id = ?')
     .bind(JSON.stringify(data), updatedAt, STATE_ID)
