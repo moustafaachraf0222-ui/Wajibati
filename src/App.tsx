@@ -244,6 +244,7 @@ const REMEMBERED_ACCOUNTS_KEY = 'school_platform_remembered_accounts_v1';
 const REMOTE_STATE_ENDPOINT = import.meta.env.VITE_REMOTE_STATE_ENDPOINT || '/api/state';
 const MAX_ATTACHMENT_SIZE = 1_000_000;
 const SCHOOL_TRASH_RETENTION_MS = 24 * 60 * 60 * 1000;
+const ANNOUNCEMENT_ACTIVE_MS = 72 * 60 * 60 * 1000;
 
 const languages: Language[] = ['ar', 'fr', 'en'];
 const primarySubjects: Subject[] = [
@@ -543,6 +544,12 @@ const copy: Record<Language, Record<string, string>> = {
     announcementBody: 'نص الإعلان',
     publishAnnouncement: 'نشر الإعلان',
     schoolAnnouncements: 'إعلانات المدرسة',
+    activeAnnouncements: 'الإعلانات الحالية',
+    announcementArchive: 'أرشيف الإعلانات',
+    announcementArchiveHint: 'تظهر الإعلانات للجميع لمدة 72 ساعة، ثم تنتقل إلى الأرشيف ولا يراها إلا المشرف والمدير.',
+    noArchivedAnnouncements: 'لا توجد إعلانات مؤرشفة.',
+    visibleUntil: 'مرئي إلى غاية',
+    archivedAt: 'دخل الأرشيف',
     noAnnouncements: 'لا توجد إعلانات بعد.',
     noteTitle: 'عنوان الملاحظة',
     noteBody: 'نص الملاحظة',
@@ -772,6 +779,12 @@ const copy: Record<Language, Record<string, string>> = {
     announcementBody: 'Texte de l’annonce',
     publishAnnouncement: 'Publier l’annonce',
     schoolAnnouncements: 'Annonces de l’école',
+    activeAnnouncements: 'Annonces actives',
+    announcementArchive: 'Archive des annonces',
+    announcementArchiveHint: 'Les annonces restent visibles pour tout le monde pendant 72 heures, puis passent dans l’archive visible seulement par l’administrateur et le directeur.',
+    noArchivedAnnouncements: 'Aucune annonce archivée.',
+    visibleUntil: 'Visible jusqu’au',
+    archivedAt: 'Archivée le',
     noAnnouncements: 'Aucune annonce.',
     noteTitle: 'Titre de la note',
     noteBody: 'Texte de la note',
@@ -1001,6 +1014,12 @@ const copy: Record<Language, Record<string, string>> = {
     announcementBody: 'Announcement text',
     publishAnnouncement: 'Publish announcement',
     schoolAnnouncements: 'School announcements',
+    activeAnnouncements: 'Active announcements',
+    announcementArchive: 'Announcement archive',
+    announcementArchiveHint: 'Announcements stay visible to everyone for 72 hours, then move to the archive visible only to the administrator and principal.',
+    noArchivedAnnouncements: 'No archived announcements.',
+    visibleUntil: 'Visible until',
+    archivedAt: 'Archived at',
     noAnnouncements: 'No announcements yet.',
     noteTitle: 'Note title',
     noteBody: 'Note text',
@@ -1269,6 +1288,7 @@ const navItems: Record<Role, Array<{ id: View; labelKey: string; icon: LucideIco
     { id: 'overview', labelKey: 'overview', icon: ShieldCheck },
     { id: 'schools', labelKey: 'schools', icon: School },
     { id: 'users', labelKey: 'users', icon: Users },
+    { id: 'announcements', labelKey: 'announcements', icon: MessageSquare },
     { id: 'settings', labelKey: 'settings', icon: Settings }
   ],
   director: [
@@ -2204,6 +2224,24 @@ function formatDateTime(language: Language, value?: string | Date | null) {
   }
 
   return new Intl.DateTimeFormat(localeNames[language], { dateStyle: 'medium', timeStyle: 'short' }).format(date);
+}
+
+function announcementExpiresAt(announcement: Announcement) {
+  const createdAt = Date.parse(announcement.createdAt);
+  if (Number.isNaN(createdAt)) {
+    return null;
+  }
+
+  return new Date(createdAt + ANNOUNCEMENT_ACTIVE_MS);
+}
+
+function isAnnouncementArchived(announcement: Announcement, now = Date.now()) {
+  const expiresAt = announcementExpiresAt(announcement);
+  return Boolean(expiresAt && expiresAt.getTime() <= now);
+}
+
+function canViewAnnouncementArchive(user: PlatformUser) {
+  return user.role === 'admin' || user.role === 'director';
 }
 
 function isPastExercise(exercise: Exercise) {
@@ -6002,7 +6040,13 @@ function AttachmentPreview({ attachment, language }: { attachment: UploadedAttac
 
 function AnnouncementsView({ data, setData, currentUser, language }: CommonViewProps & { setData: DataSetter }) {
   const school = getSchool(data, currentUser);
-  const announcements = scopedAnnouncements(data, currentUser).sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+  const scopedAnnouncementList = scopedAnnouncements(data, currentUser);
+  const activeAnnouncements = scopedAnnouncementList
+    .filter((announcement) => !isAnnouncementArchived(announcement))
+    .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+  const archivedAnnouncements = canViewAnnouncementArchive(currentUser)
+    ? scopedAnnouncementList.filter((announcement) => isAnnouncementArchived(announcement)).sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+    : [];
   const [form, setForm] = useState<{ title: string; body: string; image: UploadedAttachment | null }>({ title: '', body: '', image: null });
   const [error, setError] = useState('');
 
@@ -6042,6 +6086,28 @@ function AnnouncementsView({ data, setData, currentUser, language }: CommonViewP
     setError('');
   };
 
+  const renderAnnouncementCard = (announcement: Announcement, archived = false) => {
+    const author = data.users.find((user) => user.id === announcement.authorId);
+    const announcementSchool = data.schools.find((record) => record.id === announcement.schoolId);
+    const expiresAt = announcementExpiresAt(announcement);
+
+    return (
+      <article className={archived ? 'message-card archived-message-card' : 'message-card'} key={announcement.id}>
+        <div className="message-card-head">
+          <h3>{announcement.title}</h3>
+          <small>{formatDateTime(language, announcement.createdAt)}</small>
+        </div>
+        <div className="message-meta">
+          {currentUser.role === 'admin' && announcementSchool && <span>{announcementSchool.name}</span>}
+          <span>{author?.name ?? '-'}</span>
+          <span>{tr(language, archived ? 'archivedAt' : 'visibleUntil')}: {formatDateTime(language, expiresAt)}</span>
+        </div>
+        <p>{announcement.body}</p>
+        {announcement.image && <AttachmentPreview attachment={announcement.image} language={language} />}
+      </article>
+    );
+  };
+
   return (
     <section className="content-grid">
       {currentUser.role === 'director' && (
@@ -6078,28 +6144,31 @@ function AnnouncementsView({ data, setData, currentUser, language }: CommonViewP
         <div className="panel-heading">
           <div>
             <p>{school?.name ?? tr(language, 'scopedData')}</p>
-            <h2>{tr(language, 'schoolAnnouncements')}</h2>
+            <h2>{tr(language, 'activeAnnouncements')}</h2>
           </div>
           <MessageSquare size={24} aria-hidden="true" />
         </div>
         <div className="message-list">
-          {announcements.length === 0 && <p className="empty-state">{tr(language, 'noAnnouncements')}</p>}
-          {announcements.map((announcement) => {
-            const author = data.users.find((user) => user.id === announcement.authorId);
-            return (
-              <article className="message-card" key={announcement.id}>
-                <div className="message-card-head">
-                  <h3>{announcement.title}</h3>
-                  <small>{new Date(announcement.createdAt).toLocaleDateString(localeNames[language])}</small>
-                </div>
-                <p>{announcement.body}</p>
-                {announcement.image && <AttachmentPreview attachment={announcement.image} language={language} />}
-                <small>{author?.name ?? '-'}</small>
-              </article>
-            );
-          })}
+          {activeAnnouncements.length === 0 && <p className="empty-state">{tr(language, 'noAnnouncements')}</p>}
+          {activeAnnouncements.map((announcement) => renderAnnouncementCard(announcement))}
         </div>
       </div>
+
+      {canViewAnnouncementArchive(currentUser) && (
+        <div className="panel">
+          <div className="panel-heading">
+            <div>
+              <p>{tr(language, 'announcementArchiveHint')}</p>
+              <h2>{tr(language, 'announcementArchive')}</h2>
+            </div>
+            <Archive size={24} aria-hidden="true" />
+          </div>
+          <div className="message-list">
+            {archivedAnnouncements.length === 0 && <p className="empty-state">{tr(language, 'noArchivedAnnouncements')}</p>}
+            {archivedAnnouncements.map((announcement) => renderAnnouncementCard(announcement, true))}
+          </div>
+        </div>
+      )}
     </section>
   );
 }

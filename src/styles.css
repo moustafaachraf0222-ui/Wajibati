@@ -1641,6 +1641,11 @@ tbody tr.account-details-row:hover td {
   overflow: hidden;
 }
 
+.message-card.archived-message-card {
+  background: var(--paper);
+  border-style: dashed;
+}
+
 .message-card-head {
   display: flex;
   justify-content: space-between;
