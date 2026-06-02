@@ -1,5 +1,4 @@
 import {
-  Archive,
   BarChart3,
   BookOpen,
   Building2,
@@ -14,7 +13,6 @@ import {
   LogOut,
   MessageSquare,
   Moon,
-  Plus,
   RotateCcw,
   Save,
   School,
@@ -23,17 +21,15 @@ import {
   Sun,
   Trash2,
   Trophy,
-  Upload,
   UserPlus,
   Users,
   X
 } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { PushNotifications, type Token } from '@capacitor/push-notifications';
-import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import type {
-  Announcement,
   DataSetter,
   Language,
   PlatformData,
@@ -43,16 +39,13 @@ import type {
   SchoolRecord,
   SecondaryStream,
   SyncStatus,
-  TeacherNote,
   Theme,
-  UploadedAttachment,
   View
 } from './types';
 import {
   languageFlags,
   languageNames,
   localeNames,
-  schoolYearLabel,
   secondaryStreamNames,
   stageNames,
   statusNames,
@@ -62,17 +55,11 @@ import {
 import {
   assignedClassGroups,
   assignedSchoolYears,
-  assignedYearClassGroups,
-  assignedYearStreamClassGroups,
   classGroupsLabel,
-  sameClassGroup,
   schoolYearsLabel,
   secondaryStreams,
-  secondaryStreamsForYear,
   secondaryStreamLabel,
-  teacherSubjectForYear,
   teacherSubjectsLabel,
-  uniqueStrings,
   yearClassGroupsLabel
 } from './education';
 import {
@@ -81,7 +68,6 @@ import {
   SESSION_KEY,
   SHARED_DATA_REFRESH_MS,
   THEME_KEY,
-  applyDeletedNoteTombstones,
   canAuthenticateUser,
   cloneSeedData,
   defaultView,
@@ -94,7 +80,6 @@ import {
   loadLanguage,
   loadRememberedAccounts,
   loadTheme,
-  makeId,
   mergeDeletionTombstones,
   promoteLocalDataIfRemoteIsEmpty,
   pruneRememberedAccounts,
@@ -105,9 +90,7 @@ import {
   saveSharedData,
   schoolIsTrashed,
   schoolTrashExpiresAt,
-  scopedAnnouncements,
   scopedExercises,
-  scopedNotes,
   scopedUsers,
   trashSchoolRecords,
   upsertPushToken,
@@ -115,7 +98,6 @@ import {
 } from './data';
 import {
   AppInfoDialog,
-  AttachmentPreview,
   ConfirmDialog,
   Field,
   LanguageMenu,
@@ -127,6 +109,8 @@ import {
 } from './ui';
 import { UsersView } from './views/accounts';
 import { ExercisesView } from './views/exercises';
+import { AnnouncementsView, NotesView } from './views/messages';
+import { formatDateTime } from './dates';
 import {
   completionRateForExercises,
   reportLinesForDirector,
@@ -135,10 +119,6 @@ import {
   topTeacherByActivity,
   weekRangeLabel
 } from './homework';
-
-const MAX_ATTACHMENT_SIZE = 1_000_000;
-const ANNOUNCEMENT_ACTIVE_MS = 72 * 60 * 60 * 1000;
-const NOTE_ACTIVE_MS = 72 * 60 * 60 * 1000;
 
 const navItems: Record<Role, Array<{ id: View; labelKey: string; icon: LucideIcon }>> = {
   admin: [
@@ -169,51 +149,6 @@ const navItems: Record<Role, Array<{ id: View; labelKey: string; icon: LucideIco
     { id: 'settings', labelKey: 'settings', icon: Settings }
   ]
 };
-
-function formatDateTime(language: Language, value?: string | Date | null) {
-  if (!value) {
-    return '-';
-  }
-
-  const date = typeof value === 'string' ? new Date(value) : value;
-  if (Number.isNaN(date.getTime())) {
-    return '-';
-  }
-
-  return new Intl.DateTimeFormat(localeNames[language], { dateStyle: 'medium', timeStyle: 'short' }).format(date);
-}
-
-function announcementExpiresAt(announcement: Announcement) {
-  const createdAt = Date.parse(announcement.createdAt);
-  if (Number.isNaN(createdAt)) {
-    return null;
-  }
-
-  return new Date(createdAt + ANNOUNCEMENT_ACTIVE_MS);
-}
-
-function isAnnouncementArchived(announcement: Announcement, now = Date.now()) {
-  const expiresAt = announcementExpiresAt(announcement);
-  return Boolean(expiresAt && expiresAt.getTime() <= now);
-}
-
-function canViewAnnouncementArchive(user: PlatformUser) {
-  return user.role === 'admin' || user.role === 'director';
-}
-
-function noteExpiresAt(note: TeacherNote) {
-  const createdAt = Date.parse(note.createdAt);
-  if (Number.isNaN(createdAt)) {
-    return null;
-  }
-
-  return new Date(createdAt + NOTE_ACTIVE_MS);
-}
-
-function isNoteArchived(note: TeacherNote, now = Date.now()) {
-  const expiresAt = noteExpiresAt(note);
-  return Boolean(expiresAt && expiresAt.getTime() <= now);
-}
 
 function drawWrappedCanvasText(
   context: CanvasRenderingContext2D,
@@ -370,33 +305,6 @@ function createReportPdfBlob(title: string, lines: string[], language: Language)
   context.fillText(new Date().toLocaleDateString(localeNames[language]), textX, canvas.height - 96);
 
   return canvasToPdfBlob(canvas);
-}
-
-function readAttachmentFromInput(
-  event: ChangeEvent<HTMLInputElement>,
-  onReady: (attachment: UploadedAttachment) => void,
-  onTooLarge: () => void
-) {
-  const file = event.target.files?.[0];
-  if (!file) {
-    return;
-  }
-
-  if (file.size > MAX_ATTACHMENT_SIZE) {
-    event.target.value = '';
-    onTooLarge();
-    return;
-  }
-
-  const reader = new FileReader();
-  reader.onload = () =>
-    onReady({
-      name: file.name,
-      type: file.type || 'application/octet-stream',
-      size: file.size,
-      dataUrl: String(reader.result)
-    });
-  reader.readAsDataURL(file);
 }
 
 function App() {
@@ -1417,445 +1325,6 @@ function SchoolProfileView({ data, setData, currentUser, language }: CommonViewP
         </button>
       </form>
     </section>
-  );
-}
-
-function useTimeTick(intervalMs = 60_000) {
-  const [now, setNow] = useState(Date.now());
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), intervalMs);
-    return () => window.clearInterval(timer);
-  }, [intervalMs]);
-
-  return now;
-}
-
-function AnnouncementsView({ data, setData, currentUser, language }: CommonViewProps & { setData: DataSetter }) {
-  const school = getSchool(data, currentUser);
-  const scopedAnnouncementList = scopedAnnouncements(data, currentUser);
-  const activeAnnouncements = scopedAnnouncementList
-    .filter((announcement) => !isAnnouncementArchived(announcement))
-    .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
-  const archivedAnnouncements = canViewAnnouncementArchive(currentUser)
-    ? scopedAnnouncementList.filter((announcement) => isAnnouncementArchived(announcement)).sort((left, right) => right.createdAt.localeCompare(left.createdAt))
-    : [];
-  const [form, setForm] = useState<{ title: string; body: string; image: UploadedAttachment | null }>({ title: '', body: '', image: null });
-  const [error, setError] = useState('');
-
-  const readImage = (event: ChangeEvent<HTMLInputElement>) => {
-    readAttachmentFromInput(
-      event,
-      (image) => {
-        setForm((previous) => ({ ...previous, image }));
-        setError('');
-      },
-      () => setError(tr(language, 'fileTooLarge'))
-    );
-  };
-
-  const submit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (currentUser.role !== 'director' || !currentUser.schoolId) {
-      return;
-    }
-
-    setData((previous) => ({
-      ...previous,
-      announcements: [
-        ...previous.announcements,
-        {
-          id: makeId('announcement'),
-          schoolId: currentUser.schoolId!,
-          authorId: currentUser.id,
-          title: form.title.trim(),
-          body: form.body.trim(),
-          image: form.image ?? undefined,
-          createdAt: new Date().toISOString()
-        }
-      ]
-    }));
-    setForm({ title: '', body: '', image: null });
-    setError('');
-  };
-
-  const renderAnnouncementCard = (announcement: Announcement, archived = false) => {
-    const author = data.users.find((user) => user.id === announcement.authorId);
-    const announcementSchool = data.schools.find((record) => record.id === announcement.schoolId);
-    const expiresAt = announcementExpiresAt(announcement);
-
-    return (
-      <article className={archived ? 'message-card archived-message-card' : 'message-card'} key={announcement.id}>
-        <div className="message-card-head">
-          <h3>{announcement.title}</h3>
-          <small>{formatDateTime(language, announcement.createdAt)}</small>
-        </div>
-        <div className="message-meta">
-          {currentUser.role === 'admin' && announcementSchool && <span>{announcementSchool.name}</span>}
-          <span>{author?.name ?? '-'}</span>
-          <span>{tr(language, archived ? 'archivedAt' : 'visibleUntil')}: {formatDateTime(language, expiresAt)}</span>
-        </div>
-        <p>{announcement.body}</p>
-        {announcement.image && <AttachmentPreview attachment={announcement.image} language={language} />}
-      </article>
-    );
-  };
-
-  return (
-    <section className="content-grid">
-      {currentUser.role === 'director' && (
-        <div className="panel">
-          <div className="panel-heading">
-            <div>
-              <p>{school?.name ?? tr(language, 'schoolAnnouncements')}</p>
-              <h2>{tr(language, 'announcements')}</h2>
-            </div>
-            <MessageSquare size={24} aria-hidden="true" />
-          </div>
-          <form className="form-stack" onSubmit={submit}>
-            <Field label={tr(language, 'announcementTitle')} value={form.title} onChange={(value) => setForm({ ...form, title: value })} required />
-            <label>
-              <span>{tr(language, 'announcementBody')}</span>
-              <textarea value={form.body} onChange={(event) => setForm({ ...form, body: event.target.value })} required rows={5} />
-            </label>
-            <label className="file-field">
-              <span>{tr(language, 'uploadImage')}</span>
-              <input type="file" accept="image/*" onChange={readImage} />
-              <Upload size={18} aria-hidden="true" />
-            </label>
-            {form.image && <AttachmentPreview attachment={form.image} language={language} />}
-            {error && <p className="form-error">{error}</p>}
-            <button className="button primary" type="submit">
-              <Plus size={17} aria-hidden="true" />
-              <span>{tr(language, 'publishAnnouncement')}</span>
-            </button>
-          </form>
-        </div>
-      )}
-
-      <div className="panel">
-        <div className="panel-heading">
-          <div>
-            <p>{school?.name ?? tr(language, 'scopedData')}</p>
-            <h2>{tr(language, 'activeAnnouncements')}</h2>
-          </div>
-          <MessageSquare size={24} aria-hidden="true" />
-        </div>
-        <div className="message-list">
-          {activeAnnouncements.length === 0 && <p className="empty-state">{tr(language, 'noAnnouncements')}</p>}
-          {activeAnnouncements.map((announcement) => renderAnnouncementCard(announcement))}
-        </div>
-      </div>
-
-      {canViewAnnouncementArchive(currentUser) && (
-        <div className="panel">
-          <div className="panel-heading">
-            <div>
-              <p>{tr(language, 'announcementArchiveHint')}</p>
-              <h2>{tr(language, 'announcementArchive')}</h2>
-            </div>
-            <Archive size={24} aria-hidden="true" />
-          </div>
-          <div className="message-list">
-            {archivedAnnouncements.length === 0 && <p className="empty-state">{tr(language, 'noArchivedAnnouncements')}</p>}
-            {archivedAnnouncements.map((announcement) => renderAnnouncementCard(announcement, true))}
-          </div>
-        </div>
-      )}
-    </section>
-  );
-}
-
-function NotesView({ data, setData, currentUser, language }: CommonViewProps & { setData: DataSetter }) {
-  if (currentUser.role === 'teacher') {
-    return <TeacherNotes data={data} setData={setData} currentUser={currentUser} language={language} />;
-  }
-
-  if (currentUser.role === 'student') {
-    return <StudentNotes data={data} currentUser={currentUser} language={language} />;
-  }
-
-  return <p className="empty-state">{tr(language, 'scopedData')}</p>;
-}
-
-function TeacherNotes({ data, setData, currentUser, language }: CommonViewProps & { setData: DataSetter }) {
-  const school = getSchool(data, currentUser);
-  const now = useTimeTick();
-  const teacherYearClassGroups = assignedYearClassGroups(currentUser);
-  const teacherYearStreamClassGroups = assignedYearStreamClassGroups(currentUser);
-  const hasStreamAssignments = Object.keys(teacherYearStreamClassGroups).length > 0;
-  const teacherYears = assignedSchoolYears(currentUser);
-  const firstYear = teacherYears[0] ?? 1;
-  const teacherClassesForYear = (year: number) => teacherYearClassGroups[String(year)] ?? [];
-  const teacherStreamsForYear = (year: number) => {
-    const streamsForYear = secondaryStreamsForYear(school, year);
-    const assignedStreams = Object.keys(teacherYearStreamClassGroups[String(year)] ?? {}) as SecondaryStream[];
-    return currentUser.stage === 'secondary' ? assignedStreams.filter((stream) => streamsForYear.includes(stream)) : [];
-  };
-  const teacherClassesForYearAndStream = (year: number, stream: SecondaryStream | '') =>
-    stream && hasStreamAssignments ? teacherYearStreamClassGroups[String(year)]?.[stream] ?? [] : teacherClassesForYear(year);
-  const firstStream = teacherStreamsForYear(firstYear)[0] ?? '';
-  const [form, setForm] = useState({
-    title: '',
-    body: '',
-    targetSchoolYear: firstYear,
-    targetStream: firstStream as SecondaryStream | '',
-    targetClassGroup: teacherClassesForYearAndStream(firstYear, firstStream)[0] ?? teacherClassesForYear(firstYear)[0] ?? '',
-    attachment: null as UploadedAttachment | null
-  });
-  const [error, setError] = useState('');
-  const notes = scopedNotes(data, currentUser).sort((left, right) => right.createdAt.localeCompare(left.createdAt));
-  const activeNotes = notes.filter((note) => !isNoteArchived(note, now));
-  const archivedNotes = notes.filter((note) => isNoteArchived(note, now));
-  const streamOptionsForSelectedYear = teacherStreamsForYear(form.targetSchoolYear);
-  const streamRequired = currentUser.stage === 'secondary';
-
-  const readFile = (event: ChangeEvent<HTMLInputElement>) => {
-    readAttachmentFromInput(
-      event,
-      (attachment) => {
-        setForm((previous) => ({ ...previous, attachment }));
-        setError('');
-      },
-      () => setError(tr(language, 'fileTooLarge'))
-    );
-  };
-
-  const submit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const classGroup = form.targetClassGroup.trim();
-    const targetSubject = teacherSubjectForYear(currentUser, form.targetSchoolYear);
-    const targetStream =
-      form.targetStream && streamOptionsForSelectedYear.includes(form.targetStream as SecondaryStream) ? (form.targetStream as SecondaryStream) : undefined;
-    const targetClasses =
-      currentUser.stage === 'secondary' && targetStream
-        ? teacherClassesForYearAndStream(form.targetSchoolYear, targetStream)
-        : teacherClassesForYear(form.targetSchoolYear);
-
-    if (
-      !currentUser.schoolId ||
-      !currentUser.stage ||
-      !teacherYears.includes(form.targetSchoolYear) ||
-      !targetClasses.some((assignedClass) => sameClassGroup(assignedClass, classGroup)) ||
-      (streamRequired && !targetStream)
-    ) {
-      return;
-    }
-
-    setData((previous) => ({
-      ...previous,
-      notes: [
-        ...previous.notes,
-        {
-          id: makeId('note'),
-          schoolId: currentUser.schoolId!,
-          stage: currentUser.stage!,
-          teacherId: currentUser.id,
-          subject: targetSubject,
-          title: form.title.trim(),
-          body: form.body.trim(),
-          schoolYear: form.targetSchoolYear,
-          classGroup,
-          stream: targetStream,
-          attachment: form.attachment ?? undefined,
-          createdAt: new Date().toISOString()
-        }
-      ]
-    }));
-    setForm({
-      title: '',
-      body: '',
-      targetSchoolYear: firstYear,
-      targetStream: firstStream as SecondaryStream | '',
-      targetClassGroup: teacherClassesForYearAndStream(firstYear, firstStream)[0] ?? teacherClassesForYear(firstYear)[0] ?? '',
-      attachment: null
-    });
-    setError('');
-  };
-
-  const deleteNote = (note: TeacherNote) => {
-    if (note.teacherId !== currentUser.id) {
-      return;
-    }
-
-    setData((previous) =>
-      applyDeletedNoteTombstones({
-        ...previous,
-        deletedNoteIds: uniqueStrings([...previous.deletedNoteIds, note.id])
-      })
-    );
-  };
-
-  return (
-    <section className="content-grid">
-      <div className="panel">
-        <div className="panel-heading">
-          <div>
-            <p>{tr(language, 'targetGroup')}</p>
-            <h2>{tr(language, 'teacherNotes')}</h2>
-          </div>
-          <MessageSquare size={24} aria-hidden="true" />
-        </div>
-        <form className="form-stack" onSubmit={submit}>
-          <Field label={tr(language, 'noteTitle')} value={form.title} onChange={(value) => setForm({ ...form, title: value })} required />
-          <label>
-            <span>{tr(language, 'noteBody')}</span>
-            <textarea value={form.body} onChange={(event) => setForm({ ...form, body: event.target.value })} required rows={5} />
-          </label>
-          <label>
-            <span>{tr(language, 'schoolYear')}</span>
-            <select
-              value={form.targetSchoolYear}
-              onChange={(event) => {
-                const year = Number(event.target.value);
-                const streams = teacherStreamsForYear(year);
-                const nextStream = streams.includes(form.targetStream as SecondaryStream) ? (form.targetStream as SecondaryStream) : streams[0] ?? '';
-                const classes =
-                  currentUser.stage === 'secondary' && nextStream ? teacherClassesForYearAndStream(year, nextStream) : teacherClassesForYear(year);
-                setForm({ ...form, targetSchoolYear: year, targetStream: nextStream, targetClassGroup: classes[0] ?? '' });
-              }}
-            >
-              {teacherYears.map((year) => (
-                <option value={year} key={year}>
-                  {schoolYearLabel(language, currentUser.stage, year)}
-                </option>
-              ))}
-            </select>
-          </label>
-          {streamRequired && (
-            <label>
-              <span>{tr(language, 'stream')}</span>
-              <select
-                value={form.targetStream}
-                onChange={(event) => {
-                  const stream = event.target.value as SecondaryStream | '';
-                  const classes = teacherClassesForYearAndStream(form.targetSchoolYear, stream);
-                  setForm({ ...form, targetStream: stream, targetClassGroup: classes[0] ?? '' });
-                }}
-              >
-                {streamOptionsForSelectedYear.map((stream) => (
-                  <option value={stream} key={stream}>
-                    {secondaryStreamLabel(language, stream, form.targetSchoolYear)}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-          <label>
-            <span>{tr(language, 'classGroup')}</span>
-            <select value={form.targetClassGroup} onChange={(event) => setForm({ ...form, targetClassGroup: event.target.value })}>
-              {(streamRequired && form.targetStream
-                ? teacherClassesForYearAndStream(form.targetSchoolYear, form.targetStream as SecondaryStream)
-                : teacherClassesForYear(form.targetSchoolYear)
-              ).map((classGroup) => (
-                <option value={classGroup} key={classGroup}>
-                  {classGroup}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="file-field">
-            <span>{tr(language, 'uploadFile')}</span>
-            <input type="file" onChange={readFile} />
-            <Upload size={18} aria-hidden="true" />
-          </label>
-          {form.attachment && <AttachmentPreview attachment={form.attachment} language={language} />}
-          {error && <p className="form-error">{error}</p>}
-          <button className="button primary" type="submit">
-            <Plus size={17} aria-hidden="true" />
-            <span>{tr(language, 'publishNote')}</span>
-          </button>
-        </form>
-      </div>
-      <NotesList notes={activeNotes} data={data} language={language} titleKey="activeNotes" emptyKey="noNotes" archived={false} onDelete={deleteNote} />
-      <NotesList
-        notes={archivedNotes}
-        data={data}
-        language={language}
-        titleKey="noteArchive"
-        subtitleKey="noteArchiveHint"
-        emptyKey="noArchivedNotes"
-        archived
-        onDelete={deleteNote}
-      />
-    </section>
-  );
-}
-
-function StudentNotes({ data, currentUser, language }: CommonViewProps) {
-  const now = useTimeTick();
-  const notes = scopedNotes(data, currentUser)
-    .filter((note) => !isNoteArchived(note, now))
-    .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
-
-  return (
-    <section className="content-grid">
-      <NotesList notes={notes} data={data} language={language} titleKey="activeNotes" emptyKey="noNotes" archived={false} />
-    </section>
-  );
-}
-
-function NotesList({
-  notes,
-  data,
-  language,
-  titleKey = 'teacherNotes',
-  subtitleKey = 'scopedData',
-  emptyKey = 'noNotes',
-  archived = false,
-  onDelete
-}: {
-  notes: TeacherNote[];
-  data: PlatformData;
-  language: Language;
-  titleKey?: string;
-  subtitleKey?: string;
-  emptyKey?: string;
-  archived?: boolean;
-  onDelete?: (note: TeacherNote) => void;
-}) {
-  return (
-    <div className="panel">
-      <div className="panel-heading">
-        <div>
-          <p>{tr(language, subtitleKey)}</p>
-          <h2>{tr(language, titleKey)}</h2>
-        </div>
-        {archived ? <Archive size={24} aria-hidden="true" /> : <MessageSquare size={24} aria-hidden="true" />}
-      </div>
-      <div className="message-list">
-        {notes.length === 0 && <p className="empty-state">{tr(language, emptyKey)}</p>}
-        {notes.map((note) => {
-          const teacher = data.users.find((user) => user.id === note.teacherId);
-          return (
-            <article className={archived ? 'message-card archived-message-card' : 'message-card'} key={note.id}>
-              <div className="message-card-head">
-                <h3>{note.title}</h3>
-                <small>{formatDateTime(language, note.createdAt)}</small>
-              </div>
-              <div className="message-meta">
-                {note.subject && <span>{subjectNames[language][note.subject]}</span>}
-                {note.schoolYear && <span>{schoolYearLabel(language, note.stage, note.schoolYear)}</span>}
-                {note.stream && <span>{secondaryStreamLabel(language, note.stream, note.schoolYear)}</span>}
-                {note.classGroup && <span>{tr(language, 'classGroup')} {note.classGroup}</span>}
-                <span>{tr(language, archived ? 'archivedAt' : 'visibleUntil')}: {formatDateTime(language, noteExpiresAt(note))}</span>
-              </div>
-              <p>{note.body}</p>
-              {note.attachment && <AttachmentPreview attachment={note.attachment} language={language} />}
-              <small>{teacher?.name ?? '-'}</small>
-              {onDelete && (
-                <div className="button-row">
-                  <button className="button danger" type="button" onClick={() => onDelete(note)}>
-                    <Trash2 size={16} aria-hidden="true" />
-                    <span>{tr(language, 'delete')}</span>
-                  </button>
-                </div>
-              )}
-            </article>
-          );
-        })}
-      </div>
-    </div>
   );
 }
 
