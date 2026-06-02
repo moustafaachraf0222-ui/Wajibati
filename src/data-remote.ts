@@ -1,0 +1,115 @@
+import type { PlatformData, SharedDataSnapshot } from './types';
+import { uniqueStrings } from './education';
+import { REMOTE_STATE_ENDPOINT } from './data-constants';
+import { normalizePlatformData } from './data-normalization';
+import { isSeedOnlyData } from './data-seed';
+import { applyDeletionTombstones } from './data-tombstones';
+
+export async function fetchSharedData(): Promise<SharedDataSnapshot | null> {
+  if (window.location.protocol === 'file:' && !REMOTE_STATE_ENDPOINT.startsWith('http')) {
+    return null;
+  }
+
+  const response = await fetch(REMOTE_STATE_ENDPOINT, {
+    headers: { Accept: 'application/json' },
+    cache: 'no-store'
+  });
+
+  if (!response.ok) {
+    throw new Error(`Shared data request failed with ${response.status}`);
+  }
+
+  const payload = (await response.json()) as { data?: PlatformData; updatedAt?: string | null };
+  return {
+    data: normalizePlatformData(payload.data),
+    updatedAt: payload.updatedAt ?? null
+  };
+}
+
+export async function fetchSharedDataUpdatedAt(): Promise<string | null> {
+  if (window.location.protocol === 'file:' && !REMOTE_STATE_ENDPOINT.startsWith('http')) {
+    return null;
+  }
+
+  const separator = REMOTE_STATE_ENDPOINT.includes('?') ? '&' : '?';
+  const response = await fetch(`${REMOTE_STATE_ENDPOINT}${separator}meta=1`, {
+    headers: { Accept: 'application/json' },
+    cache: 'no-store'
+  });
+
+  if (!response.ok) {
+    throw new Error(`Shared data metadata request failed with ${response.status}`);
+  }
+
+  const payload = (await response.json()) as { updatedAt?: string | null };
+  return payload.updatedAt ?? null;
+}
+
+export async function saveSharedData(data: PlatformData): Promise<SharedDataSnapshot | null> {
+  if (window.location.protocol === 'file:' && !REMOTE_STATE_ENDPOINT.startsWith('http')) {
+    return null;
+  }
+
+  const response = await fetch(REMOTE_STATE_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ data })
+  });
+
+  if (!response.ok) {
+    throw new Error(`Shared data save failed with ${response.status}`);
+  }
+
+  const payload = (await response.json()) as { data?: PlatformData; updatedAt?: string | null };
+  return {
+    data: normalizePlatformData(payload.data ?? data),
+    updatedAt: payload.updatedAt ?? null
+  };
+}
+
+export function mergeDeletionTombstones(baseData: PlatformData, sourceData: PlatformData): PlatformData {
+  return applyDeletionTombstones({
+    ...baseData,
+    deletedSchoolIds: uniqueStrings([...baseData.deletedSchoolIds, ...sourceData.deletedSchoolIds]),
+    deletedExerciseIds: uniqueStrings([...baseData.deletedExerciseIds, ...sourceData.deletedExerciseIds]),
+    deletedNoteIds: uniqueStrings([...baseData.deletedNoteIds, ...sourceData.deletedNoteIds])
+  });
+}
+
+export function hasUserData(data: PlatformData) {
+  return (
+    data.schools.length > 0 ||
+    data.users.length > 1 ||
+    data.exercises.length > 0 ||
+    data.announcements.length > 0 ||
+    data.notes.length > 0 ||
+    data.deletedSchoolIds.length > 0 ||
+    data.deletedExerciseIds.length > 0 ||
+    data.deletedNoteIds.length > 0 ||
+    Object.keys(data.completions).length > 0 ||
+    Object.keys(data.completionDates).length > 0 ||
+    Object.keys(data.feedback).length > 0
+  );
+}
+
+export async function promoteLocalDataIfRemoteIsEmpty(sharedData: PlatformData, localData: PlatformData) {
+  if (isSeedOnlyData(sharedData) && hasUserData(localData)) {
+    await saveSharedData(localData);
+    return localData;
+  }
+
+  const mergedData = mergeDeletionTombstones(sharedData, localData);
+  if (
+    mergedData.deletedSchoolIds.length !== sharedData.deletedSchoolIds.length ||
+    mergedData.deletedExerciseIds.length !== sharedData.deletedExerciseIds.length ||
+    mergedData.deletedNoteIds.length !== sharedData.deletedNoteIds.length
+  ) {
+    await saveSharedData(mergedData);
+    return mergedData;
+  }
+
+  return sharedData;
+}
