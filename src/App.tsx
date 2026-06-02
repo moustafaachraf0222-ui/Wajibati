@@ -1,38 +1,13 @@
-import {
-  BookOpen,
-  Building2,
-  GraduationCap,
-  LogOut,
-  MessageSquare,
-  Moon,
-  School,
-  Settings,
-  ShieldCheck,
-  Sun,
-  UserPlus,
-  Users
-} from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { PushNotifications, type Token } from '@capacitor/push-notifications';
 import { useEffect, useRef, useState } from 'react';
-import type { LucideIcon } from 'lucide-react';
 import type {
   Language,
   PlatformData,
-  Role,
   SyncStatus,
   Theme,
   View
 } from './types';
-import { stageNames, tr } from './i18n';
-import {
-  assignedClassGroups,
-  assignedSchoolYears,
-  classGroupsLabel,
-  schoolYearsLabel,
-  secondaryStreamLabel,
-  yearClassGroupsLabel
-} from './education';
 import {
   DATA_KEY,
   LANGUAGE_KEY,
@@ -54,12 +29,8 @@ import {
   saveSharedData,
   upsertPushToken
 } from './data';
-import {
-  ConfirmDialog,
-  LanguageMenu,
-  RoleLabel,
-  SyncIndicator
-} from './ui';
+import { AppShell } from './app-shell';
+import { navItems } from './navigation';
 import { UsersView } from './views/accounts';
 import { ExercisesView } from './views/exercises';
 import { LoginPage } from './views/login';
@@ -67,36 +38,6 @@ import { AnnouncementsView, NotesView } from './views/messages';
 import { OverviewView } from './views/overview';
 import { SchoolProfileView, SchoolsView } from './views/schools';
 import { SettingsView } from './views/settings';
-
-const navItems: Record<Role, Array<{ id: View; labelKey: string; icon: LucideIcon }>> = {
-  admin: [
-    { id: 'overview', labelKey: 'overview', icon: ShieldCheck },
-    { id: 'schools', labelKey: 'schools', icon: School },
-    { id: 'users', labelKey: 'users', icon: Users },
-    { id: 'announcements', labelKey: 'announcements', icon: MessageSquare },
-    { id: 'settings', labelKey: 'settings', icon: Settings }
-  ],
-  director: [
-    { id: 'overview', labelKey: 'overview', icon: Building2 },
-    { id: 'school', labelKey: 'school', icon: School },
-    { id: 'users', labelKey: 'users', icon: UserPlus },
-    { id: 'announcements', labelKey: 'announcements', icon: MessageSquare },
-    { id: 'settings', labelKey: 'settings', icon: Settings }
-  ],
-  teacher: [
-    { id: 'overview', labelKey: 'overview', icon: GraduationCap },
-    { id: 'announcements', labelKey: 'announcements', icon: MessageSquare },
-    { id: 'exercises', labelKey: 'exercises', icon: BookOpen },
-    { id: 'notes', labelKey: 'notes', icon: MessageSquare },
-    { id: 'settings', labelKey: 'settings', icon: Settings }
-  ],
-  student: [
-    { id: 'announcements', labelKey: 'announcements', icon: MessageSquare },
-    { id: 'exercises', labelKey: 'exercises', icon: BookOpen },
-    { id: 'notes', labelKey: 'notes', icon: MessageSquare },
-    { id: 'settings', labelKey: 'settings', icon: Settings }
-  ]
-};
 
 function App() {
   const [language, setLanguage] = useState<Language>(loadLanguage);
@@ -447,92 +388,27 @@ function App() {
   };
 
   return (
-    <div className="app-shell">
-      <aside className="sidebar">
-        <div className="brand">
-          <div className="brand-mark">
-            <School size={25} aria-hidden="true" />
-          </div>
-          <div>
-            <strong>{tr(language, 'appTitle')}</strong>
-            <span>{tr(language, 'appSubtitle')}</span>
-          </div>
-        </div>
-
-        <nav className="nav-list" aria-label="Primary">
-          {tabs.map((item) => {
-            const Icon = item.icon;
-            return (
-              <button
-                key={item.id}
-                className={safeView === item.id ? 'nav-item active' : 'nav-item'}
-                type="button"
-                onClick={() => setActiveView(item.id)}
-              >
-                <Icon size={18} aria-hidden="true" />
-                <span>{tr(language, item.labelKey)}</span>
-              </button>
-            );
-          })}
-        </nav>
-
-        <div className="scope-card">
-          <span>{tr(language, 'visibleScope')}</span>
-          <strong>
-            <RoleLabel role={currentUser.role} language={language} />
-          </strong>
-          {currentSchool && <small>{currentSchool.name}</small>}
-          {currentUser.stage && <small>{stageNames[language][currentUser.stage]}</small>}
-          {assignedSchoolYears(currentUser).length > 0 && <small>{schoolYearsLabel(language, currentUser)}</small>}
-          {assignedClassGroups(currentUser).length > 0 && (
-            <small>
-              {tr(language, currentUser.role === 'teacher' ? 'classGroups' : 'classGroup')}{' '}
-              {currentUser.role === 'teacher' ? yearClassGroupsLabel(language, currentUser) : classGroupsLabel(currentUser)}
-            </small>
-          )}
-          {currentUser.stream && <small>{secondaryStreamLabel(language, currentUser.stream, currentUser.schoolYear)}</small>}
-        </div>
-      </aside>
-
-      <main className="main-area">
-        <header className="topbar">
-          <div>
-            <p>{tr(language, safeView)}</p>
-            <h1>{currentUser.name}</h1>
-          </div>
-          <div className="topbar-actions">
-            <SyncIndicator status={syncStatus} language={language} />
-            <LanguageMenu language={language} onLanguageChange={setLanguage} />
-            <button
-              className="icon-text-button"
-              type="button"
-              title={theme === 'dark' ? tr(language, 'lightMode') : tr(language, 'darkMode')}
-              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-            >
-              {theme === 'dark' ? <Sun size={17} aria-hidden="true" /> : <Moon size={17} aria-hidden="true" />}
-              <span>{theme === 'dark' ? tr(language, 'lightMode') : tr(language, 'darkMode')}</span>
-            </button>
-            <button className="button ghost" type="button" onClick={() => setLogoutOpen(true)}>
-              <LogOut size={17} aria-hidden="true" />
-              <span>{tr(language, 'logout')}</span>
-            </button>
-          </div>
-        </header>
-
-        {renderView()}
-      </main>
-
-      {logoutOpen && (
-        <ConfirmDialog
-          language={language}
-          onCancel={() => setLogoutOpen(false)}
-          onConfirm={() => {
-            setLogoutOpen(false);
-            logoutUser();
-          }}
-        />
-      )}
-    </div>
+    <AppShell
+      currentSchool={currentSchool}
+      currentUser={currentUser}
+      language={language}
+      logoutOpen={logoutOpen}
+      safeView={safeView}
+      syncStatus={syncStatus}
+      tabs={tabs}
+      theme={theme}
+      onLanguageChange={setLanguage}
+      onLogoutCancel={() => setLogoutOpen(false)}
+      onLogoutConfirm={() => {
+        setLogoutOpen(false);
+        logoutUser();
+      }}
+      onLogoutRequest={() => setLogoutOpen(true)}
+      onThemeChange={setTheme}
+      onViewChange={setActiveView}
+    >
+      {renderView()}
+    </AppShell>
   );
 }
 
