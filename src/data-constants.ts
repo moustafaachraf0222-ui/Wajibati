@@ -1,0 +1,8 @@
+export const DATA_KEY = 'school_platform_data_v2';
+export const SESSION_KEY = 'school_platform_session_v2';
+export const LANGUAGE_KEY = 'school_platform_language_v1';
+export const THEME_KEY = 'school_platform_theme_v1';
+export const REMEMBERED_ACCOUNTS_KEY = 'school_platform_remembered_accounts_v1';
+export const REMOTE_STATE_ENDPOINT = import.meta.env.VITE_REMOTE_STATE_ENDPOINT || 'https://wajibati.pages.dev/api/state';
+export const SCHOOL_TRASH_RETENTION_MS = 24 * 60 * 60 * 1000;
+export const SHARED_DATA_REFRESH_MS = 2_000;

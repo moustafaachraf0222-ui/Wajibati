@@ -1,18 +1,15 @@
 import { Capacitor } from '@capacitor/core';
 import type {
   AccountEditState,
-  Language,
   PlatformData,
   PlatformUser,
   PushTokenRecord,
-  RememberedAccount,
   Role,
   SchoolRecord,
   SecondaryStream,
   SharedDataSnapshot,
   Subject,
   TeacherNote,
-  Theme,
   View
 } from './types';
 import {
@@ -28,15 +25,11 @@ import {
   teacherSubjectForYear,
   uniqueStrings
 } from './education';
+import { DATA_KEY, REMOTE_STATE_ENDPOINT, SCHOOL_TRASH_RETENTION_MS } from './data-constants';
 
-export const DATA_KEY = 'school_platform_data_v2';
-export const SESSION_KEY = 'school_platform_session_v2';
-export const LANGUAGE_KEY = 'school_platform_language_v1';
-export const THEME_KEY = 'school_platform_theme_v1';
-export const REMEMBERED_ACCOUNTS_KEY = 'school_platform_remembered_accounts_v1';
-export const REMOTE_STATE_ENDPOINT = import.meta.env.VITE_REMOTE_STATE_ENDPOINT || 'https://wajibati.pages.dev/api/state';
-export const SCHOOL_TRASH_RETENTION_MS = 24 * 60 * 60 * 1000;
-export const SHARED_DATA_REFRESH_MS = 2_000;
+export * from './data-constants';
+export * from './data-identifiers';
+export * from './data-preferences';
 
 const seedData: PlatformData = {
   schools: [],
@@ -258,115 +251,6 @@ export async function promoteLocalDataIfRemoteIsEmpty(sharedData: PlatformData, 
   return sharedData;
 }
 
-export function isLanguage(value: string | null): value is Language {
-  return value === 'ar' || value === 'fr' || value === 'en';
-}
-
-export function loadLanguage(): Language {
-  const stored = localStorage.getItem(LANGUAGE_KEY);
-  return isLanguage(stored) ? stored : 'ar';
-}
-
-export function isTheme(value: string | null): value is Theme {
-  return value === 'light' || value === 'dark';
-}
-
-export function loadTheme(): Theme {
-  const stored = localStorage.getItem(THEME_KEY);
-  return isTheme(stored) ? stored : 'light';
-}
-
-export function isRole(value: unknown): value is Role {
-  return value === 'admin' || value === 'director' || value === 'teacher' || value === 'student';
-}
-
-export function loadRememberedAccounts(): RememberedAccount[] {
-  try {
-    const stored = localStorage.getItem(REMEMBERED_ACCOUNTS_KEY);
-    if (!stored) {
-      return [];
-    }
-
-    const parsed = JSON.parse(stored);
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-
-    const seen = new Set<string>();
-
-    return parsed
-      .filter(
-        (item): item is RememberedAccount =>
-          item &&
-          typeof item.id === 'string' &&
-          typeof item.name === 'string' &&
-          typeof item.email === 'string' &&
-          isRole(item.role)
-      )
-      .filter((item) => {
-        const idKey = `id:${item.id}`;
-        const emailKey = `email:${item.email.toLowerCase()}`;
-        if (seen.has(idKey) || seen.has(emailKey)) {
-          return false;
-        }
-        seen.add(idKey);
-        seen.add(emailKey);
-        return true;
-      })
-      .slice(0, 8);
-  } catch {
-    return [];
-  }
-}
-
-export function rememberedAccountFromUser(account: PlatformUser): RememberedAccount {
-  return {
-    id: account.id,
-    name: account.name,
-    email: account.email,
-    role: account.role
-  };
-}
-
-export function mergeRememberedAccount(previous: RememberedAccount[], account: PlatformUser) {
-  const nextAccount = rememberedAccountFromUser(account);
-  return [
-    nextAccount,
-    ...previous.filter((item) => item.id !== account.id && item.email.toLowerCase() !== account.email.toLowerCase())
-  ].slice(0, 8);
-}
-
-export function rememberedAccountListsEqual(left: RememberedAccount[], right: RememberedAccount[]) {
-  return JSON.stringify(left) === JSON.stringify(right);
-}
-
-export function saveRememberedAccounts(accounts: RememberedAccount[]) {
-  localStorage.setItem(REMEMBERED_ACCOUNTS_KEY, JSON.stringify(accounts));
-}
-
-export function rememberStoredAccount(account: PlatformUser) {
-  const next = mergeRememberedAccount(loadRememberedAccounts(), account);
-  saveRememberedAccounts(next);
-  return next;
-}
-
-export function forgetStoredAccount(account: PlatformUser) {
-  const next = loadRememberedAccounts().filter(
-    (item) => item.id !== account.id && item.email.toLowerCase() !== account.email.toLowerCase()
-  );
-  saveRememberedAccounts(next);
-  return next;
-}
-
-export function pruneRememberedAccounts(users: PlatformUser[]) {
-  const next = loadRememberedAccounts().filter((remembered) =>
-    users.some((user) => user.id === remembered.id || user.email.toLowerCase() === remembered.email.toLowerCase())
-  );
-
-  saveRememberedAccounts(next);
-  return next;
-}
-
 export function loadData(): PlatformData {
   localStorage.removeItem('school_platform_data_v1');
   localStorage.removeItem('school_platform_session_v1');
@@ -382,69 +266,6 @@ export function loadData(): PlatformData {
   } catch {
     return cloneSeedData();
   }
-}
-
-export function makeId(prefix: string) {
-  return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
-}
-
-export function randomIndex(max: number) {
-  if (max <= 0) {
-    return 0;
-  }
-
-  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
-    const values = new Uint32Array(1);
-    crypto.getRandomValues(values);
-    return values[0] % max;
-  }
-
-  return Math.floor(Math.random() * max);
-}
-
-export function generateAccountCode() {
-  const letters = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
-  const digits = '23456789';
-  const alphabet = `${letters}${digits}`;
-  const characters = [
-    letters[randomIndex(letters.length)],
-    digits[randomIndex(digits.length)],
-    ...Array.from({ length: 4 }, () => alphabet[randomIndex(alphabet.length)])
-  ];
-
-  for (let index = characters.length - 1; index > 0; index -= 1) {
-    const swapIndex = randomIndex(index + 1);
-    [characters[index], characters[swapIndex]] = [characters[swapIndex], characters[index]];
-  }
-
-  return characters.join('');
-}
-
-export function normalizeEmailDomain(domain: string) {
-  return domain.replace(/^@/, '').trim().toLowerCase();
-}
-
-export function compactEmailLocalPart(value: string) {
-  return value
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '');
-}
-
-export function generateSchoolEmail(name: string, role: 'teacher' | 'student', domain: string, users: PlatformUser[]) {
-  const emailDomain = normalizeEmailDomain(domain);
-  const localBase = compactEmailLocalPart(name) || role;
-  const usedEmails = new Set(users.map((user) => user.email.toLowerCase()));
-  let suffix = 0;
-  let email = `${localBase}@${emailDomain}`;
-
-  while (usedEmails.has(email.toLowerCase())) {
-    suffix += 1;
-    email = `${localBase}${suffix}@${emailDomain}`;
-  }
-
-  return email;
 }
 
 export function getSchool(data: PlatformData, user?: PlatformUser) {
