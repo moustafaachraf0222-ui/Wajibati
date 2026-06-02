@@ -1,7 +1,6 @@
 import {
   BookOpen,
   Building2,
-  Globe2,
   GraduationCap,
   LogOut,
   MessageSquare,
@@ -10,7 +9,6 @@ import {
   Settings,
   ShieldCheck,
   Sun,
-  Trash2,
   UserPlus,
   Users
 } from 'lucide-react';
@@ -19,21 +17,14 @@ import { PushNotifications, type Token } from '@capacitor/push-notifications';
 import { useEffect, useRef, useState } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import type {
-  DataSetter,
   Language,
   PlatformData,
-  PlatformUser,
   Role,
   SyncStatus,
   Theme,
   View
 } from './types';
-import {
-  languageFlags,
-  languageNames,
-  stageNames,
-  tr
-} from './i18n';
+import { stageNames, tr } from './i18n';
 import {
   assignedClassGroups,
   assignedSchoolYears,
@@ -67,8 +58,7 @@ import {
   ConfirmDialog,
   LanguageMenu,
   RoleLabel,
-  SyncIndicator,
-  languages
+  SyncIndicator
 } from './ui';
 import { UsersView } from './views/accounts';
 import { ExercisesView } from './views/exercises';
@@ -76,6 +66,7 @@ import { LoginPage } from './views/login';
 import { AnnouncementsView, NotesView } from './views/messages';
 import { OverviewView } from './views/overview';
 import { SchoolProfileView, SchoolsView } from './views/schools';
+import { SettingsView } from './views/settings';
 
 const navItems: Record<Role, Array<{ id: View; labelKey: string; icon: LucideIcon }>> = {
   admin: [
@@ -542,106 +533,6 @@ function App() {
         />
       )}
     </div>
-  );
-}
-
-type CommonViewProps = {
-  data: PlatformData;
-  currentUser: PlatformUser;
-  language: Language;
-};
-
-function SettingsView({
-  data,
-  setData,
-  currentUser,
-  language,
-  theme,
-  onLanguageChange,
-  onThemeChange,
-  onResetDemo
-}: CommonViewProps & {
-  setData: DataSetter;
-  theme: Theme;
-  onLanguageChange: (language: Language) => void;
-  onThemeChange: (theme: Theme) => void;
-  onResetDemo: () => void;
-}) {
-  return (
-    <section className="content-grid">
-      <div className="panel">
-        <div className="panel-heading">
-          <div>
-            <p>{tr(language, 'settingsLanguageText')}</p>
-            <h2>{tr(language, 'chooseLanguage')}</h2>
-          </div>
-          <Globe2 size={24} aria-hidden="true" />
-        </div>
-        <div className="segmented">
-          {languages.map((option) => (
-            <button
-              key={option}
-              type="button"
-              className={language === option ? 'active' : ''}
-              onClick={() => onLanguageChange(option)}
-            >
-              <span className="language-flag" aria-hidden="true">{languageFlags[option]}</span>
-              <span>{languageNames[option]}</span>
-            </button>
-          ))}
-        </div>
-        <label className="toggle-row settings-toggle">
-          <span>{tr(language, 'darkMode')}</span>
-          <input
-            type="checkbox"
-            checked={theme === 'dark'}
-            onChange={(event) => onThemeChange(event.target.checked ? 'dark' : 'light')}
-          />
-        </label>
-      </div>
-
-      {currentUser.role === 'admin' && (
-        <div className="panel">
-          <div className="panel-heading">
-            <div>
-              <p>{tr(language, 'adminPower')}</p>
-              <h2>{tr(language, 'systemSettings')}</h2>
-            </div>
-            <Settings size={24} aria-hidden="true" />
-          </div>
-          <label className="toggle-row">
-            <span>{tr(language, 'allowImages')}</span>
-            <input
-              type="checkbox"
-              checked={data.settings.allowExerciseImages}
-              onChange={(event) =>
-                setData((previous) => ({
-                  ...previous,
-                  settings: { ...previous.settings, allowExerciseImages: event.target.checked }
-                }))
-              }
-            />
-          </label>
-          <label className="toggle-row">
-            <span>{tr(language, 'maintenanceMode')}</span>
-            <input
-              type="checkbox"
-              checked={data.settings.maintenanceMode}
-              onChange={(event) =>
-                setData((previous) => ({
-                  ...previous,
-                  settings: { ...previous.settings, maintenanceMode: event.target.checked }
-                }))
-              }
-            />
-          </label>
-          <button className="button danger" type="button" onClick={onResetDemo}>
-            <Trash2 size={17} aria-hidden="true" />
-            <span>{tr(language, 'resetDemo')}</span>
-          </button>
-        </div>
-      )}
-    </section>
   );
 }
 
