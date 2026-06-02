@@ -1,0 +1,632 @@
+import type { Exercise, Language, PlatformUser, SchoolRecord, SecondaryStream, Stage, Subject, YearStreamClassGroups } from './types';
+import { schoolYearLabel, secondaryStreamNames, stageNames, subjectNames, tr } from './i18n';
+
+export const primarySubjects: Subject[] = [
+  'arabic',
+  'tamazight',
+  'french',
+  'english',
+  'islamic_education',
+  'civic_education',
+  'math',
+  'scientific_technology',
+  'history',
+  'art_education',
+  'music_education',
+  'physical_education'
+];
+export const primaryLowerYearExcludedSubjects: Subject[] = ['french', 'english'];
+export const middleSubjects: Subject[] = [
+  'arabic',
+  'tamazight',
+  'french',
+  'english',
+  'islamic_education',
+  'civic_education',
+  'history',
+  'math',
+  'life_science',
+  'physical_science_technology',
+  'computer_science',
+  'art_education',
+  'music_education',
+  'physical_education'
+];
+export const secondarySubjects: Subject[] = [
+  'arabic_literature',
+  'english',
+  'french',
+  'math',
+  'history',
+  'islamic_science',
+  'philosophy',
+  'computer_science',
+  'physical_education',
+  'tamazight',
+  'life_science',
+  'physical_science_technology',
+  'physical_sciences',
+  'technology',
+  'civil_engineering_subject',
+  'electrical_engineering_subject',
+  'mechanical_engineering_subject',
+  'process_engineering_subject',
+  'spanish',
+  'german',
+  'italian'
+];
+export const stages: Stage[] = ['primary', 'middle', 'secondary'];
+export const defaultClassGroups = ['1', '2', '3', '4'];
+export const secondaryStreams: SecondaryStream[] = [
+  'experimental_science',
+  'mathematics',
+  'civil_engineering',
+  'electrical_engineering',
+  'mechanical_engineering',
+  'process_engineering',
+  'management_economics',
+  'literature_philosophy',
+  'foreign_languages'
+];
+export const firstYearSecondaryStreams: SecondaryStream[] = ['experimental_science', 'literature_philosophy'];
+export const scientificSecondaryStreams: SecondaryStream[] = ['experimental_science', 'mathematics'];
+export const technicalMathStreams: SecondaryStream[] = [
+  'civil_engineering',
+  'electrical_engineering',
+  'mechanical_engineering',
+  'process_engineering'
+];
+export const secondarySubjectStreams: Partial<Record<Subject, SecondaryStream[]>> = {
+  life_science: scientificSecondaryStreams,
+  physical_science_technology: [...scientificSecondaryStreams, ...technicalMathStreams],
+  physical_sciences: [...scientificSecondaryStreams, ...technicalMathStreams],
+  technology: [...scientificSecondaryStreams, ...technicalMathStreams],
+  civil_engineering_subject: ['civil_engineering'],
+  electrical_engineering_subject: ['electrical_engineering'],
+  mechanical_engineering_subject: ['mechanical_engineering'],
+  process_engineering_subject: ['process_engineering'],
+  spanish: ['foreign_languages'],
+  german: ['foreign_languages'],
+  italian: ['foreign_languages']
+};
+export const subjectOrder: Subject[] = [
+  ...primarySubjects,
+  ...middleSubjects.filter((subject) => !primarySubjects.includes(subject)),
+  ...secondarySubjects.filter((subject) => !primarySubjects.includes(subject) && !middleSubjects.includes(subject))
+];
+
+export function uniqueNumbers(values: number[]) {
+  return [...new Set(values)].sort((left, right) => left - right);
+}
+
+export function uniqueStrings(values: string[]) {
+  return [...new Set(values.filter(Boolean))];
+}
+
+export function parseClassGroups(value: string) {
+  const seen = new Set<string>();
+
+  return value
+    .split(/[,،;\n]+/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .filter((item) => {
+      const normalized = item.toLowerCase();
+      if (seen.has(normalized)) {
+        return false;
+      }
+      seen.add(normalized);
+      return true;
+    });
+}
+
+export function normalizeClassGroup(value: string) {
+  return value.trim();
+}
+
+export function normalizeYearClassGroups(assignments: Record<string, string[]> | undefined) {
+  const normalized: Record<string, string[]> = {};
+
+  Object.entries(assignments ?? {}).forEach(([year, groups]) => {
+    const yearNumber = Number(year);
+    const cleanGroups = parseClassGroups(groups.join(','));
+    if (Number.isInteger(yearNumber) && yearNumber > 0 && cleanGroups.length > 0) {
+      normalized[String(yearNumber)] = cleanGroups;
+    }
+  });
+
+  return normalized;
+}
+
+export function normalizeYearStreamClassGroups(assignments: YearStreamClassGroups | undefined) {
+  const normalized: YearStreamClassGroups = {};
+
+  Object.entries(assignments ?? {}).forEach(([year, streams]) => {
+    const yearNumber = Number(year);
+    if (!Number.isInteger(yearNumber) || yearNumber <= 0) {
+      return;
+    }
+
+    const normalizedStreams: Partial<Record<SecondaryStream, string[]>> = {};
+
+    Object.entries(streams ?? {}).forEach(([stream, groups]) => {
+      if (!secondaryStreams.includes(stream as SecondaryStream)) {
+        return;
+      }
+
+      const cleanGroups = parseClassGroups((groups ?? []).join(','));
+      if (cleanGroups.length > 0) {
+        normalizedStreams[stream as SecondaryStream] = cleanGroups;
+      }
+    });
+
+    if (Object.keys(normalizedStreams).length > 0) {
+      normalized[String(yearNumber)] = normalizedStreams;
+    }
+  });
+
+  return normalized;
+}
+
+export function assignedYearStreamClassGroups(user: PlatformUser) {
+  return normalizeYearStreamClassGroups(user.yearStreamClassGroups);
+}
+
+export function assignedSchoolYears(user: PlatformUser) {
+  const streamGroupedYears = uniqueNumbers(Object.keys(assignedYearStreamClassGroups(user)).map(Number));
+  if (streamGroupedYears.length > 0) {
+    return streamGroupedYears;
+  }
+
+  const groupedYears = uniqueNumbers(Object.keys(normalizeYearClassGroups(user.yearClassGroups)).map(Number));
+  if (groupedYears.length > 0) {
+    return groupedYears;
+  }
+
+  const years = uniqueNumbers((user.schoolYears ?? []).filter((year) => Number.isInteger(year) && year > 0));
+  if (years.length > 0) {
+    return years;
+  }
+
+  return user.schoolYear ? [user.schoolYear] : [];
+}
+
+export function assignedYearClassGroups(user: PlatformUser) {
+  const grouped = normalizeYearClassGroups(user.yearClassGroups);
+  if (Object.keys(grouped).length > 0) {
+    return grouped;
+  }
+
+  const years = assignedSchoolYears(user);
+  const groups = parseClassGroups((user.classGroups ?? []).join(','));
+
+  if (years.length > 0 && groups.length > 0) {
+    return Object.fromEntries(years.map((year) => [String(year), groups]));
+  }
+
+  if (user.schoolYear && user.classGroup?.trim()) {
+    return { [String(user.schoolYear)]: [user.classGroup.trim()] };
+  }
+
+  return {};
+}
+
+export function assignedClassGroups(user: PlatformUser) {
+  const streamGrouped = assignedYearStreamClassGroups(user);
+  const streamGroupedClasses = parseClassGroups(
+    Object.values(streamGrouped)
+      .flatMap((streams) => Object.values(streams).flat())
+      .join(',')
+  );
+  if (streamGroupedClasses.length > 0) {
+    return streamGroupedClasses;
+  }
+
+  const grouped = normalizeYearClassGroups(user.yearClassGroups);
+  const groupedClasses = parseClassGroups(Object.values(grouped).flat().join(','));
+  if (groupedClasses.length > 0) {
+    return groupedClasses;
+  }
+
+  const groups = parseClassGroups((user.classGroups ?? []).join(','));
+  if (groups.length > 0) {
+    return groups;
+  }
+
+  return user.classGroup?.trim() ? [user.classGroup.trim()] : [];
+}
+
+export function schoolYearsLabel(language: Language, user: PlatformUser) {
+  const years = assignedSchoolYears(user);
+  if (years.length === 0) {
+    return '-';
+  }
+
+  return years.map((year) => schoolYearLabel(language, user.stage, year)).join('، ');
+}
+
+export function classGroupsLabel(user: PlatformUser) {
+  const groups = assignedClassGroups(user);
+  return groups.length > 0 ? groups.join('، ') : '-';
+}
+
+export function yearClassGroupsLabel(language: Language, user: PlatformUser) {
+  const streamGrouped = assignedYearStreamClassGroups(user);
+  const streamEntries = Object.entries(streamGrouped);
+
+  if (streamEntries.length > 0) {
+    return streamEntries
+      .sort(([left], [right]) => Number(left) - Number(right))
+      .map(([year, streams]) => {
+        const streamText = Object.entries(streams)
+          .map(([stream, groups]) => `${secondaryStreamLabel(language, stream as SecondaryStream, Number(year))}: ${(groups ?? []).join('، ')}`)
+          .join(' / ');
+
+        return `${schoolYearLabel(language, user.stage, Number(year))}: ${streamText}`;
+      })
+      .join(' | ');
+  }
+
+  const grouped = assignedYearClassGroups(user);
+  const entries = Object.entries(grouped);
+
+  if (entries.length === 0) {
+    return '-';
+  }
+
+  return entries
+    .sort(([left], [right]) => Number(left) - Number(right))
+    .map(([year, groups]) => `${schoolYearLabel(language, user.stage, Number(year))}: ${groups.join('، ')}`)
+    .join(' | ');
+}
+
+export function scopedYearDetailsLabel(language: Language, user: PlatformUser, details: Array<{ year: number; text: string }>) {
+  const visibleDetails = details.filter((detail) => detail.text.trim());
+
+  if (visibleDetails.length === 0) {
+    return '-';
+  }
+
+  if (visibleDetails.length === 1) {
+    return visibleDetails[0].text;
+  }
+
+  return visibleDetails.map((detail) => `${schoolYearLabel(language, user.stage, detail.year)}: ${detail.text}`).join(' | ');
+}
+
+export function teacherTableClassGroupsLabel(language: Language, user: PlatformUser) {
+  const streamGrouped = assignedYearStreamClassGroups(user);
+  const streamEntries = Object.entries(streamGrouped);
+
+  if (streamEntries.length > 0) {
+    return scopedYearDetailsLabel(
+      language,
+      user,
+      streamEntries
+        .sort(([left], [right]) => Number(left) - Number(right))
+        .map(([year, streams]) => ({
+          year: Number(year),
+          text: parseClassGroups(Object.values(streams).flat().join(',')).join('، ')
+        }))
+    );
+  }
+
+  const grouped = assignedYearClassGroups(user);
+  const entries = Object.entries(grouped);
+
+  if (entries.length > 0) {
+    return scopedYearDetailsLabel(
+      language,
+      user,
+      entries
+        .sort(([left], [right]) => Number(left) - Number(right))
+        .map(([year, groups]) => ({ year: Number(year), text: parseClassGroups(groups.join(',')).join('، ') }))
+    );
+  }
+
+  return classGroupsLabel(user);
+}
+
+export function teacherTableStreamsLabel(language: Language, user: PlatformUser) {
+  const streamEntries = Object.entries(assignedYearStreamClassGroups(user));
+
+  if (streamEntries.length === 0) {
+    return '-';
+  }
+
+  return scopedYearDetailsLabel(
+    language,
+    user,
+    streamEntries
+      .sort(([left], [right]) => Number(left) - Number(right))
+      .map(([year, streams]) => ({
+        year: Number(year),
+        text: (Object.keys(streams) as SecondaryStream[]).map((stream) => secondaryStreamLabel(language, stream, Number(year))).join('، ')
+      }))
+  );
+}
+
+export function assignedYearSubjects(user: PlatformUser) {
+  const years = assignedSchoolYears(user);
+  const subjectsByYear: Record<string, Subject> = {};
+
+  years.forEach((year) => {
+    const key = String(year);
+    const subject = user.subjectsByYear?.[key] ?? user.subject;
+    if (subject) {
+      subjectsByYear[key] = subject;
+    }
+  });
+
+  Object.entries(user.subjectsByYear ?? {}).forEach(([year, subject]) => {
+    if (subject) {
+      subjectsByYear[year] = subject;
+    }
+  });
+
+  return subjectsByYear;
+}
+
+export function teacherSubjectForYear(user: PlatformUser, schoolYear: number | undefined) {
+  if (!schoolYear) {
+    return user.subject;
+  }
+
+  return assignedYearSubjects(user)[String(schoolYear)] ?? user.subject;
+}
+
+export function teacherSubjectsLabel(language: Language, user: PlatformUser) {
+  if (user.role !== 'teacher') {
+    return user.subject ? subjectNames[language][user.subject] : '-';
+  }
+
+  const subjectEntries = Object.entries(assignedYearSubjects(user)).sort(([left], [right]) => Number(left) - Number(right));
+  if (subjectEntries.length === 0) {
+    return user.subject ? subjectNames[language][user.subject] : '-';
+  }
+
+  const uniqueSubjects = [...new Set(subjectEntries.map(([, subject]) => subject))];
+  if (uniqueSubjects.length === 1) {
+    return subjectNames[language][uniqueSubjects[0]];
+  }
+
+  return subjectEntries.map(([year, subject]) => `${schoolYearLabel(language, user.stage, Number(year))}: ${subjectNames[language][subject]}`).join(' | ');
+}
+
+export function selectedStreamsForTeacherYear(yearStreamClassGroups: YearStreamClassGroups, school: SchoolRecord | undefined, schoolYear: number) {
+  const selectedStreams = Object.keys(normalizeYearStreamClassGroups(yearStreamClassGroups)[String(schoolYear)] ?? {}) as SecondaryStream[];
+  if (school?.stage === 'secondary') {
+    return selectedStreams;
+  }
+
+  return selectedStreams.length > 0 ? selectedStreams : secondaryStreamsForYear(school, schoolYear);
+}
+
+export function subjectOptionsForTeacherYear(school: SchoolRecord | undefined, yearStreamClassGroups: YearStreamClassGroups, schoolYear: number) {
+  const selectedStreams = selectedStreamsForTeacherYear(yearStreamClassGroups, school, schoolYear);
+  if (school?.stage === 'secondary' && selectedStreams.length === 0) {
+    return [];
+  }
+
+  return subjectsForTeacherYear(school, selectedStreams, schoolYear);
+}
+
+export function normalizeTeacherSubjectsByYear(
+  school: SchoolRecord | undefined,
+  schoolYears: number[],
+  yearStreamClassGroups: YearStreamClassGroups,
+  subjectsByYear: Record<string, Subject | ''>,
+  fallbackSubject?: Subject
+) {
+  const normalized: Record<string, Subject> = {};
+
+  schoolYears.forEach((year) => {
+    const key = String(year);
+    const options = subjectOptionsForTeacherYear(school, yearStreamClassGroups, year);
+    const selected = subjectsByYear[key] || fallbackSubject || '';
+    const subject = selected && options.includes(selected as Subject) ? (selected as Subject) : options[0];
+
+    if (subject) {
+      normalized[key] = subject;
+    }
+  });
+
+  return normalized;
+}
+
+export function assignmentSummaryLabel(language: Language, user: PlatformUser) {
+  if (user.role === 'admin') {
+    return tr(language, 'noAssignments');
+  }
+
+  if (user.role === 'director') {
+    return user.stage ? stageNames[language][user.stage] : tr(language, 'noAssignments');
+  }
+
+  if (user.role === 'student') {
+    const parts = [
+      schoolYearLabel(language, user.stage, user.schoolYear),
+      user.stream ? secondaryStreamLabel(language, user.stream, user.schoolYear) : '',
+      user.classGroup ? `${tr(language, 'classGroup')} ${user.classGroup}` : ''
+    ].filter((part) => part && part !== '-');
+
+    return parts.length > 0 ? parts.join(' / ') : tr(language, 'noAssignments');
+  }
+
+  const years = assignedSchoolYears(user);
+  const classes = assignedClassGroups(user);
+  const streams = Object.values(assignedYearStreamClassGroups(user)).flatMap((streamGroups) => Object.keys(streamGroups));
+  const parts = [`${years.length} ${tr(language, 'schoolYears')}`, `${classes.length} ${tr(language, 'classGroups')}`];
+
+  if (user.stage === 'secondary') {
+    parts.splice(1, 0, `${new Set(streams).size} ${tr(language, 'stream')}`);
+  }
+
+  return years.length > 0 || classes.length > 0 ? parts.join(' / ') : tr(language, 'noAssignments');
+}
+
+export function hasAccountDetails(user: PlatformUser) {
+  return user.role !== 'admin';
+}
+
+export function sameClassGroup(left?: string, right?: string) {
+  return (left ?? '').trim().toLowerCase() === (right ?? '').trim().toLowerCase();
+}
+
+export function exerciseMatchesStudent(exercise: Exercise, user: PlatformUser) {
+  if (user.role !== 'student' || !user.schoolId || !user.stage || !user.schoolYear || !user.classGroup?.trim()) {
+    return false;
+  }
+
+  if (exercise.schoolId !== user.schoolId || exercise.stage !== user.stage || exercise.schoolYear !== user.schoolYear) {
+    return false;
+  }
+
+  if (!sameClassGroup(exercise.classGroup, user.classGroup)) {
+    return false;
+  }
+
+  if (user.stage === 'secondary') {
+    return Boolean(exercise.stream && user.stream && exercise.stream === user.stream);
+  }
+
+  return true;
+}
+
+export function exerciseMatchesTeacherAssignment(exercise: Exercise, user: PlatformUser) {
+  const streamGrouped = assignedYearStreamClassGroups(user);
+  const streamEntries = Object.entries(streamGrouped);
+
+  if (streamEntries.length > 0) {
+    const years = Object.keys(streamGrouped).map(Number);
+    const yearMatches = exercise.schoolYear === undefined || years.includes(exercise.schoolYear);
+    const streamGroupsForYear =
+      exercise.schoolYear === undefined ? Object.values(streamGrouped) : [streamGrouped[String(exercise.schoolYear)] ?? {}];
+    const streamMatches =
+      exercise.stream === undefined || streamGroupsForYear.some((streams) => Boolean(streams[exercise.stream as SecondaryStream]?.length));
+    const classesForTarget = streamGroupsForYear.flatMap((streams) =>
+      exercise.stream === undefined ? Object.values(streams).flat() : streams[exercise.stream as SecondaryStream] ?? []
+    );
+    const classMatches = exercise.classGroup === undefined || classesForTarget.some((group) => sameClassGroup(group, exercise.classGroup));
+
+    return yearMatches && streamMatches && classMatches;
+  }
+
+  const grouped = assignedYearClassGroups(user);
+  const years = Object.keys(grouped).map(Number);
+  const yearMatches = exercise.schoolYear === undefined || years.includes(exercise.schoolYear);
+  const classesForYear = exercise.schoolYear === undefined ? Object.values(grouped).flat() : grouped[String(exercise.schoolYear)] ?? [];
+  const classMatches = exercise.classGroup === undefined || classesForYear.some((group) => sameClassGroup(group, exercise.classGroup));
+
+  return yearMatches && classMatches;
+}
+
+export function enabledSecondaryStreams(school?: SchoolRecord) {
+  return school?.stage === 'secondary' ? school.streams ?? [] : [];
+}
+
+export function secondaryStreamsForYear(school: SchoolRecord | undefined, schoolYear: number | undefined) {
+  const enabledStreams = enabledSecondaryStreams(school);
+
+  if (school?.stage !== 'secondary') {
+    return [];
+  }
+
+  if (schoolYear === 1) {
+    return firstYearSecondaryStreams.filter((stream) => enabledStreams.includes(stream));
+  }
+
+  return enabledStreams;
+}
+
+export function secondaryStreamLabel(language: Language, stream: SecondaryStream, schoolYear?: number) {
+  if (schoolYear === 1 && stream === 'literature_philosophy') {
+    return {
+      ar: 'آداب',
+      fr: 'Lettres',
+      en: 'Literature'
+    }[language];
+  }
+
+  return secondaryStreamNames[language][stream];
+}
+
+export function streamsForSubject(subject: Subject | undefined, school?: SchoolRecord) {
+  if (!subject || school?.stage !== 'secondary') {
+    return [];
+  }
+
+  const enabledStreams = enabledSecondaryStreams(school);
+  const specificStreams = secondarySubjectStreams[subject];
+
+  if (!specificStreams) {
+    return enabledStreams;
+  }
+
+  return enabledStreams.filter((stream) => specificStreams.includes(stream));
+}
+
+export function subjectsForSchool(school?: SchoolRecord) {
+  if (school?.stage === 'primary') {
+    return primarySubjects;
+  }
+
+  if (school?.stage === 'middle' || !school) {
+    return middleSubjects;
+  }
+
+  return secondarySubjects.filter((subject) => !secondarySubjectStreams[subject] || streamsForSubject(subject, school).length > 0);
+}
+
+export function subjectMatchesStreams(subject: Subject, streams: SecondaryStream[]) {
+  const specificStreams = secondarySubjectStreams[subject];
+  return !specificStreams || streams.some((stream) => specificStreams.includes(stream));
+}
+
+export function subjectsForTeacherStreams(school: SchoolRecord | undefined, selectedStreams: SecondaryStream[]) {
+  if (school?.stage !== 'secondary') {
+    return subjectsForSchool(school);
+  }
+
+  const availableStreams = selectedStreams.length > 0 ? selectedStreams : enabledSecondaryStreams(school);
+  return secondarySubjects.filter((subject) => subjectMatchesStreams(subject, availableStreams));
+}
+
+export function subjectsForTeacherYears(school: SchoolRecord | undefined, selectedStreams: SecondaryStream[], schoolYears: number[]) {
+  if (schoolYears.length === 0) {
+    return [];
+  }
+
+  const availableSubjects = subjectsForTeacherStreams(school, selectedStreams);
+
+  if (school?.stage === 'primary' && schoolYears.some((year) => year === 1 || year === 2)) {
+    return availableSubjects.filter((subject) => !primaryLowerYearExcludedSubjects.includes(subject));
+  }
+
+  return availableSubjects;
+}
+
+export function subjectsForTeacherYear(school: SchoolRecord | undefined, selectedStreams: SecondaryStream[], schoolYear: number) {
+  return subjectsForTeacherYears(school, selectedStreams, [schoolYear]);
+}
+
+export function subjectScopeLabel(language: Language, subject: Subject, school?: SchoolRecord) {
+  if (school?.stage !== 'secondary') {
+    return '';
+  }
+
+  const specificStreams = secondarySubjectStreams[subject];
+  if (!specificStreams) {
+    return tr(language, 'commonSubject');
+  }
+
+  const streams = streamsForSubject(subject, school);
+  return streams.length > 0 ? streams.map((stream) => secondaryStreamLabel(language, stream)).join('، ') : '-';
+}
+
+export function subjectOptionLabel(language: Language, subject: Subject, school?: SchoolRecord) {
+  const subjectName = subjectNames[language][subject];
+  const scope = subjectScopeLabel(language, subject, school);
+
+  return scope ? `${subjectName} - ${scope}` : subjectName;
+}
