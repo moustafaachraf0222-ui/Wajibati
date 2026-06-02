@@ -29,15 +29,10 @@ import {
   saveSharedData,
   upsertPushToken
 } from './data';
+import { AppRouter } from './app-router';
 import { AppShell } from './app-shell';
 import { navItems } from './navigation';
-import { UsersView } from './views/accounts';
-import { ExercisesView } from './views/exercises';
 import { LoginPage } from './views/login';
-import { AnnouncementsView, NotesView } from './views/messages';
-import { OverviewView } from './views/overview';
-import { SchoolProfileView, SchoolsView } from './views/schools';
-import { SettingsView } from './views/settings';
 
 function App() {
   const [language, setLanguage] = useState<Language>(loadLanguage);
@@ -351,42 +346,6 @@ function App() {
     );
   }
 
-  const renderView = () => {
-    switch (safeView) {
-      case 'schools':
-        return <SchoolsView data={data} setData={setData} currentUser={currentUser} language={language} />;
-      case 'users':
-        return <UsersView data={data} setData={setData} currentUser={currentUser} language={language} />;
-      case 'school':
-        return <SchoolProfileView data={data} setData={setData} currentUser={currentUser} language={language} />;
-      case 'exercises':
-        return <ExercisesView data={data} setData={setData} currentUser={currentUser} language={language} />;
-      case 'announcements':
-        return <AnnouncementsView data={data} setData={setData} currentUser={currentUser} language={language} />;
-      case 'notes':
-        return <NotesView data={data} setData={setData} currentUser={currentUser} language={language} />;
-      case 'settings':
-        return (
-          <SettingsView
-            data={data}
-            setData={setData}
-            language={language}
-            theme={theme}
-            currentUser={currentUser}
-            onLanguageChange={setLanguage}
-            onThemeChange={setTheme}
-            onResetDemo={() => {
-              setData(cloneSeedData());
-              logoutUser();
-            }}
-          />
-        );
-      case 'overview':
-      default:
-        return <OverviewView data={data} currentUser={currentUser} language={language} />;
-    }
-  };
-
   return (
     <AppShell
       currentSchool={currentSchool}
@@ -407,7 +366,20 @@ function App() {
       onThemeChange={setTheme}
       onViewChange={setActiveView}
     >
-      {renderView()}
+      <AppRouter
+        data={data}
+        setData={setData}
+        currentUser={currentUser}
+        language={language}
+        theme={theme}
+        view={safeView}
+        onLanguageChange={setLanguage}
+        onThemeChange={setTheme}
+        onResetDemo={() => {
+          setData(cloneSeedData());
+          logoutUser();
+        }}
+      />
     </AppShell>
   );
 }
