@@ -1,5 +1,3 @@
-import { Capacitor } from '@capacitor/core';
-import { PushNotifications, type Token } from '@capacitor/push-notifications';
 import { useEffect, useRef, useState } from 'react';
 import type {
   Language,
@@ -10,10 +8,8 @@ import type {
 } from './types';
 import {
   DATA_KEY,
-  LANGUAGE_KEY,
   SESSION_KEY,
   SHARED_DATA_REFRESH_MS,
-  THEME_KEY,
   canAuthenticateUser,
   cloneSeedData,
   defaultView,
@@ -25,10 +21,15 @@ import {
   loadTheme,
   mergeDeletionTombstones,
   promoteLocalDataIfRemoteIsEmpty,
-  purgeExpiredTrashedSchools,
-  saveSharedData,
-  upsertPushToken
+  saveSharedData
 } from './data';
+import {
+  useExpiredSchoolTrashPurge,
+  useLanguagePreference,
+  usePushRegistration,
+  useSessionPersistence,
+  useThemePreference
+} from './app-effects';
 import { AppRouter } from './app-router';
 import { AppShell } from './app-shell';
 import { navItems } from './navigation';
@@ -245,79 +246,11 @@ function App() {
     };
   }, [currentUser?.id]);
 
-  useEffect(() => {
-    const purgeExpiredSchools = () => {
-      setData((previous) => purgeExpiredTrashedSchools(previous));
-    };
-
-    purgeExpiredSchools();
-    const purgeTimer = window.setInterval(purgeExpiredSchools, 60_000);
-    return () => window.clearInterval(purgeTimer);
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem(LANGUAGE_KEY, language);
-    document.documentElement.lang = language;
-    document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr';
-  }, [language]);
-
-  useEffect(() => {
-    localStorage.setItem(THEME_KEY, theme);
-    document.documentElement.dataset.theme = theme;
-  }, [theme]);
-
-  useEffect(() => {
-    if (sessionUserId) {
-      localStorage.setItem(SESSION_KEY, sessionUserId);
-    } else {
-      localStorage.removeItem(SESSION_KEY);
-    }
-  }, [sessionUserId]);
-
-  useEffect(() => {
-    if (!currentUser || syncStatus === 'checking' || !Capacitor.isNativePlatform()) {
-      return;
-    }
-
-    let cancelled = false;
-    const listenerHandles: Array<{ remove: () => Promise<void> }> = [];
-
-    const registerForPush = async () => {
-      try {
-        let permissions = await PushNotifications.checkPermissions();
-        if (permissions.receive === 'prompt') {
-          permissions = await PushNotifications.requestPermissions();
-        }
-
-        if (permissions.receive !== 'granted') {
-          return;
-        }
-
-        const registrationHandle = await PushNotifications.addListener('registration', (token: Token) => {
-          if (!cancelled) {
-            setData((previous) => upsertPushToken(previous, currentUser.id, token.value));
-          }
-        });
-        listenerHandles.push(registrationHandle);
-
-        const errorHandle = await PushNotifications.addListener('registrationError', () => undefined);
-        listenerHandles.push(errorHandle);
-
-        await PushNotifications.register();
-      } catch {
-        // Push registration is best effort; the website must still work normally without it.
-      }
-    };
-
-    registerForPush();
-
-    return () => {
-      cancelled = true;
-      listenerHandles.forEach((handle) => {
-        handle.remove().catch(() => undefined);
-      });
-    };
-  }, [currentUser?.id, syncStatus]);
+  useExpiredSchoolTrashPurge(setData);
+  useLanguagePreference(language);
+  useThemePreference(theme);
+  useSessionPersistence(sessionUserId);
+  usePushRegistration(currentUser, syncStatus, setData);
 
   useEffect(() => {
     if (currentUser) {
