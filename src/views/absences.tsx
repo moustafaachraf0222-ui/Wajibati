@@ -438,6 +438,28 @@ function sessionTimesAreValid(sessions: AbsenceSchedule['sessions']) {
   return sessions.every((session) => timePattern.test(session.startsAt) && timePattern.test(session.endsAt) && session.startsAt < session.endsAt);
 }
 
+function normalizeTimeInput(value: string) {
+  const match = value.trim().match(/^(\d{1,2}):([0-5]\d)$/);
+  if (!match) {
+    return value.trim();
+  }
+
+  const hour = Number(match[1]);
+  if (hour > 23) {
+    return value.trim();
+  }
+
+  return `${String(hour).padStart(2, '0')}:${match[2]}`;
+}
+
+function normalizeScheduleSessions(sessions: AbsenceSchedule['sessions']) {
+  return sessions.map((session) => ({
+    ...session,
+    startsAt: normalizeTimeInput(session.startsAt),
+    endsAt: normalizeTimeInput(session.endsAt)
+  }));
+}
+
 function DirectorScheduleManager({ data, setData, currentUser, language }: CommonViewProps & { setData: DataSetter }) {
   const classGroups = useMemo(() => classesForAbsences(data, currentUser), [data, currentUser]);
   const schedules = useMemo(
@@ -517,7 +539,8 @@ function DirectorScheduleManager({ data, setData, currentUser, language }: Commo
       return;
     }
 
-    if (!sessionTimesAreValid(form.sessions)) {
+    const normalizedSessions = normalizeScheduleSessions(form.sessions);
+    if (!sessionTimesAreValid(normalizedSessions)) {
       setError(tr(language, 'timeFormatRequired'));
       return;
     }
@@ -545,7 +568,7 @@ function DirectorScheduleManager({ data, setData, currentUser, language }: Commo
       schoolId: currentUser.schoolId,
       stage: currentUser.stage,
       name: form.name.trim(),
-      sessions: form.sessions.map((session) => ({ ...session, name: session.name.trim() || '1' })),
+      sessions: normalizedSessions.map((session) => ({ ...session, name: session.name.trim() || '1' })),
       targets,
       weekdays: [...form.weekdays],
       createdBy: currentUser.id,
@@ -624,11 +647,27 @@ function DirectorScheduleManager({ data, setData, currentUser, language }: Commo
               </label>
               <label>
                 <span>{tr(language, 'startsAt')}</span>
-                <input type="time" value={session.startsAt} onChange={(event) => updateSession(index, { startsAt: event.target.value })} />
+                <input
+                  dir="ltr"
+                  inputMode="numeric"
+                  pattern="[0-2][0-9]:[0-5][0-9]"
+                  placeholder="08:00"
+                  value={session.startsAt}
+                  onBlur={(event) => updateSession(index, { startsAt: normalizeTimeInput(event.target.value) })}
+                  onChange={(event) => updateSession(index, { startsAt: event.target.value })}
+                />
               </label>
               <label>
                 <span>{tr(language, 'endsAt')}</span>
-                <input type="time" value={session.endsAt} onChange={(event) => updateSession(index, { endsAt: event.target.value })} />
+                <input
+                  dir="ltr"
+                  inputMode="numeric"
+                  pattern="[0-2][0-9]:[0-5][0-9]"
+                  placeholder="09:00"
+                  value={session.endsAt}
+                  onBlur={(event) => updateSession(index, { endsAt: normalizeTimeInput(event.target.value) })}
+                  onChange={(event) => updateSession(index, { endsAt: event.target.value })}
+                />
               </label>
               <button className="icon-button danger" type="button" title={tr(language, 'removeSession')} onClick={() => removeSession(index)}>
                 <X size={16} aria-hidden="true" />
