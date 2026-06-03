@@ -659,7 +659,7 @@ export function DirectorCreateAccountPanel({
             </div>
             <p className="hint full">{tr(language, currentUser.stage === 'secondary' ? 'streamClassesHint' : 'classesHint')}</p>
           </>
-        ) : (
+        ) : form.role === 'student' ? (
           <>
             <label>
               <span>{tr(language, 'classGroup')}</span>
@@ -676,7 +676,7 @@ export function DirectorCreateAccountPanel({
               <Field label={tr(language, 'customClass')} value={form.customClassGroup} onChange={(value) => setForm({ ...form, customClassGroup: value })} required />
             )}
           </>
-        )}
+        ) : null}
         {form.role === 'teacher' && form.schoolYears.length === 0 && <p className="hint full">{tr(language, 'subjectAfterYear')}</p>}
         <p className="hint full">{tr(language, 'createOnlyTeacherStudent')}</p>
         {error && <p className="form-error full">{error}</p>}
