@@ -1,6 +1,17 @@
-import { CalendarDays, Check, ClipboardCheck, FileText, Printer, Send, X } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
-import type { AbsenceRecord, AbsenceReport, DataSetter, Language, PlatformData, PlatformUser, SecondaryStream } from '../types';
+import { CalendarDays, Check, ClipboardCheck, Clock, FileText, Plus, Printer, Save, Send, X } from 'lucide-react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import type {
+  AbsenceRecord,
+  AbsenceReport,
+  AbsenceSchedule,
+  AbsenceScheduleTarget,
+  AbsenceSession,
+  DataSetter,
+  Language,
+  PlatformData,
+  PlatformUser,
+  SecondaryStream
+} from '../types';
 import { localeNames, schoolYearLabel, tr } from '../i18n';
 import { sameClassGroup, secondaryStreamLabel } from '../education';
 import { getSchool, makeId } from '../data';
@@ -43,18 +54,6 @@ type CommonViewProps = {
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10);
-}
-
-function currentTimeIso() {
-  const now = new Date();
-  return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-}
-
-function addMinutesToTime(value: string, minutes: number) {
-  const [hours = '0', rawMinutes = '0'] = value.split(':');
-  const date = new Date();
-  date.setHours(Number(hours), Number(rawMinutes) + minutes, 0, 0);
-  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 }
 
 function classKey(schoolYear: number, stream: SecondaryStream | undefined, classGroup: string) {
@@ -116,6 +115,35 @@ function classLabel(language: Language, group: Pick<AbsenceClassGroup, 'schoolYe
   return `${schoolYearLabel(language, undefined, group.schoolYear)}${stream} - ${tr(language, 'classGroup')} ${group.classGroup}`;
 }
 
+function makeDraftSession(index: number): AbsenceSession {
+  return {
+    id: makeId('session'),
+    name: String(index),
+    startsAt: '',
+    endsAt: ''
+  };
+}
+
+function classTargetFromGroup(group: AbsenceClassGroup): AbsenceScheduleTarget {
+  return {
+    schoolYear: group.schoolYear,
+    stream: group.stream,
+    classGroup: group.classGroup
+  };
+}
+
+function targetMatchesClass(target: AbsenceScheduleTarget, group: Pick<AbsenceClassGroup, 'schoolYear' | 'stream' | 'classGroup'>) {
+  return target.schoolYear === group.schoolYear && target.stream === group.stream && sameClassGroup(target.classGroup, group.classGroup);
+}
+
+function scheduleAppliesToClass(schedule: AbsenceSchedule, group: AbsenceClassGroup) {
+  return !schedule.targets?.length || schedule.targets.some((target) => targetMatchesClass(target, group));
+}
+
+function scheduleLabel(schedule: AbsenceSchedule) {
+  return `${schedule.name} (${schedule.sessions.length})`;
+}
+
 function formatAbsenceDate(language: Language, value: string) {
   const date = new Date(`${value}T00:00:00`);
   if (Number.isNaN(date.getTime())) {
@@ -134,9 +162,8 @@ function formatAbsenceDateTime(language: Language, value: string) {
   return new Intl.DateTimeFormat(localeNames[language], { dateStyle: 'medium', timeStyle: 'short' }).format(date);
 }
 
-function sessionIdFor(date: string, sessionName: string, startsAt: string, endsAt: string) {
-  const label = sessionName.trim().toLowerCase() || 'session';
-  return `manual:${date}:${startsAt}:${endsAt}:${label}`;
+function sessionIdFor(date: string, scheduleId: string, sessionId: string) {
+  return `template:${date}:${scheduleId}:${sessionId}`;
 }
 
 function reportSessionLabel(report: AbsenceReport) {
@@ -446,13 +473,21 @@ function DirectorAbsenceReports({ data, currentUser, language }: CommonViewProps
 function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: CommonViewProps & { setData: DataSetter }) {
   const school = getSchool(data, currentUser);
   const classGroups = useMemo(() => classesForAbsences(data, currentUser), [data, currentUser]);
+  const schedules = useMemo(
+    () => data.absenceSchedules.filter((schedule) => schedule.schoolId === currentUser.schoolId && (!schedule.stage || schedule.stage === currentUser.stage)),
+    [currentUser.schoolId, currentUser.stage, data.absenceSchedules]
+  );
   const [selectedDate, setSelectedDate] = useState(todayIso);
-  const [sessionName, setSessionName] = useState('');
-  const [startsAt, setStartsAt] = useState(currentTimeIso);
-  const [endsAt, setEndsAt] = useState(() => addMinutesToTime(currentTimeIso(), 60));
+  const [selectedScheduleId, setSelectedScheduleId] = useState('');
+  const [selectedSessionId, setSelectedSessionId] = useState('');
   const [selectedYear, setSelectedYear] = useState<number | ''>('');
   const [selectedStream, setSelectedStream] = useState<SecondaryStream | ''>('');
   const [selectedClassKey, setSelectedClassKey] = useState('');
+  const [templateDraft, setTemplateDraft] = useState({
+    name: '',
+    sessions: [makeDraftSession(1)],
+    targets: {} as Record<string, boolean>
+  });
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   const yearOptions = useMemo(() => [...new Set(classGroups.map((group) => group.schoolYear))].sort((left, right) => left - right), [classGroups]);
@@ -501,9 +536,29 @@ function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: Co
   }, [classOptions, selectedClassKey]);
 
   const selectedClass = classOptions.find((group) => group.key === selectedClassKey);
-  const sessionReady = Boolean(selectedDate && startsAt && endsAt);
-  const currentSessionName = sessionName.trim() || tr(language, 'session');
-  const currentSessionId = sessionReady ? sessionIdFor(selectedDate, currentSessionName, startsAt, endsAt) : '';
+  const schedulesForSelectedClass = useMemo(
+    () => (selectedClass ? schedules.filter((schedule) => scheduleAppliesToClass(schedule, selectedClass)) : []),
+    [schedules, selectedClass]
+  );
+
+  useEffect(() => {
+    if (!schedulesForSelectedClass.some((schedule) => schedule.id === selectedScheduleId)) {
+      setSelectedScheduleId(schedulesForSelectedClass[0]?.id ?? '');
+    }
+  }, [schedulesForSelectedClass, selectedScheduleId]);
+
+  const selectedSchedule = schedulesForSelectedClass.find((schedule) => schedule.id === selectedScheduleId);
+
+  useEffect(() => {
+    if (!selectedSchedule?.sessions.some((session) => session.id === selectedSessionId)) {
+      setSelectedSessionId(selectedSchedule?.sessions[0]?.id ?? '');
+    }
+  }, [selectedSchedule, selectedSessionId]);
+
+  const selectedSession = selectedSchedule?.sessions.find((session) => session.id === selectedSessionId);
+  const sessionReady = Boolean(selectedDate && selectedSchedule && selectedSession);
+  const currentSessionName = selectedSession?.name ?? tr(language, 'session');
+  const currentSessionId = selectedSchedule && selectedSession ? sessionIdFor(selectedDate, selectedSchedule.id, selectedSession.id) : '';
   const sentReport = currentSessionId
     ? data.absenceReports.find(
         (report) =>
@@ -528,13 +583,87 @@ function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: Co
   const draftAbsenceCount = recordsForSession.filter((record) => !record.sentAt).length;
   const absentCount = recordsForSelection.length;
 
+  const updateTemplateSession = (sessionId: string, patch: Partial<AbsenceSession>) => {
+    setTemplateDraft((previous) => ({
+      ...previous,
+      sessions: previous.sessions.map((session) => (session.id === sessionId ? { ...session, ...patch } : session))
+    }));
+  };
+
+  const removeTemplateSession = (sessionId: string) => {
+    setTemplateDraft((previous) => ({
+      ...previous,
+      sessions: previous.sessions.length > 1 ? previous.sessions.filter((session) => session.id !== sessionId) : previous.sessions
+    }));
+  };
+
+  const toggleTemplateTarget = (targetKey: string) => {
+    setTemplateDraft((previous) => ({
+      ...previous,
+      targets: {
+        ...previous.targets,
+        [targetKey]: !previous.targets[targetKey]
+      }
+    }));
+  };
+
+  const saveScheduleTemplate = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setNotice('');
+    setError('');
+
+    if (!currentUser.schoolId) {
+      return;
+    }
+
+    const sessions = templateDraft.sessions
+      .map((session, index) => ({
+        ...session,
+        name: session.name.trim() || String(index + 1),
+        startsAt: session.startsAt.trim(),
+        endsAt: session.endsAt.trim()
+      }))
+      .filter((session) => session.startsAt && session.endsAt);
+
+    if (sessions.length === 0) {
+      setError(tr(language, 'sessionRequired'));
+      return;
+    }
+
+    const targets = classGroups.filter((group) => templateDraft.targets[group.key]).map(classTargetFromGroup);
+    if (targets.length === 0) {
+      setError(tr(language, 'scheduleTargetRequired'));
+      return;
+    }
+
+    const schedule: AbsenceSchedule = {
+      id: makeId('schedule'),
+      schoolId: currentUser.schoolId,
+      stage: currentUser.stage,
+      name: templateDraft.name.trim() || tr(language, 'scheduleReference'),
+      sessions,
+      targets,
+      createdBy: currentUser.id,
+      createdAt: new Date().toISOString()
+    };
+
+    setData((previous) => ({
+      ...previous,
+      absenceSchedules: [...previous.absenceSchedules, schedule]
+    }));
+    setTemplateDraft({ name: '', sessions: [makeDraftSession(1)], targets: {} });
+    setSelectedScheduleId(schedule.id);
+    setSelectedSessionId(schedule.sessions[0]?.id ?? '');
+    setNotice(tr(language, 'scheduleTemplateSaved'));
+  };
+
   const isAbsent = (studentId: string) => recordsForSelection.some((record) => record.studentId === studentId);
 
   const toggleAbsence = (student: PlatformUser) => {
     setNotice('');
     setError('');
 
-    if (!selectedClass || !currentUser.schoolId || !currentUser.stage || !sessionReady || !currentSessionId || sentReport) {
+    if (!selectedClass || !selectedSchedule || !selectedSession || !currentUser.schoolId || !currentUser.stage || !sessionReady || !currentSessionId || sentReport) {
       return;
     }
 
@@ -571,9 +700,10 @@ function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: Co
             classGroup: selectedClass.classGroup,
             date: selectedDate,
             sessionId: currentSessionId,
+            scheduleId: selectedSchedule.id,
             sessionName: currentSessionName,
-            startsAt,
-            endsAt,
+            startsAt: selectedSession.startsAt,
+            endsAt: selectedSession.endsAt,
             studentId: student.id,
             markedBy: currentUser.id,
             createdAt: new Date().toISOString()
@@ -587,8 +717,8 @@ function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: Co
     setNotice('');
     setError('');
 
-    if (!currentUser.schoolId || !currentUser.stage || !sessionReady || !currentSessionId) {
-      setError(tr(language, 'sessionTimeRequired'));
+    if (!currentUser.schoolId || !currentUser.stage || !selectedSchedule || !selectedSession || !sessionReady || !currentSessionId) {
+      setError(tr(language, 'scheduleRequired'));
       return;
     }
 
@@ -604,9 +734,10 @@ function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: Co
       stage: currentUser.stage,
       date: selectedDate,
       sessionId: currentSessionId,
+      scheduleId: selectedSchedule.id,
       sessionName: currentSessionName,
-      startsAt,
-      endsAt,
+      startsAt: selectedSession.startsAt,
+      endsAt: selectedSession.endsAt,
       markedBy: currentUser.id,
       createdAt: sentAt
     };
@@ -620,9 +751,10 @@ function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: Co
               ...record,
               reportId: report.id,
               sentAt,
+              scheduleId: selectedSchedule.id,
               sessionName: currentSessionName,
-              startsAt,
-              endsAt
+              startsAt: selectedSession.startsAt,
+              endsAt: selectedSession.endsAt
             }
           : record
       )
@@ -635,33 +767,91 @@ function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: Co
       <div className="panel full">
         <div className="panel-heading">
           <div>
-            <p>{school?.name ?? tr(language, 'school')}</p>
-            <h2>{tr(language, 'absenceTracking')}</h2>
+            <p>{tr(language, 'scheduleTemplateHint')}</p>
+            <h2>{tr(language, 'scheduleTemplates')}</h2>
           </div>
-          <ClipboardCheck size={24} aria-hidden="true" />
+          <Clock size={24} aria-hidden="true" />
         </div>
-        <p className="hint">{tr(language, 'supervisorAbsenceFlowHint')}</p>
-        <div className="absence-session-grid">
+        <form className="schedule-editor" onSubmit={saveScheduleTemplate}>
           <label>
-            <span>{tr(language, 'absenceDate')}</span>
-            <input type="date" value={selectedDate} onChange={(event) => setSelectedDate(event.target.value)} />
+            <span>{tr(language, 'scheduleName')}</span>
+            <input value={templateDraft.name} onChange={(event) => setTemplateDraft({ ...templateDraft, name: event.target.value })} />
           </label>
-          <label>
-            <span>{tr(language, 'sessionName')}</span>
-            <input value={sessionName} placeholder={tr(language, 'session')} onChange={(event) => setSessionName(event.target.value)} />
-          </label>
-          <label>
-            <span>{tr(language, 'startsAt')}</span>
-            <input type="time" value={startsAt} onChange={(event) => setStartsAt(event.target.value)} />
-          </label>
-          <label>
-            <span>{tr(language, 'endsAt')}</span>
-            <input type="time" value={endsAt} onChange={(event) => setEndsAt(event.target.value)} />
-          </label>
-        </div>
-        <div className="absence-flow-summary">
-          <span>{tr(language, 'draftAbsenceCount')}: {draftAbsenceCount}</span>
-          <strong>{sentReport ? tr(language, 'absenceReportAlreadySent') : tr(language, 'draftReport')}</strong>
+          <div className="schedule-session-list">
+            {templateDraft.sessions.map((session, index) => (
+              <div className="schedule-session-row" key={session.id}>
+                <input
+                  aria-label={tr(language, 'sessionName')}
+                  value={session.name}
+                  placeholder={`${tr(language, 'sessionName')} ${index + 1}`}
+                  onChange={(event) => updateTemplateSession(session.id, { name: event.target.value })}
+                />
+                <input
+                  aria-label={tr(language, 'startsAt')}
+                  type="time"
+                  value={session.startsAt}
+                  onChange={(event) => updateTemplateSession(session.id, { startsAt: event.target.value })}
+                />
+                <input
+                  aria-label={tr(language, 'endsAt')}
+                  type="time"
+                  value={session.endsAt}
+                  onChange={(event) => updateTemplateSession(session.id, { endsAt: event.target.value })}
+                />
+                <button className="icon-button danger" type="button" title={tr(language, 'removeSession')} onClick={() => removeTemplateSession(session.id)}>
+                  <X size={16} aria-hidden="true" />
+                </button>
+              </div>
+            ))}
+          </div>
+          <div className="form-field full">
+            <span>{tr(language, 'assignedClasses')}</span>
+            <div className="checkbox-grid template-target-grid">
+              {classGroups.map((group) => (
+                <label className="check-option" key={group.key}>
+                  <input type="checkbox" checked={Boolean(templateDraft.targets[group.key])} onChange={() => toggleTemplateTarget(group.key)} />
+                  <span>{classLabel(language, group)}</span>
+                </label>
+              ))}
+            </div>
+            {classGroups.length === 0 && <p className="empty-state">{tr(language, 'noClassesForAbsence')}</p>}
+          </div>
+          <div className="button-row">
+            <button
+              className="button ghost"
+              type="button"
+              onClick={() => setTemplateDraft((previous) => ({ ...previous, sessions: [...previous.sessions, makeDraftSession(previous.sessions.length + 1)] }))}
+            >
+              <Plus size={17} aria-hidden="true" />
+              <span>{tr(language, 'addSession')}</span>
+            </button>
+            <button className="button primary" type="submit">
+              <Save size={17} aria-hidden="true" />
+              <span>{tr(language, 'saveSchedule')}</span>
+            </button>
+          </div>
+        </form>
+        <div className="absence-template-list">
+          {schedules.length === 0 && <p className="empty-state">{tr(language, 'noScheduleTemplates')}</p>}
+          {schedules.map((schedule) => (
+            <details className="absence-template-item" key={schedule.id}>
+              <summary>
+                <span>
+                  <strong>{scheduleLabel(schedule)}</strong>
+                  <small>
+                    {tr(language, 'assignedClasses')}: {schedule.targets?.length ? schedule.targets.map((target) => classLabel(language, target)).join('، ') : tr(language, 'allClasses')}
+                  </small>
+                </span>
+              </summary>
+              <div className="chip-row">
+                {schedule.sessions.map((session) => (
+                  <span className="assignment-chip" key={session.id}>
+                    {session.name} {session.startsAt}-{session.endsAt}
+                  </span>
+                ))}
+              </div>
+            </details>
+          ))}
         </div>
       </div>
 
@@ -708,6 +898,51 @@ function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: Co
           </label>
         </div>
         {classGroups.length === 0 && <p className="empty-state">{tr(language, 'noClassesForAbsence')}</p>}
+      </div>
+
+      <div className="panel full">
+        <div className="panel-heading">
+          <div>
+            <p>{school?.name ?? tr(language, 'school')}</p>
+            <h2>{tr(language, 'absenceTracking')}</h2>
+          </div>
+          <ClipboardCheck size={24} aria-hidden="true" />
+        </div>
+        <p className="hint">{tr(language, 'supervisorAbsenceFlowHint')}</p>
+        <div className="absence-session-grid">
+          <label>
+            <span>{tr(language, 'absenceDate')}</span>
+            <input type="date" value={selectedDate} onChange={(event) => setSelectedDate(event.target.value)} />
+          </label>
+          <label>
+            <span>{tr(language, 'scheduleReference')}</span>
+            <select value={selectedScheduleId} disabled={!selectedClass || schedulesForSelectedClass.length === 0} onChange={(event) => setSelectedScheduleId(event.target.value)}>
+              <option value="">
+                {!selectedClass ? tr(language, 'chooseClassFirst') : schedulesForSelectedClass.length === 0 ? tr(language, 'noScheduleTemplates') : tr(language, 'chooseScheduleTemplate')}
+              </option>
+              {schedulesForSelectedClass.map((schedule) => (
+                <option value={schedule.id} key={schedule.id}>
+                  {scheduleLabel(schedule)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>{tr(language, 'session')}</span>
+            <select value={selectedSessionId} disabled={!selectedSchedule} onChange={(event) => setSelectedSessionId(event.target.value)}>
+              <option value="">{selectedSchedule ? tr(language, 'session') : tr(language, 'chooseTemplateFirst')}</option>
+              {selectedSchedule?.sessions.map((session) => (
+                <option value={session.id} key={session.id}>
+                  {session.name} {session.startsAt}-{session.endsAt}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <div className="absence-flow-summary">
+          <span>{tr(language, 'draftAbsenceCount')}: {draftAbsenceCount}</span>
+          <strong>{sentReport ? tr(language, 'absenceReportAlreadySent') : tr(language, 'draftReport')}</strong>
+        </div>
       </div>
 
       <div className="panel full">

@@ -152,11 +152,19 @@ export type AbsenceSession = {
   endsAt: string;
 };
 
+export type AbsenceScheduleTarget = {
+  schoolYear: number;
+  classGroup: string;
+  stream?: SecondaryStream;
+};
+
 export type AbsenceSchedule = {
   id: string;
   schoolId: string;
+  stage?: Stage;
   name: string;
   sessions: AbsenceSession[];
+  targets?: AbsenceScheduleTarget[];
   createdBy: string;
   createdAt: string;
 };
@@ -169,6 +177,7 @@ export type AbsenceRecord = {
   stream?: SecondaryStream;
   date: string;
   sessionId: string;
+  scheduleId?: string;
   sessionName?: string;
   startsAt?: string;
   endsAt?: string;
@@ -186,6 +195,7 @@ export type AbsenceReport = {
   stage: Stage;
   date: string;
   sessionId: string;
+  scheduleId?: string;
   sessionName: string;
   startsAt: string;
   endsAt: string;

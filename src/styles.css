@@ -2483,6 +2483,56 @@ summary.subject-group-heading:hover .subject-icon svg {
   grid-template-columns: minmax(120px, 1fr) 120px 120px auto;
 }
 
+.template-target-grid {
+  max-height: 220px;
+  overflow: auto;
+  padding-inline-end: 4px;
+}
+
+.absence-template-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.absence-template-item {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper-soft);
+  overflow: hidden;
+}
+
+.absence-template-item summary {
+  min-height: 48px;
+  padding: 10px 12px;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+}
+
+.absence-template-item summary::-webkit-details-marker {
+  display: none;
+}
+
+.absence-template-item summary span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.absence-template-item summary small {
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.absence-template-item .chip-row {
+  border-top: 1px solid var(--line);
+  padding: 10px 12px;
+}
+
 .absence-toolbar {
   align-items: end;
   display: grid;
