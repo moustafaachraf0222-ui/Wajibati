@@ -1,0 +1,377 @@
+import { CalendarDays, Check, ClipboardCheck, Clock, Plus, Save, X } from 'lucide-react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import type { AbsenceSchedule, AbsenceSession, DataSetter, Language, PlatformData, PlatformUser, SecondaryStream } from '../types';
+import { schoolYearLabel, tr } from '../i18n';
+import { sameClassGroup, secondaryStreamLabel } from '../education';
+import { getSchool, makeId } from '../data';
+import { Field, ResponsiveTable } from '../ui';
+
+type AbsenceClassGroup = {
+  key: string;
+  schoolYear: number;
+  stream?: SecondaryStream;
+  classGroup: string;
+  students: PlatformUser[];
+};
+
+type CommonViewProps = {
+  data: PlatformData;
+  currentUser: PlatformUser;
+  language: Language;
+};
+
+function todayIso() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function classKey(schoolYear: number, stream: SecondaryStream | undefined, classGroup: string) {
+  return `${schoolYear}:${stream ?? ''}:${classGroup.trim().toLowerCase()}`;
+}
+
+function sortByName(left: PlatformUser, right: PlatformUser) {
+  return left.name.localeCompare(right.name, undefined, { numeric: true, sensitivity: 'base' });
+}
+
+function classesForAbsences(data: PlatformData, currentUser: PlatformUser): AbsenceClassGroup[] {
+  const groups = new Map<string, AbsenceClassGroup>();
+
+  data.users
+    .filter(
+      (user) =>
+        user.role === 'student' &&
+        user.schoolId === currentUser.schoolId &&
+        user.stage === currentUser.stage &&
+        user.schoolYear &&
+        user.classGroup?.trim()
+    )
+    .forEach((student) => {
+      const schoolYear = student.schoolYear!;
+      const classGroup = student.classGroup!.trim();
+      const key = classKey(schoolYear, student.stream, classGroup);
+      const existing = groups.get(key);
+
+      if (existing) {
+        existing.students.push(student);
+        return;
+      }
+
+      groups.set(key, {
+        key,
+        schoolYear,
+        stream: student.stream,
+        classGroup,
+        students: [student]
+      });
+    });
+
+  return [...groups.values()]
+    .map((group) => ({ ...group, students: [...group.students].sort(sortByName) }))
+    .sort((left, right) => left.schoolYear - right.schoolYear || left.classGroup.localeCompare(right.classGroup, undefined, { numeric: true }));
+}
+
+function classLabel(language: Language, group: AbsenceClassGroup) {
+  const stream = group.stream ? ` - ${secondaryStreamLabel(language, group.stream, group.schoolYear)}` : '';
+  return `${schoolYearLabel(language, undefined, group.schoolYear)}${stream} - ${tr(language, 'classGroup')} ${group.classGroup}`;
+}
+
+function makeDraftSession(index: number): AbsenceSession {
+  return {
+    id: makeId('session'),
+    name: String(index),
+    startsAt: '',
+    endsAt: ''
+  };
+}
+
+function scheduleLabel(schedule: AbsenceSchedule) {
+  return `${schedule.name} (${schedule.sessions.length})`;
+}
+
+export function AbsencesView({ data, setData, currentUser, language }: CommonViewProps & { setData: DataSetter }) {
+  const school = getSchool(data, currentUser);
+  const classGroups = useMemo(() => classesForAbsences(data, currentUser), [data, currentUser]);
+  const schedules = data.absenceSchedules.filter((schedule) => schedule.schoolId === currentUser.schoolId);
+  const [selectedClassKey, setSelectedClassKey] = useState('');
+  const [selectedDate, setSelectedDate] = useState(todayIso);
+  const [selectedScheduleId, setSelectedScheduleId] = useState('');
+  const [scheduleError, setScheduleError] = useState('');
+  const [draftSchedule, setDraftSchedule] = useState(() => ({
+    name: '',
+    sessions: [makeDraftSession(1)]
+  }));
+
+  useEffect(() => {
+    if (!selectedClassKey && classGroups[0]) {
+      setSelectedClassKey(classGroups[0].key);
+    }
+  }, [classGroups, selectedClassKey]);
+
+  useEffect(() => {
+    if (selectedScheduleId && schedules.some((schedule) => schedule.id === selectedScheduleId)) {
+      return;
+    }
+
+    setSelectedScheduleId(schedules[0]?.id ?? '');
+  }, [schedules, selectedScheduleId]);
+
+  const selectedClass = classGroups.find((group) => group.key === selectedClassKey) ?? classGroups[0];
+  const selectedSchedule = schedules.find((schedule) => schedule.id === selectedScheduleId);
+  const absenceRecordsForSelection = selectedClass
+    ? data.absenceRecords.filter(
+        (record) =>
+          record.schoolId === currentUser.schoolId &&
+          record.date === selectedDate &&
+          record.schoolYear === selectedClass.schoolYear &&
+          record.stream === selectedClass.stream &&
+          sameClassGroup(record.classGroup, selectedClass.classGroup)
+      )
+    : [];
+  const absentCount = absenceRecordsForSelection.length;
+
+  const updateDraftSession = (sessionId: string, patch: Partial<AbsenceSession>) => {
+    setDraftSchedule((previous) => ({
+      ...previous,
+      sessions: previous.sessions.map((session) => (session.id === sessionId ? { ...session, ...patch } : session))
+    }));
+  };
+
+  const removeDraftSession = (sessionId: string) => {
+    setDraftSchedule((previous) => ({
+      ...previous,
+      sessions: previous.sessions.length > 1 ? previous.sessions.filter((session) => session.id !== sessionId) : previous.sessions
+    }));
+  };
+
+  const saveSchedule = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!currentUser.schoolId) {
+      return;
+    }
+
+    const sessions = draftSchedule.sessions
+      .map((session, index) => ({
+        ...session,
+        name: session.name.trim() || String(index + 1),
+        startsAt: session.startsAt.trim(),
+        endsAt: session.endsAt.trim()
+      }))
+      .filter((session) => session.startsAt && session.endsAt);
+
+    if (sessions.length === 0) {
+      setScheduleError(tr(language, 'sessionRequired'));
+      return;
+    }
+
+    const schedule: AbsenceSchedule = {
+      id: makeId('schedule'),
+      schoolId: currentUser.schoolId,
+      name: draftSchedule.name.trim() || tr(language, 'dailySchedule'),
+      sessions,
+      createdBy: currentUser.id,
+      createdAt: new Date().toISOString()
+    };
+
+    setData((previous) => ({
+      ...previous,
+      absenceSchedules: [...previous.absenceSchedules, schedule]
+    }));
+    setSelectedScheduleId(schedule.id);
+    setDraftSchedule({ name: '', sessions: [makeDraftSession(1)] });
+    setScheduleError('');
+  };
+
+  const isAbsent = (studentId: string, sessionId: string) =>
+    Boolean(absenceRecordsForSelection.find((record) => record.studentId === studentId && record.sessionId === sessionId));
+
+  const toggleAbsence = (student: PlatformUser, session: AbsenceSession) => {
+    if (!selectedClass || !currentUser.schoolId) {
+      return;
+    }
+    const schoolId = currentUser.schoolId;
+
+    setData((previous) => {
+      const existing = previous.absenceRecords.find(
+        (record) =>
+          record.studentId === student.id &&
+          record.sessionId === session.id &&
+          record.date === selectedDate &&
+          record.schoolId === schoolId &&
+          record.schoolYear === selectedClass.schoolYear &&
+          record.stream === selectedClass.stream &&
+          sameClassGroup(record.classGroup, selectedClass.classGroup)
+      );
+
+      if (existing) {
+        return {
+          ...previous,
+          absenceRecords: previous.absenceRecords.filter((record) => record.id !== existing.id)
+        };
+      }
+
+      return {
+        ...previous,
+        absenceRecords: [
+          ...previous.absenceRecords,
+          {
+            id: makeId('absence'),
+            schoolId,
+            schoolYear: selectedClass.schoolYear,
+            stream: selectedClass.stream,
+            classGroup: selectedClass.classGroup,
+            date: selectedDate,
+            sessionId: session.id,
+            studentId: student.id,
+            markedBy: currentUser.id,
+            createdAt: new Date().toISOString()
+          }
+        ]
+      };
+    });
+  };
+
+  return (
+    <section className="content-grid absences-view">
+      <div className="panel">
+        <div className="panel-heading">
+          <div>
+            <p>{school?.name ?? tr(language, 'school')}</p>
+            <h2>{tr(language, 'absenceTracking')}</h2>
+          </div>
+          <ClipboardCheck size={24} aria-hidden="true" />
+        </div>
+        <p className="hint">{tr(language, 'absenceClassList')}</p>
+        <div className="absence-class-list">
+          {classGroups.length === 0 && <p className="empty-state">{tr(language, 'noClassesForAbsence')}</p>}
+          {classGroups.map((group) => (
+            <button
+              className={group.key === selectedClass?.key ? 'absence-class-button active' : 'absence-class-button'}
+              type="button"
+              key={group.key}
+              onClick={() => setSelectedClassKey(group.key)}
+            >
+              <strong>{classLabel(language, group)}</strong>
+              <span>
+                {tr(language, 'studentCount')}: {group.students.length}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="panel">
+        <div className="panel-heading">
+          <div>
+            <p>{tr(language, 'reuseScheduleHint')}</p>
+            <h2>{tr(language, 'scheduleReference')}</h2>
+          </div>
+          <Clock size={24} aria-hidden="true" />
+        </div>
+        <form className="schedule-editor" onSubmit={saveSchedule}>
+          <Field label={tr(language, 'scheduleName')} value={draftSchedule.name} onChange={(value) => setDraftSchedule({ ...draftSchedule, name: value })} />
+          <div className="schedule-session-list">
+            {draftSchedule.sessions.map((session, index) => (
+              <div className="schedule-session-row" key={session.id}>
+                <input
+                  aria-label={tr(language, 'sessionName')}
+                  value={session.name}
+                  placeholder={`${tr(language, 'sessionName')} ${index + 1}`}
+                  onChange={(event) => updateDraftSession(session.id, { name: event.target.value })}
+                />
+                <input
+                  aria-label={tr(language, 'startsAt')}
+                  type="time"
+                  value={session.startsAt}
+                  onChange={(event) => updateDraftSession(session.id, { startsAt: event.target.value })}
+                />
+                <input
+                  aria-label={tr(language, 'endsAt')}
+                  type="time"
+                  value={session.endsAt}
+                  onChange={(event) => updateDraftSession(session.id, { endsAt: event.target.value })}
+                />
+                <button className="icon-button danger" type="button" title={tr(language, 'removeSession')} onClick={() => removeDraftSession(session.id)}>
+                  <X size={16} aria-hidden="true" />
+                </button>
+              </div>
+            ))}
+          </div>
+          {scheduleError && <p className="form-error">{scheduleError}</p>}
+          <div className="button-row">
+            <button
+              className="button ghost"
+              type="button"
+              onClick={() => setDraftSchedule((previous) => ({ ...previous, sessions: [...previous.sessions, makeDraftSession(previous.sessions.length + 1)] }))}
+            >
+              <Plus size={17} aria-hidden="true" />
+              <span>{tr(language, 'addSession')}</span>
+            </button>
+            <button className="button primary" type="submit">
+              <Save size={17} aria-hidden="true" />
+              <span>{tr(language, 'saveSchedule')}</span>
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <div className="panel full">
+        <div className="panel-heading">
+          <div>
+            <p>{selectedClass ? classLabel(language, selectedClass) : tr(language, 'selectedClass')}</p>
+            <h2>{tr(language, 'markAbsences')}</h2>
+          </div>
+          <CalendarDays size={24} aria-hidden="true" />
+        </div>
+        <div className="absence-toolbar">
+          <label>
+            <span>{tr(language, 'absenceDate')}</span>
+            <input type="date" value={selectedDate} onChange={(event) => setSelectedDate(event.target.value)} />
+          </label>
+          <label>
+            <span>{tr(language, 'dailySchedule')}</span>
+            <select value={selectedScheduleId} onChange={(event) => setSelectedScheduleId(event.target.value)}>
+              <option value="">{schedules.length === 0 ? tr(language, 'noSchedules') : tr(language, 'scheduleReference')}</option>
+              {schedules.map((schedule) => (
+                <option value={schedule.id} key={schedule.id}>
+                  {scheduleLabel(schedule)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="absence-summary">
+            <span>{tr(language, 'studentCount')}: {selectedClass?.students.length ?? 0}</span>
+            <strong>{tr(language, 'absentCount')}: {absentCount}</strong>
+          </div>
+        </div>
+        <p className="hint">{selectedSchedule ? tr(language, 'absenceGridHint') : tr(language, 'scheduleRequired')}</p>
+        {selectedClass && selectedSchedule ? (
+          <ResponsiveTable
+            columns={[tr(language, 'fullName'), ...selectedSchedule.sessions.map((session) => `${session.name} ${session.startsAt}-${session.endsAt}`)]}
+            emptyText={tr(language, 'noRecords')}
+          >
+            {selectedClass.students.map((student) => (
+              <tr key={student.id}>
+                <td>{student.name}</td>
+                {selectedSchedule.sessions.map((session) => {
+                  const checked = isAbsent(student.id, session.id);
+                  return (
+                    <td key={`${student.id}-${session.id}`}>
+                      <label className={checked ? 'absence-check absent' : 'absence-check'}>
+                        <input type="checkbox" checked={checked} onChange={() => toggleAbsence(student, session)} />
+                        <span>
+                          {checked ? <X size={15} aria-hidden="true" /> : <Check size={15} aria-hidden="true" />}
+                          {tr(language, checked ? 'absent' : 'present')}
+                        </span>
+                      </label>
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </ResponsiveTable>
+        ) : (
+          <p className="empty-state">{selectedClass ? tr(language, 'scheduleRequired') : tr(language, 'noClassesForAbsence')}</p>
+        )}
+      </div>
+    </section>
+  );
+}

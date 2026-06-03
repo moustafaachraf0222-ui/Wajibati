@@ -46,7 +46,7 @@ export function DirectorCreateAccountPanel({
   school: SchoolRecord | undefined;
 }) {
   const [form, setForm] = useState({
-    role: 'teacher' as 'teacher' | 'student',
+    role: 'teacher' as 'supervisor' | 'teacher' | 'student',
     name: '',
     subject: 'math' as Subject,
     subjectsByYear: {} as Record<string, Subject | ''>,
@@ -142,7 +142,7 @@ export function DirectorCreateAccountPanel({
       return;
     }
 
-    const primaryYear = form.role === 'teacher' ? form.schoolYears[0] : form.schoolYear;
+    const primaryYear = form.role === 'teacher' ? form.schoolYears[0] : form.role === 'student' ? form.schoolYear : undefined;
     const primarySubject = form.role === 'teacher' ? teacherSubjectsByYear[String(primaryYear)] : undefined;
     const primaryStreamGroups = teacherYearStreamClassGroups[String(primaryYear)] ?? {};
     const primaryStream = Object.keys(primaryStreamGroups)[0] as SecondaryStream | undefined;
@@ -151,7 +151,9 @@ export function DirectorCreateAccountPanel({
         ? primaryStreamGroups[primaryStream as SecondaryStream]?.[0] ?? ''
         : form.role === 'teacher'
           ? teacherYearClassGroups[String(primaryYear)]?.[0] ?? ''
-          : studentClassGroup.trim();
+          : form.role === 'student'
+            ? studentClassGroup.trim()
+            : undefined;
     const accountCode = generateAccountCode();
 
     setData((previous) => ({
@@ -411,7 +413,7 @@ export function DirectorCreateAccountPanel({
           <select
             value={form.role}
             onChange={(event) => {
-              const role = event.target.value as 'teacher' | 'student';
+                const role = event.target.value as 'supervisor' | 'teacher' | 'student';
               const streamsForYear = secondaryStreamsForYear(school, form.schoolYear);
               const defaultStream = streamsForYear.includes(form.stream as SecondaryStream) ? form.stream : streamsForYear[0] ?? '';
               setForm({
@@ -421,8 +423,9 @@ export function DirectorCreateAccountPanel({
               });
             }}
           >
-            <option value="teacher">{tr(language, 'teacher')}</option>
-            <option value="student">{tr(language, 'student')}</option>
+              <option value="teacher">{tr(language, 'teacher')}</option>
+              <option value="supervisor">{tr(language, 'supervisor')}</option>
+              <option value="student">{tr(language, 'student')}</option>
           </select>
         </label>
         <Field label={tr(language, 'fullName')} value={form.name} onChange={(value) => setForm({ ...form, name: value })} required />

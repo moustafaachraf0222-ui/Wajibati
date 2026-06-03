@@ -48,7 +48,7 @@ export function compactEmailLocalPart(value: string) {
     .replace(/[^a-z0-9]+/g, '');
 }
 
-export function generateSchoolEmail(name: string, role: 'teacher' | 'student', domain: string, users: PlatformUser[]) {
+export function generateSchoolEmail(name: string, role: 'supervisor' | 'teacher' | 'student', domain: string, users: PlatformUser[]) {
   const emailDomain = normalizeEmailDomain(domain);
   const localBase = compactEmailLocalPart(name) || role;
   const usedEmails = new Set(users.map((user) => user.email.toLowerCase()));

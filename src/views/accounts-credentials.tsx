@@ -12,7 +12,7 @@ function escapeHtml(value: string) {
     .replace(/'/g, '&#39;');
 }
 
-function sortedCredentialUsers(users: PlatformUser[], role: 'teacher' | 'student') {
+function sortedCredentialUsers(users: PlatformUser[], role: 'supervisor' | 'teacher' | 'student') {
   return users
     .filter((user) => user.role === role)
     .sort((left, right) => left.name.localeCompare(right.name, undefined, { numeric: true, sensitivity: 'base' }));
@@ -99,6 +99,7 @@ function printCredentialTable(language: Language, title: string, schoolName: str
 
 export function CredentialDatabasePanel({ users, school, language }: { users: PlatformUser[]; school: SchoolRecord | undefined; language: Language }) {
   const teacherUsers = sortedCredentialUsers(users, 'teacher');
+  const supervisorUsers = sortedCredentialUsers(users, 'supervisor');
   const studentUsers = sortedCredentialUsers(users, 'student');
   const schoolName = school?.name ?? '-';
 
@@ -112,6 +113,7 @@ export function CredentialDatabasePanel({ users, school, language }: { users: Pl
         <Database size={24} aria-hidden="true" />
       </div>
       <div className="credential-database-grid">
+        <CredentialDatabaseCard title={tr(language, 'supervisorDatabase')} users={supervisorUsers} schoolName={schoolName} language={language} />
         <CredentialDatabaseCard title={tr(language, 'teacherDatabase')} users={teacherUsers} schoolName={schoolName} language={language} />
         <CredentialDatabaseCard title={tr(language, 'studentDatabase')} users={studentUsers} schoolName={schoolName} language={language} />
       </div>

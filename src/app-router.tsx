@@ -1,4 +1,5 @@
 import type { DataSetter, Language, PlatformData, PlatformUser, Theme, View } from './types';
+import { AbsencesView } from './views/absences';
 import { UsersView } from './views/accounts';
 import { ExercisesView } from './views/exercises';
 import { AnnouncementsView, NotesView } from './views/messages';
@@ -42,6 +43,8 @@ export function AppRouter({
       return <AnnouncementsView data={data} setData={setData} currentUser={currentUser} language={language} />;
     case 'notes':
       return <NotesView data={data} setData={setData} currentUser={currentUser} language={language} />;
+    case 'absences':
+      return <AbsencesView data={data} setData={setData} currentUser={currentUser} language={language} />;
     case 'settings':
       return (
         <SettingsView

@@ -113,6 +113,10 @@ export function scopedNotes(data: PlatformData, user: PlatformUser) {
 }
 
 export function defaultView(role: Role): View {
+  if (role === 'supervisor') {
+    return 'absences';
+  }
+
   if (role === 'student') {
     return 'exercises';
   }
@@ -129,7 +133,11 @@ export function canToggleUser(currentUser: PlatformUser, target: PlatformUser) {
     return true;
   }
 
-  return currentUser.role === 'director' && target.schoolId === currentUser.schoolId && (target.role === 'teacher' || target.role === 'student');
+  return (
+    currentUser.role === 'director' &&
+    target.schoolId === currentUser.schoolId &&
+    (target.role === 'supervisor' || target.role === 'teacher' || target.role === 'student')
+  );
 }
 
 export function canEditUser(currentUser: PlatformUser, target: PlatformUser) {
@@ -141,7 +149,11 @@ export function canEditUser(currentUser: PlatformUser, target: PlatformUser) {
     return true;
   }
 
-  return currentUser.role === 'director' && target.schoolId === currentUser.schoolId && (target.role === 'teacher' || target.role === 'student');
+  return (
+    currentUser.role === 'director' &&
+    target.schoolId === currentUser.schoolId &&
+    (target.role === 'supervisor' || target.role === 'teacher' || target.role === 'student')
+  );
 }
 
 export function canDeleteUser(currentUser: PlatformUser, target: PlatformUser) {
@@ -153,5 +165,9 @@ export function canDeleteUser(currentUser: PlatformUser, target: PlatformUser) {
     return true;
   }
 
-  return currentUser.role === 'director' && target.schoolId === currentUser.schoolId && (target.role === 'teacher' || target.role === 'student');
+  return (
+    currentUser.role === 'director' &&
+    target.schoolId === currentUser.schoolId &&
+    (target.role === 'supervisor' || target.role === 'teacher' || target.role === 'student')
+  );
 }

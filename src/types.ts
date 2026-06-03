@@ -1,6 +1,6 @@
 import type { Dispatch, SetStateAction } from 'react';
 
-export type Role = 'admin' | 'director' | 'teacher' | 'student';
+export type Role = 'admin' | 'director' | 'supervisor' | 'teacher' | 'student';
 export type Stage = 'primary' | 'middle' | 'secondary';
 export type Language = 'ar' | 'fr' | 'en';
 export type Theme = 'light' | 'dark';
@@ -47,7 +47,7 @@ export type Subject =
   | 'german'
   | 'italian';
 
-export type View = 'overview' | 'schools' | 'users' | 'school' | 'exercises' | 'announcements' | 'notes' | 'settings';
+export type View = 'overview' | 'schools' | 'users' | 'school' | 'exercises' | 'announcements' | 'notes' | 'absences' | 'settings';
 
 export type SecondaryStream =
   | 'experimental_science'
@@ -145,6 +145,36 @@ export type HomeworkFeedback = {
   updatedAt: string;
 };
 
+export type AbsenceSession = {
+  id: string;
+  name: string;
+  startsAt: string;
+  endsAt: string;
+};
+
+export type AbsenceSchedule = {
+  id: string;
+  schoolId: string;
+  name: string;
+  sessions: AbsenceSession[];
+  createdBy: string;
+  createdAt: string;
+};
+
+export type AbsenceRecord = {
+  id: string;
+  schoolId: string;
+  schoolYear: number;
+  classGroup: string;
+  stream?: SecondaryStream;
+  date: string;
+  sessionId: string;
+  studentId: string;
+  markedBy: string;
+  createdAt: string;
+  updatedAt?: string;
+};
+
 export type PushTokenRecord = {
   token: string;
   platform: string;
@@ -160,6 +190,8 @@ export type PlatformData = {
   completions: Record<string, string[]>;
   completionDates: Record<string, Record<string, string>>;
   feedback: Record<string, Record<string, HomeworkFeedback>>;
+  absenceSchedules: AbsenceSchedule[];
+  absenceRecords: AbsenceRecord[];
   pushTokens: Record<string, PushTokenRecord[]>;
   deletedSchoolIds: string[];
   deletedExerciseIds: string[];

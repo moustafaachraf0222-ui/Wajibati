@@ -130,7 +130,7 @@ export function UsersTable({
       {rowsForUsers(tableUsers)}
     </ResponsiveTable>
   );
-  const groupedUsers = (['admin', 'director', 'teacher', 'student'] as Role[])
+  const groupedUsers = (['admin', 'director', 'supervisor', 'teacher', 'student'] as Role[])
     .map((role) => ({ role, users: users.filter((user) => user.role === role) }))
     .filter((group) => group.users.length > 0);
 

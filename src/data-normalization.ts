@@ -26,6 +26,8 @@ export function normalizePlatformData(value: Partial<PlatformData> | null | unde
     completionDates:
       source.completionDates && typeof source.completionDates === 'object' ? source.completionDates : fallback.completionDates,
     feedback: source.feedback && typeof source.feedback === 'object' ? source.feedback : fallback.feedback,
+    absenceSchedules: Array.isArray(source.absenceSchedules) ? source.absenceSchedules : fallback.absenceSchedules,
+    absenceRecords: Array.isArray(source.absenceRecords) ? source.absenceRecords : fallback.absenceRecords,
     pushTokens: source.pushTokens && typeof source.pushTokens === 'object' ? source.pushTokens : fallback.pushTokens,
     deletedSchoolIds: Array.isArray(source.deletedSchoolIds)
       ? uniqueStrings(source.deletedSchoolIds.filter((id): id is string => typeof id === 'string'))

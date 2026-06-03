@@ -2,6 +2,7 @@ import {
   BookOpen,
   Building2,
   GraduationCap,
+  ClipboardCheck,
   MessageSquare,
   School,
   Settings,
@@ -30,6 +31,12 @@ export const navItems: Record<Role, NavItem[]> = {
     { id: 'overview', labelKey: 'overview', icon: Building2 },
     { id: 'school', labelKey: 'school', icon: School },
     { id: 'users', labelKey: 'users', icon: UserPlus },
+    { id: 'absences', labelKey: 'absences', icon: ClipboardCheck },
+    { id: 'announcements', labelKey: 'announcements', icon: MessageSquare },
+    { id: 'settings', labelKey: 'settings', icon: Settings }
+  ],
+  supervisor: [
+    { id: 'absences', labelKey: 'absences', icon: ClipboardCheck },
     { id: 'announcements', labelKey: 'announcements', icon: MessageSquare },
     { id: 'settings', labelKey: 'settings', icon: Settings }
   ],

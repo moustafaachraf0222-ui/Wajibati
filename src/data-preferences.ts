@@ -20,7 +20,7 @@ export function loadTheme(): Theme {
 }
 
 export function isRole(value: unknown): value is Role {
-  return value === 'admin' || value === 'director' || value === 'teacher' || value === 'student';
+  return value === 'admin' || value === 'director' || value === 'supervisor' || value === 'teacher' || value === 'student';
 }
 
 export function loadRememberedAccounts(): RememberedAccount[] {
