@@ -50,6 +50,8 @@ type CommonViewProps = {
   language: Language;
 };
 
+const ABSENCE_REPORT_CURRENT_MS = 24 * 60 * 60 * 1000;
+
 function todayIso() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -160,6 +162,11 @@ function sessionIdFor(date: string, scheduleId: string, sessionId: string) {
 
 function reportSessionLabel(report: AbsenceReport) {
   return `${report.sessionName} ${report.startsAt}-${report.endsAt}`;
+}
+
+function reportIsCurrent(report: AbsenceReport, now = Date.now()) {
+  const createdAt = Date.parse(report.createdAt);
+  return !Number.isFinite(createdAt) || now - createdAt < ABSENCE_REPORT_CURRENT_MS;
 }
 
 function recordMatchesSession(record: AbsenceRecord, schoolId: string, markedBy: string, date: string, sessionId: string) {
@@ -330,6 +337,59 @@ function printAbsenceReports(language: Language, schoolName: string, sections: A
   }, 120);
 }
 
+function AbsenceReportList({
+  emptyText,
+  language,
+  schoolName,
+  sections
+}: {
+  emptyText: string;
+  language: Language;
+  schoolName: string;
+  sections: AbsenceReportSection[];
+}) {
+  return (
+    <div className="absence-report-list">
+      {sections.length === 0 && <p className="empty-state">{emptyText}</p>}
+      {sections.map((section) => (
+        <details className="absence-report-group" key={section.report.id} open>
+          <summary>
+            <span className="absence-report-group-title">
+              <strong>{formatAbsenceDate(language, section.report.date)} - {reportSessionLabel(section.report)}</strong>
+              <small>
+                {tr(language, 'reportedBy')}: {section.marker.name} | {tr(language, 'sentAt')}: {formatAbsenceDateTime(language, section.report.createdAt)}
+              </small>
+            </span>
+            <span className="absence-report-count">{section.entries.length}</span>
+          </summary>
+          <div className="absence-report-inner">
+            <div className="absence-report-actions">
+              <button className="button ghost" type="button" onClick={() => printAbsenceReports(language, schoolName, [section])}>
+                <Printer size={17} aria-hidden="true" />
+                <span>{tr(language, 'printAbsenceReport')}</span>
+              </button>
+            </div>
+            {section.entries.length === 0 && <p className="empty-state">{tr(language, 'noAbsenceReports')}</p>}
+            {buildAbsenceReportGroups(section.entries).map((group) => (
+              <div className="absence-report-class" key={`${section.report.id}-${group.key}`}>
+                <strong>{classLabel(language, group)}</strong>
+                <ResponsiveTable columns={[tr(language, 'fullName'), tr(language, 'session')]} emptyText={tr(language, 'noAbsenceReports')}>
+                  {group.entries.map((entry) => (
+                    <tr key={entry.record.id}>
+                      <td>{entry.student.name}</td>
+                      <td>{reportSessionLabel(section.report)}</td>
+                    </tr>
+                  ))}
+                </ResponsiveTable>
+              </div>
+            ))}
+          </div>
+        </details>
+      ))}
+    </div>
+  );
+}
+
 export function AbsencesView({ data, setData, currentUser, language }: CommonViewProps & { setData: DataSetter }) {
   if (currentUser.role === 'director') {
     return <DirectorAbsenceReports data={data} currentUser={currentUser} language={language} />;
@@ -341,6 +401,7 @@ export function AbsencesView({ data, setData, currentUser, language }: CommonVie
 function DirectorAbsenceReports({ data, currentUser, language }: CommonViewProps) {
   const school = getSchool(data, currentUser);
   const [selectedDate, setSelectedDate] = useState('all');
+  const [now, setNow] = useState(() => Date.now());
   const dateOptions = useMemo(
     () =>
       [...new Set(data.absenceReports.filter((report) => report.schoolId === currentUser.schoolId && report.stage === currentUser.stage).map((report) => report.date))].sort(
@@ -349,10 +410,17 @@ function DirectorAbsenceReports({ data, currentUser, language }: CommonViewProps
     [currentUser.schoolId, currentUser.stage, data.absenceReports]
   );
   const reportSections = useMemo(() => reportSectionsForDirector(data, currentUser, selectedDate), [currentUser, data, selectedDate]);
-  const reportEntries = reportSections.flatMap((section) => section.entries);
-  const uniqueClasses = new Set(reportEntries.map((entry) => reportGroupKey(entry.record)));
-  const uniqueStudents = new Set(reportEntries.map((entry) => entry.student.id));
-  const uniqueMarkers = new Set(reportSections.map((section) => section.marker.id));
+  const currentReportSections = useMemo(() => reportSections.filter((section) => reportIsCurrent(section.report, now)), [now, reportSections]);
+  const historyReportSections = useMemo(() => reportSections.filter((section) => !reportIsCurrent(section.report, now)), [now, reportSections]);
+  const currentReportEntries = currentReportSections.flatMap((section) => section.entries);
+  const uniqueClasses = new Set(currentReportEntries.map((entry) => reportGroupKey(entry.record)));
+  const uniqueStudents = new Set(currentReportEntries.map((entry) => entry.student.id));
+  const uniqueMarkers = new Set(currentReportSections.map((section) => section.marker.id));
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 60 * 1000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     if (selectedDate !== 'all' && !dateOptions.includes(selectedDate)) {
@@ -386,21 +454,21 @@ function DirectorAbsenceReports({ data, currentUser, language }: CommonViewProps
           <button
             className="button ghost"
             type="button"
-            disabled={reportSections.length === 0}
-            onClick={() => printAbsenceReports(language, school?.name ?? '-', reportSections)}
+            disabled={currentReportSections.length === 0}
+            onClick={() => printAbsenceReports(language, school?.name ?? '-', currentReportSections)}
           >
             <Printer size={17} aria-hidden="true" />
-            <span>{tr(language, 'printAbsenceReport')}</span>
+            <span>{tr(language, 'printCurrentAbsenceReports')}</span>
           </button>
         </div>
         <div className="absence-report-stats">
           <div className="absence-report-stat">
-            <span>{tr(language, 'sentAbsenceReports')}</span>
-            <strong>{reportSections.length}</strong>
+            <span>{tr(language, 'currentAbsenceReports')}</span>
+            <strong>{currentReportSections.length}</strong>
           </div>
           <div className="absence-report-stat">
             <span>{tr(language, 'absenceMarkCount')}</span>
-            <strong>{reportEntries.length}</strong>
+            <strong>{currentReportEntries.length}</strong>
           </div>
           <div className="absence-report-stat">
             <span>{tr(language, 'reportedClassCount')}</span>
@@ -420,43 +488,44 @@ function DirectorAbsenceReports({ data, currentUser, language }: CommonViewProps
       <div className="panel full">
         <div className="panel-heading">
           <div>
-            <p>{tr(language, 'directorAbsenceReportHint')}</p>
-            <h2>{tr(language, 'sentAbsenceReports')}</h2>
+            <p>{tr(language, 'currentAbsenceReportsHint')}</p>
+            <h2>{tr(language, 'currentAbsenceReports')}</h2>
           </div>
           <ClipboardCheck size={24} aria-hidden="true" />
         </div>
-        <div className="absence-report-list">
-          {reportSections.length === 0 && <p className="empty-state">{tr(language, 'noAbsenceReports')}</p>}
-          {reportSections.map((section) => (
-            <details className="absence-report-group" key={section.report.id} open>
-              <summary>
-                <span className="absence-report-group-title">
-                  <strong>{formatAbsenceDate(language, section.report.date)} - {reportSessionLabel(section.report)}</strong>
-                  <small>
-                    {tr(language, 'reportedBy')}: {section.marker.name} | {tr(language, 'sentAt')}: {formatAbsenceDateTime(language, section.report.createdAt)}
-                  </small>
-                </span>
-                <span className="absence-report-count">{section.entries.length}</span>
-              </summary>
-              <div className="absence-report-inner">
-                {section.entries.length === 0 && <p className="empty-state">{tr(language, 'noAbsenceReports')}</p>}
-                {buildAbsenceReportGroups(section.entries).map((group) => (
-                  <div className="absence-report-class" key={`${section.report.id}-${group.key}`}>
-                    <strong>{classLabel(language, group)}</strong>
-                    <ResponsiveTable columns={[tr(language, 'fullName'), tr(language, 'session')]} emptyText={tr(language, 'noAbsenceReports')}>
-                      {group.entries.map((entry) => (
-                        <tr key={entry.record.id}>
-                          <td>{entry.student.name}</td>
-                          <td>{reportSessionLabel(section.report)}</td>
-                        </tr>
-                      ))}
-                    </ResponsiveTable>
-                  </div>
-                ))}
-              </div>
-            </details>
-          ))}
+        <AbsenceReportList
+          emptyText={tr(language, 'noCurrentAbsenceReports')}
+          language={language}
+          schoolName={school?.name ?? '-'}
+          sections={currentReportSections}
+        />
+      </div>
+
+      <div className="panel full">
+        <div className="panel-heading">
+          <div>
+            <p>{tr(language, 'absenceHistoryHint')}</p>
+            <h2>{tr(language, 'absenceHistory')}</h2>
+          </div>
+          <FileText size={24} aria-hidden="true" />
         </div>
+        <div className="absence-report-toolbar compact">
+          <button
+            className="button ghost"
+            type="button"
+            disabled={historyReportSections.length === 0}
+            onClick={() => printAbsenceReports(language, school?.name ?? '-', historyReportSections)}
+          >
+            <Printer size={17} aria-hidden="true" />
+            <span>{tr(language, 'printHistoryAbsenceReports')}</span>
+          </button>
+        </div>
+        <AbsenceReportList
+          emptyText={tr(language, 'noAbsenceHistory')}
+          language={language}
+          schoolName={school?.name ?? '-'}
+          sections={historyReportSections}
+        />
       </div>
     </section>
   );

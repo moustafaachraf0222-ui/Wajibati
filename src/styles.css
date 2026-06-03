@@ -2551,6 +2551,11 @@ summary.subject-group-heading:hover .subject-icon svg {
   font-size: 0.9rem;
 }
 
+.absence-report-toolbar.compact {
+  grid-template-columns: auto;
+  justify-content: flex-start;
+}
+
 .absence-report-stats {
   display: grid;
   gap: 10px;
@@ -2632,6 +2637,11 @@ summary.subject-group-heading:hover .subject-icon svg {
   display: grid;
   gap: 12px;
   padding: 12px;
+}
+
+.absence-report-actions {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .absence-report-class {
