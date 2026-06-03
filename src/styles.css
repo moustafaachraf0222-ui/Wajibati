@@ -2501,9 +2501,59 @@ summary.subject-group-heading:hover .subject-icon svg {
   padding: 10px 12px;
 }
 
+.absence-session-grid,
+.absence-target-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(4, minmax(150px, 1fr));
+  margin-top: 14px;
+}
+
+.absence-target-grid {
+  grid-template-columns: repeat(3, minmax(160px, 1fr));
+}
+
+.absence-session-grid label,
+.absence-target-grid label {
+  display: grid;
+  gap: 6px;
+}
+
+.absence-session-grid label > span,
+.absence-target-grid label > span {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.absence-flow-summary,
+.absence-summary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+
+.absence-flow-summary {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper-soft);
+  padding: 10px 12px;
+}
+
+.absence-flow-summary span {
+  color: var(--muted);
+}
+
+.absence-flow-summary strong {
+  color: var(--teal);
+}
+
 .absence-report-toolbar {
   display: grid;
-  grid-template-columns: minmax(180px, 260px);
+  align-items: end;
+  grid-template-columns: minmax(180px, 260px) auto;
   gap: 12px;
   margin-top: 14px;
 }
@@ -2595,6 +2645,21 @@ summary.subject-group-heading:hover .subject-icon svg {
   font-weight: 800;
 }
 
+.absence-report-inner {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+}
+
+.absence-report-class {
+  display: grid;
+  gap: 8px;
+}
+
+.absence-report-class > strong {
+  color: var(--ink);
+}
+
 .absence-check {
   display: inline-flex;
 }
@@ -2662,6 +2727,11 @@ summary.subject-group-heading:hover .subject-icon svg {
 
   .absence-report-stats {
     grid-template-columns: repeat(2, minmax(140px, 1fr));
+  }
+
+  .absence-session-grid,
+  .absence-target-grid {
+    grid-template-columns: repeat(2, minmax(160px, 1fr));
   }
 
   .absence-toolbar,
@@ -2755,6 +2825,8 @@ summary.subject-group-heading:hover .subject-icon svg {
   .stats-grid,
   .absence-report-stats,
   .absence-report-toolbar,
+  .absence-session-grid,
+  .absence-target-grid,
   .account-type-grid,
   .form-grid,
   .exercise-grid,

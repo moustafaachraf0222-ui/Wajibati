@@ -88,6 +88,7 @@ export function hasUserData(data: PlatformData) {
     data.notes.length > 0 ||
     data.absenceSchedules.length > 0 ||
     data.absenceRecords.length > 0 ||
+    data.absenceReports.length > 0 ||
     data.deletedSchoolIds.length > 0 ||
     data.deletedExerciseIds.length > 0 ||
     data.deletedNoteIds.length > 0 ||

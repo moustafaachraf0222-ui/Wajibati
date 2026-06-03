@@ -38,6 +38,7 @@ export function deleteUserRecords(previous: PlatformData, target: PlatformUser):
     notes: previous.notes.filter((note) => note.teacherId !== target.id),
     absenceSchedules: previous.absenceSchedules.filter((schedule) => schedule.createdBy !== target.id),
     absenceRecords: previous.absenceRecords.filter((record) => record.studentId !== target.id && record.markedBy !== target.id),
+    absenceReports: previous.absenceReports.filter((report) => report.markedBy !== target.id),
     completions: Object.fromEntries(
       Object.entries(previous.completions)
         .filter(([userId]) => userId !== target.id)
@@ -83,6 +84,7 @@ export function applyDeletedSchoolTombstones(data: PlatformData): PlatformData {
     notes: data.notes.filter((note) => !deletedSchoolIds.has(note.schoolId)),
     absenceSchedules: data.absenceSchedules.filter((schedule) => !deletedSchoolIds.has(schedule.schoolId)),
     absenceRecords: data.absenceRecords.filter((record) => !deletedSchoolIds.has(record.schoolId)),
+    absenceReports: data.absenceReports.filter((report) => !deletedSchoolIds.has(report.schoolId)),
     completions: Object.fromEntries(
       Object.entries(data.completions)
         .filter(([userId]) => !removedUserIds.has(userId))

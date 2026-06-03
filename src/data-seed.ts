@@ -20,6 +20,7 @@ const seedData: PlatformData = {
   feedback: {},
   absenceSchedules: [],
   absenceRecords: [],
+  absenceReports: [],
   pushTokens: {},
   deletedSchoolIds: [],
   deletedExerciseIds: [],
@@ -49,6 +50,7 @@ export function isSeedOnlyData(data: PlatformData) {
     Object.keys(data.completionDates).length === 0 &&
     Object.keys(data.feedback).length === 0 &&
     data.absenceSchedules.length === 0 &&
-    data.absenceRecords.length === 0
+    data.absenceRecords.length === 0 &&
+    data.absenceReports.length === 0
   );
 }

@@ -169,10 +169,28 @@ export type AbsenceRecord = {
   stream?: SecondaryStream;
   date: string;
   sessionId: string;
+  sessionName?: string;
+  startsAt?: string;
+  endsAt?: string;
   studentId: string;
   markedBy: string;
+  reportId?: string;
+  sentAt?: string;
   createdAt: string;
   updatedAt?: string;
+};
+
+export type AbsenceReport = {
+  id: string;
+  schoolId: string;
+  stage: Stage;
+  date: string;
+  sessionId: string;
+  sessionName: string;
+  startsAt: string;
+  endsAt: string;
+  markedBy: string;
+  createdAt: string;
 };
 
 export type PushTokenRecord = {
@@ -192,6 +210,7 @@ export type PlatformData = {
   feedback: Record<string, Record<string, HomeworkFeedback>>;
   absenceSchedules: AbsenceSchedule[];
   absenceRecords: AbsenceRecord[];
+  absenceReports: AbsenceReport[];
   pushTokens: Record<string, PushTokenRecord[]>;
   deletedSchoolIds: string[];
   deletedExerciseIds: string[];
