@@ -44,6 +44,12 @@ type AbsenceReportSection = {
   report: AbsenceReport;
 };
 
+type AbsenceSessionChoice = {
+  key: string;
+  schedule: AbsenceSchedule;
+  session: AbsenceSchedule['sessions'][number];
+};
+
 type CommonViewProps = {
   data: PlatformData;
   currentUser: PlatformUser;
@@ -551,7 +557,7 @@ function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: Co
     [currentUser.schoolId, currentUser.stage, language]
   );
   const effectiveSchedules = schedules.length > 0 ? schedules : [fallbackSchedule];
-  const sessionChoices = useMemo(
+  const sessionChoices = useMemo<AbsenceSessionChoice[]>(
     () =>
       effectiveSchedules.flatMap((schedule) =>
         schedule.sessions.map((session) => ({
@@ -563,7 +569,7 @@ function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: Co
     [effectiveSchedules]
   );
   const [selectedDate, setSelectedDate] = useState(todayIso);
-  const [selectedSessionKey, setSelectedSessionKey] = useState('');
+  const [selectedSessionKeys, setSelectedSessionKeys] = useState<string[]>([]);
   const [selectedYear, setSelectedYear] = useState<number | ''>('');
   const [selectedStream, setSelectedStream] = useState<SecondaryStream | ''>('');
   const [selectedClassKey, setSelectedClassKey] = useState('');
@@ -572,10 +578,20 @@ function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: Co
   const yearOptions = useMemo(() => [...new Set(classGroups.map((group) => group.schoolYear))].sort((left, right) => left - right), [classGroups]);
 
   useEffect(() => {
-    if (!sessionChoices.some((choice) => choice.key === selectedSessionKey)) {
-      setSelectedSessionKey(sessionChoices[0]?.key ?? '');
-    }
-  }, [selectedSessionKey, sessionChoices]);
+    const validKeys = new Set(sessionChoices.map((choice) => choice.key));
+    setSelectedSessionKeys((previous) => {
+      const next = previous.filter((key) => validKeys.has(key));
+      if (next.length === 0 && sessionChoices[0]) {
+        next.push(sessionChoices[0].key);
+      }
+
+      if (next.length === previous.length && next.every((key, index) => key === previous[index])) {
+        return previous;
+      }
+
+      return next;
+    });
+  }, [sessionChoices]);
 
   useEffect(() => {
     if ((!selectedYear || !yearOptions.includes(selectedYear)) && yearOptions[0]) {
@@ -621,27 +637,46 @@ function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: Co
   }, [classOptions, selectedClassKey]);
 
   const selectedClass = classOptions.find((group) => group.key === selectedClassKey);
-  const selectedSessionChoice = sessionChoices.find((choice) => choice.key === selectedSessionKey);
-  const selectedSchedule = selectedSessionChoice?.schedule;
-  const selectedSession = selectedSessionChoice?.session;
-  const sessionReady = Boolean(selectedDate && selectedSchedule && selectedSession);
-  const currentSessionName = selectedSession?.name ?? tr(language, 'session');
-  const currentSessionId = selectedSchedule && selectedSession ? sessionIdFor(selectedDate, selectedSchedule.id, selectedSession.id) : '';
-  const sentReport = currentSessionId
-    ? data.absenceReports.find(
-        (report) =>
-          report.schoolId === currentUser.schoolId &&
-          report.markedBy === currentUser.id &&
-          report.date === selectedDate &&
-          report.sessionId === currentSessionId
-      )
-    : undefined;
-  const allRecordsForSession = currentSessionId
-    ? data.absenceRecords.filter((record) => recordMatchesSession(record, currentUser.schoolId ?? '', currentUser.id, selectedDate, currentSessionId))
-    : [];
-  const recordsForSession = allRecordsForSession.filter((record) => !record.deletedAt);
+  const selectedSessionChoices = useMemo(
+    () => sessionChoices.filter((choice) => selectedSessionKeys.includes(choice.key)),
+    [selectedSessionKeys, sessionChoices]
+  );
+  const sessionReady = Boolean(selectedDate && selectedSessionChoices.length > 0);
+  const selectedSessionIds = useMemo(
+    () => selectedSessionChoices.map((choice) => sessionIdFor(selectedDate, choice.schedule.id, choice.session.id)),
+    [selectedDate, selectedSessionChoices]
+  );
+  const selectedSessionIdSet = useMemo(() => new Set(selectedSessionIds), [selectedSessionIds]);
+  const sentSessionIds = useMemo(
+    () =>
+      new Set(
+        data.absenceReports
+          .filter(
+            (report) =>
+              report.schoolId === currentUser.schoolId &&
+              report.markedBy === currentUser.id &&
+              report.date === selectedDate &&
+              selectedSessionIdSet.has(report.sessionId)
+          )
+          .map((report) => report.sessionId)
+      ),
+    [currentUser.id, currentUser.schoolId, data.absenceReports, selectedDate, selectedSessionIdSet]
+  );
+  const sentSelectedSessionCount = selectedSessionChoices.filter((choice) => sentSessionIds.has(sessionIdFor(selectedDate, choice.schedule.id, choice.session.id))).length;
+  const allSelectedSessionsSent = selectedSessionChoices.length > 0 && sentSelectedSessionCount === selectedSessionChoices.length;
+  const allRecordsForSelectedSessions =
+    selectedSessionIdSet.size > 0
+      ? data.absenceRecords.filter(
+          (record) =>
+            record.schoolId === currentUser.schoolId &&
+            record.markedBy === currentUser.id &&
+            record.date === selectedDate &&
+            selectedSessionIdSet.has(record.sessionId)
+        )
+      : [];
+  const recordsForSession = allRecordsForSelectedSessions.filter((record) => !record.deletedAt);
   const recordsForSelection =
-    selectedClass && currentSessionId
+    selectedClass && selectedSessionIdSet.size > 0
       ? recordsForSession.filter(
           (record) =>
             record.schoolYear === selectedClass.schoolYear &&
@@ -652,8 +687,14 @@ function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: Co
   const draftAbsenceCount = recordsForSession.filter((record) => !record.sentAt).length;
   const draftClassCount = new Set(recordsForSession.map(reportGroupKey)).size;
   const absentCount = recordsForSelection.length;
-  const selectedSessionAppliesToClass = Boolean(selectedClass && selectedSchedule && scheduleAppliesToClass(selectedSchedule, selectedClass));
-  const canEditSelectedClass = Boolean(selectedClass && sessionReady && selectedSessionAppliesToClass && !sentReport);
+  const selectedSessionAppliesToClass = Boolean(
+    selectedClass && selectedSessionChoices.length > 0 && selectedSessionChoices.every((choice) => scheduleAppliesToClass(choice.schedule, selectedClass))
+  );
+  const editableSessionChoices =
+    selectedClass && selectedSessionAppliesToClass
+      ? selectedSessionChoices.filter((choice) => !sentSessionIds.has(sessionIdFor(selectedDate, choice.schedule.id, choice.session.id)))
+      : [];
+  const canEditSelectedClass = Boolean(selectedClass && sessionReady && selectedSessionAppliesToClass && editableSessionChoices.length > 0);
 
   const saveClassAbsences = () => {
     setNotice('');
@@ -669,7 +710,7 @@ function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: Co
       return;
     }
 
-    if (sentReport) {
+    if (allSelectedSessionsSent) {
       setNotice(tr(language, 'absenceReportAlreadySent'));
       return;
     }
@@ -677,21 +718,35 @@ function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: Co
     setNotice(tr(language, 'classAbsencesSaved'));
   };
 
-  const isAbsent = (studentId: string) => recordsForSelection.some((record) => record.studentId === studentId);
+  const canEditSessionChoice = (choice: AbsenceSessionChoice) =>
+    Boolean(
+      selectedClass &&
+        sessionReady &&
+        scheduleAppliesToClass(choice.schedule, selectedClass) &&
+        !sentSessionIds.has(sessionIdFor(selectedDate, choice.schedule.id, choice.session.id))
+    );
 
-  const toggleAbsence = (student: PlatformUser) => {
+  const isAbsent = (studentId: string, choice: AbsenceSessionChoice) => {
+    const choiceSessionId = sessionIdFor(selectedDate, choice.schedule.id, choice.session.id);
+    return recordsForSelection.some((record) => record.studentId === studentId && record.sessionId === choiceSessionId);
+  };
+
+  const toggleAbsence = (student: PlatformUser, choice: AbsenceSessionChoice) => {
     setNotice('');
     setError('');
 
-    if (!canEditSelectedClass || !selectedClass || !selectedSchedule || !selectedSession || !currentUser.schoolId || !currentUser.stage || !currentSessionId) {
+    if (!selectedClass || !currentUser.schoolId || !currentUser.stage || !canEditSessionChoice(choice)) {
       return;
     }
+
+    const choiceSessionId = sessionIdFor(selectedDate, choice.schedule.id, choice.session.id);
+    const choiceSessionName = choice.session.name;
 
     setData((previous) => {
       const existing = previous.absenceRecords.find(
         (record) =>
           record.studentId === student.id &&
-          recordMatchesSession(record, currentUser.schoolId!, currentUser.id, selectedDate, currentSessionId) &&
+          recordMatchesSession(record, currentUser.schoolId!, currentUser.id, selectedDate, choiceSessionId) &&
           record.schoolYear === selectedClass.schoolYear &&
           record.stream === selectedClass.stream &&
           sameClassGroup(record.classGroup, selectedClass.classGroup)
@@ -714,10 +769,10 @@ function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: Co
               const { deletedAt: _deletedAt, ...restoredRecord } = record;
               return {
                 ...restoredRecord,
-                scheduleId: selectedSchedule.id,
-                sessionName: currentSessionName,
-                startsAt: selectedSession.startsAt,
-                endsAt: selectedSession.endsAt,
+                scheduleId: choice.schedule.id,
+                sessionName: choiceSessionName,
+                startsAt: choice.session.startsAt,
+                endsAt: choice.session.endsAt,
                 updatedAt
               };
             }
@@ -742,11 +797,11 @@ function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: Co
             stream: selectedClass.stream,
             classGroup: selectedClass.classGroup,
             date: selectedDate,
-            sessionId: currentSessionId,
-            scheduleId: selectedSchedule.id,
-            sessionName: currentSessionName,
-            startsAt: selectedSession.startsAt,
-            endsAt: selectedSession.endsAt,
+            sessionId: choiceSessionId,
+            scheduleId: choice.schedule.id,
+            sessionName: choiceSessionName,
+            startsAt: choice.session.startsAt,
+            endsAt: choice.session.endsAt,
             studentId: student.id,
             markedBy: currentUser.id,
             createdAt: new Date().toISOString(),
@@ -761,49 +816,70 @@ function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: Co
     setNotice('');
     setError('');
 
-    if (!currentUser.schoolId || !currentUser.stage || !selectedSchedule || !selectedSession || !sessionReady || !currentSessionId) {
+    if (!currentUser.schoolId || !currentUser.stage || !sessionReady) {
       setError(tr(language, 'scheduleRequired'));
       return;
     }
 
-    if (sentReport) {
+    if (allSelectedSessionsSent) {
       setNotice(tr(language, 'absenceReportAlreadySent'));
       return;
     }
 
     const sentAt = new Date().toISOString();
-    const report: AbsenceReport = {
+    const reportChoices = selectedSessionChoices.filter((choice) => !sentSessionIds.has(sessionIdFor(selectedDate, choice.schedule.id, choice.session.id)));
+    const reports = reportChoices.map<AbsenceReport>((choice) => ({
       id: makeId('absence-report'),
-      schoolId: currentUser.schoolId,
-      stage: currentUser.stage,
+      schoolId: currentUser.schoolId!,
+      stage: currentUser.stage!,
       date: selectedDate,
-      sessionId: currentSessionId,
-      scheduleId: selectedSchedule.id,
-      sessionName: currentSessionName,
-      startsAt: selectedSession.startsAt,
-      endsAt: selectedSession.endsAt,
+      sessionId: sessionIdFor(selectedDate, choice.schedule.id, choice.session.id),
+      scheduleId: choice.schedule.id,
+      sessionName: choice.session.name,
+      startsAt: choice.session.startsAt,
+      endsAt: choice.session.endsAt,
       markedBy: currentUser.id,
       createdAt: sentAt
-    };
+    }));
+    const reportsBySessionId = new Map(reports.map((report) => [report.sessionId, report]));
+    const choicesBySessionId = new Map(reportChoices.map((choice) => [sessionIdFor(selectedDate, choice.schedule.id, choice.session.id), choice]));
 
     setData((previous) => ({
       ...previous,
-      absenceReports: [...previous.absenceReports, report],
+      absenceReports: [...previous.absenceReports, ...reports],
       absenceRecords: previous.absenceRecords.map((record) =>
-        recordMatchesSession(record, currentUser.schoolId!, currentUser.id, selectedDate, currentSessionId) && !record.sentAt && !record.deletedAt
-          ? {
-              ...record,
-              reportId: report.id,
-              sentAt,
-              scheduleId: selectedSchedule.id,
-              sessionName: currentSessionName,
-              startsAt: selectedSession.startsAt,
-              endsAt: selectedSession.endsAt
-            }
+        record.schoolId === currentUser.schoolId &&
+        record.markedBy === currentUser.id &&
+        record.date === selectedDate &&
+        choicesBySessionId.has(record.sessionId) &&
+        !record.sentAt &&
+        !record.deletedAt
+          ? (() => {
+              const choice = choicesBySessionId.get(record.sessionId)!;
+              return {
+                ...record,
+                reportId: reportsBySessionId.get(record.sessionId)?.id,
+                sentAt,
+                scheduleId: choice.schedule.id,
+                sessionName: choice.session.name,
+                startsAt: choice.session.startsAt,
+                endsAt: choice.session.endsAt
+              };
+            })()
           : record
       )
     }));
     setNotice(tr(language, 'absenceReportSent'));
+  };
+
+  const toggleSessionChoice = (key: string) => {
+    setSelectedSessionKeys((previous) => {
+      if (!previous.includes(key)) {
+        return [...previous, key];
+      }
+
+      return previous.length > 1 ? previous.filter((item) => item !== key) : previous;
+    });
   };
 
   return (
@@ -823,17 +899,16 @@ function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: Co
             <input type="date" value={selectedDate} onChange={(event) => setSelectedDate(event.target.value)} />
           </label>
           <div className="form-field absence-session-choice">
-            <span>{tr(language, 'session')}</span>
+            <span>{tr(language, 'sessions')}</span>
             <div className="checkbox-grid">
               {sessionChoices.map((choice) => (
                 <label className="check-option" key={choice.key}>
                   <input
-                    type="radio"
-                    name="absence-session"
+                    type="checkbox"
                     value={choice.key}
-                    checked={selectedSessionKey === choice.key}
+                    checked={selectedSessionKeys.includes(choice.key)}
                     disabled={sessionChoices.length === 0}
-                    onChange={(event) => setSelectedSessionKey(event.target.value)}
+                    onChange={() => toggleSessionChoice(choice.key)}
                   />
                   <span>{scheduleSessionLabel(choice.schedule, choice.session)}</span>
                 </label>
@@ -844,8 +919,8 @@ function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: Co
         <div className="absence-flow-summary">
           <span>{tr(language, 'draftAbsenceCount')}: {draftAbsenceCount}</span>
           <span>{tr(language, 'reportedClassCount')}: {draftClassCount}</span>
-          <strong>{sentReport ? tr(language, 'absenceReportAlreadySent') : tr(language, 'draftReport')}</strong>
-          <button className="button primary" type="button" disabled={!sessionReady || Boolean(sentReport)} onClick={sendAbsenceReport}>
+          <strong>{allSelectedSessionsSent ? tr(language, 'absenceReportAlreadySent') : tr(language, 'draftReport')}</strong>
+          <button className="button primary" type="button" disabled={!sessionReady || allSelectedSessionsSent} onClick={sendAbsenceReport}>
             <Send size={17} aria-hidden="true" />
             <span>{tr(language, 'sendAbsenceReport')}</span>
           </button>
@@ -918,30 +993,38 @@ function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: Co
           </div>
         </div>
         <p className="hint">
-          {sentReport
+          {allSelectedSessionsSent
             ? tr(language, 'absenceReportAlreadySent')
-            : selectedClass && !selectedSessionAppliesToClass
+            : selectedClass && selectedSessionChoices.length > 0 && !selectedSessionAppliesToClass
               ? tr(language, 'sessionNotAssignedToClass')
               : tr(language, 'absenceGridHint')}
         </p>
         {error && <p className="form-error">{error}</p>}
         {notice && <p className="success-message">{notice}</p>}
         {selectedClass ? (
-          <ResponsiveTable columns={[tr(language, 'absent'), tr(language, 'fullName')]} emptyText={tr(language, 'noRecords')}>
+          <ResponsiveTable
+            columns={[tr(language, 'fullName'), ...selectedSessionChoices.map((choice) => scheduleSessionLabel(choice.schedule, choice.session))]}
+            emptyText={tr(language, 'noRecords')}
+          >
             {selectedClass.students.map((student) => {
-              const checked = isAbsent(student.id);
               return (
                 <tr key={student.id}>
-                  <td>
-                    <label className={checked ? 'absence-check absent' : 'absence-check'}>
-                      <input type="checkbox" checked={checked} disabled={!canEditSelectedClass} onChange={() => toggleAbsence(student)} />
-                      <span>
-                        {checked ? <X size={15} aria-hidden="true" /> : <Check size={15} aria-hidden="true" />}
-                        {tr(language, checked ? 'absent' : 'present')}
-                      </span>
-                    </label>
-                  </td>
                   <td>{student.name}</td>
+                  {selectedSessionChoices.map((choice) => {
+                    const checked = isAbsent(student.id, choice);
+                    const editable = canEditSelectedClass && canEditSessionChoice(choice);
+                    return (
+                      <td key={`${student.id}-${choice.key}`}>
+                        <label className={checked ? 'absence-check absent' : 'absence-check'}>
+                          <input type="checkbox" checked={checked} disabled={!editable} onChange={() => toggleAbsence(student, choice)} />
+                          <span>
+                            {checked ? <X size={15} aria-hidden="true" /> : <Check size={15} aria-hidden="true" />}
+                            {tr(language, checked ? 'absent' : 'present')}
+                          </span>
+                        </label>
+                      </td>
+                    );
+                  })}
                 </tr>
               );
             })}
