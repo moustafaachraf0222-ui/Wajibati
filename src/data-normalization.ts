@@ -1,8 +1,68 @@
-import type { PlatformData } from './types';
+import type { AbsenceSchedule, PlatformData } from './types';
 import { secondaryStreams, uniqueStrings } from './education';
 import { DATA_KEY } from './data-constants';
 import { cloneSeedData } from './data-seed';
 import { applyDeletionTombstones, purgeExpiredTrashedSchools } from './data-tombstones';
+
+function normalizedScheduleClassGroup(value: string) {
+  return value.trim().toLowerCase();
+}
+
+function scheduleTargetKey(schedule: AbsenceSchedule, target: NonNullable<AbsenceSchedule['targets']>[number]) {
+  return `${schedule.schoolId}|${schedule.stage ?? ''}|${target.schoolYear}|${target.stream ?? ''}|${normalizedScheduleClassGroup(target.classGroup)}`;
+}
+
+function scheduleTimestamp(schedule: AbsenceSchedule) {
+  const timestamp = Date.parse(schedule.createdAt);
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function scheduleIsNewer(candidate: AbsenceSchedule, current: AbsenceSchedule) {
+  const candidateTimestamp = scheduleTimestamp(candidate);
+  const currentTimestamp = scheduleTimestamp(current);
+  return candidateTimestamp > currentTimestamp || (candidateTimestamp === currentTimestamp && candidate.id.localeCompare(current.id) > 0);
+}
+
+function normalizeAbsenceSchedules(schedules: AbsenceSchedule[]) {
+  const schedulesWithUniqueTargets = schedules.map((schedule) => {
+    if (!Array.isArray(schedule.targets) || schedule.targets.length === 0) {
+      return schedule;
+    }
+
+    const seenTargets = new Set<string>();
+    const targets = schedule.targets.filter((target) => {
+      const key = scheduleTargetKey(schedule, target);
+      if (seenTargets.has(key)) {
+        return false;
+      }
+
+      seenTargets.add(key);
+      return true;
+    });
+
+    return targets.length === schedule.targets.length ? schedule : { ...schedule, targets };
+  });
+
+  const activeScheduleByTarget = new Map<string, AbsenceSchedule>();
+  schedulesWithUniqueTargets.forEach((schedule) => {
+    schedule.targets?.forEach((target) => {
+      const key = scheduleTargetKey(schedule, target);
+      const currentSchedule = activeScheduleByTarget.get(key);
+      if (!currentSchedule || scheduleIsNewer(schedule, currentSchedule)) {
+        activeScheduleByTarget.set(key, schedule);
+      }
+    });
+  });
+
+  return schedulesWithUniqueTargets.map((schedule) => {
+    if (!schedule.targets?.length) {
+      return schedule;
+    }
+
+    const targets = schedule.targets.filter((target) => activeScheduleByTarget.get(scheduleTargetKey(schedule, target))?.id === schedule.id);
+    return targets.length === schedule.targets.length ? schedule : { ...schedule, targets };
+  });
+}
 
 export function normalizePlatformData(value: Partial<PlatformData> | null | undefined): PlatformData {
   const fallback = cloneSeedData();
@@ -26,7 +86,7 @@ export function normalizePlatformData(value: Partial<PlatformData> | null | unde
     completionDates:
       source.completionDates && typeof source.completionDates === 'object' ? source.completionDates : fallback.completionDates,
     feedback: source.feedback && typeof source.feedback === 'object' ? source.feedback : fallback.feedback,
-    absenceSchedules: Array.isArray(source.absenceSchedules) ? source.absenceSchedules : fallback.absenceSchedules,
+    absenceSchedules: Array.isArray(source.absenceSchedules) ? normalizeAbsenceSchedules(source.absenceSchedules) : fallback.absenceSchedules,
     absenceRecords: Array.isArray(source.absenceRecords) ? source.absenceRecords : fallback.absenceRecords,
     absenceReports: Array.isArray(source.absenceReports) ? source.absenceReports : fallback.absenceReports,
     pushTokens: source.pushTokens && typeof source.pushTokens === 'object' ? source.pushTokens : fallback.pushTokens,

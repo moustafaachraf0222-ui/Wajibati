@@ -140,12 +140,16 @@ function classLabel(language: Language, group: Pick<AbsenceClassGroup, 'schoolYe
   return `${schoolYearLabel(language, stage, group.schoolYear)}${stream} - ${tr(language, 'classGroup')} ${group.classGroup}`;
 }
 
+function classTargetKey(target: Pick<NonNullable<AbsenceSchedule['targets']>[number], 'schoolYear' | 'stream' | 'classGroup'>) {
+  return `${target.schoolYear}|${target.stream ?? ''}|${target.classGroup.trim().toLowerCase()}`;
+}
+
 function targetMatchesClass(target: NonNullable<AbsenceSchedule['targets']>[number], group: Pick<AbsenceClassGroup, 'schoolYear' | 'stream' | 'classGroup'>) {
   return target.schoolYear === group.schoolYear && target.stream === group.stream && sameClassGroup(target.classGroup, group.classGroup);
 }
 
 function scheduleAppliesToClass(schedule: AbsenceSchedule, group: AbsenceClassGroup) {
-  return !schedule.targets?.length || schedule.targets.some((target) => targetMatchesClass(target, group));
+  return Boolean(schedule.targets?.some((target) => targetMatchesClass(target, group)));
 }
 
 function weekdayForDate(date: string) {
@@ -189,6 +193,15 @@ function formatAbsenceDateTime(language: Language, value: string) {
 
 function sessionIdFor(date: string, scheduleId: string, sessionId: string) {
   return `template:${date}:${scheduleId}:${sessionId}`;
+}
+
+function scheduleTimestamp(schedule: AbsenceSchedule) {
+  const timestamp = Date.parse(schedule.createdAt);
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function compareSchedulesByNewest(left: AbsenceSchedule, right: AbsenceSchedule) {
+  return scheduleTimestamp(right) - scheduleTimestamp(left) || right.id.localeCompare(left.id);
 }
 
 function reportSessionLabel(report: AbsenceReport) {
@@ -574,10 +587,25 @@ function DirectorScheduleManager({ data, setData, currentUser, language }: Commo
       createdBy: currentUser.id,
       createdAt: new Date().toISOString()
     };
+    const assignedTargetKeys = new Set(targets.map(classTargetKey));
 
     setData((previous) => ({
       ...previous,
-      absenceSchedules: [...previous.absenceSchedules, schedule]
+      absenceSchedules: [
+        ...previous.absenceSchedules.map((existingSchedule) => {
+          if (
+            existingSchedule.schoolId !== currentUser.schoolId ||
+            (existingSchedule.stage && existingSchedule.stage !== currentUser.stage) ||
+            !existingSchedule.targets?.length
+          ) {
+            return existingSchedule;
+          }
+
+          const nextTargets = existingSchedule.targets.filter((target) => !assignedTargetKeys.has(classTargetKey(target)));
+          return nextTargets.length === existingSchedule.targets.length ? existingSchedule : { ...existingSchedule, targets: nextTargets };
+        }),
+        schedule
+      ]
     }));
     setForm({ name: '', sessions: defaultScheduleSessions(), targetKeys: [], weekdays: [...DEFAULT_SCHOOL_WEEKDAYS] });
     setNotice(tr(language, 'scheduleTemplateSaved'));
@@ -926,16 +954,18 @@ function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: Co
     }),
     [currentUser.schoolId, currentUser.stage, language, selectedClass]
   );
-  const effectiveSchedules = useMemo(
+  const effectiveSchedule = useMemo(
     () =>
       selectedClass
-        ? schedules.filter((schedule) => scheduleAppliesToClass(schedule, selectedClass) && scheduleAppliesToDate(schedule, selectedDate))
-        : [],
+        ? [...schedules]
+            .filter((schedule) => scheduleAppliesToClass(schedule, selectedClass) && scheduleAppliesToDate(schedule, selectedDate))
+            .sort(compareSchedulesByNewest)[0]
+        : undefined,
     [schedules, selectedClass, selectedDate]
   );
   const sessionSchedules = useMemo(
-    () => (effectiveSchedules.length > 0 ? effectiveSchedules : schedules.length === 0 && selectedClass ? [fallbackSchedule] : []),
-    [effectiveSchedules, fallbackSchedule, schedules.length, selectedClass]
+    () => (effectiveSchedule ? [effectiveSchedule] : schedules.length === 0 && selectedClass ? [fallbackSchedule] : []),
+    [effectiveSchedule, fallbackSchedule, schedules.length, selectedClass]
   );
   const sessionChoices = useMemo<AbsenceSessionChoice[]>(
     () =>
