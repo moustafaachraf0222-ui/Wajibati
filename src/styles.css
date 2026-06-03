@@ -2547,6 +2547,11 @@ summary.subject-group-heading:hover .subject-icon svg {
   padding: 12px;
 }
 
+.schedule-template-card.supervisor-schedule-card {
+  align-items: stretch;
+  grid-template-columns: minmax(180px, 0.8fr) minmax(260px, 2fr);
+}
+
 .schedule-template-card strong {
   color: var(--ink);
 }
@@ -2572,6 +2577,16 @@ summary.subject-group-heading:hover .subject-icon svg {
 
 .absence-target-grid {
   grid-template-columns: repeat(3, minmax(160px, 1fr));
+}
+
+.absence-target-grid.with-date {
+  grid-template-columns: repeat(4, minmax(150px, 1fr));
+}
+
+.supervisor-session-templates {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
 }
 
 .absence-session-grid > label,

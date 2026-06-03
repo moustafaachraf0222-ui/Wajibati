@@ -954,8 +954,8 @@ function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: Co
     const validKeys = new Set(sessionChoices.map((choice) => choice.key));
     setSelectedSessionKeys((previous) => {
       const next = previous.filter((key) => validKeys.has(key));
-      if (next.length === 0 && sessionChoices[0]) {
-        next.push(sessionChoices[0].key);
+      if (next.length === 0) {
+        next.push(...sessionChoices.map((choice) => choice.key));
       }
 
       if (next.length === previous.length && next.every((key, index) => key === previous[index])) {
@@ -1225,50 +1225,11 @@ function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: Co
           <ClipboardCheck size={24} aria-hidden="true" />
         </div>
         <p className="hint">{tr(language, 'supervisorAbsenceFlowHint')}</p>
-        <div className="absence-session-grid">
+        <div className="absence-target-grid with-date">
           <label>
             <span>{tr(language, 'absenceDate')}</span>
             <input type="date" value={selectedDate} onChange={(event) => setSelectedDate(event.target.value)} />
           </label>
-          <div className="form-field absence-session-choice">
-            <span>{tr(language, 'sessions')}</span>
-            <div className="checkbox-grid">
-              {sessionChoices.map((choice) => (
-                <label className="check-option" key={choice.key}>
-                  <input
-                    type="checkbox"
-                    value={choice.key}
-                    checked={selectedSessionKeys.includes(choice.key)}
-                    disabled={sessionChoices.length === 0}
-                    onChange={() => toggleSessionChoice(choice.key)}
-                  />
-                  <span>{scheduleSessionLabel(choice.schedule, choice.session)}</span>
-                </label>
-              ))}
-            </div>
-            {selectedClass && sessionChoices.length === 0 && <p className="empty-state">{tr(language, 'noScheduleForClassDay')}</p>}
-          </div>
-        </div>
-        <div className="absence-flow-summary">
-          <span>{tr(language, 'draftAbsenceCount')}: {draftAbsenceCount}</span>
-          <span>{tr(language, 'reportedClassCount')}: {draftClassCount}</span>
-          <strong>{allSelectedSessionsSent ? tr(language, 'absenceReportAlreadySent') : tr(language, 'draftReport')}</strong>
-          <button className="button primary" type="button" disabled={!sessionReady || allSelectedSessionsSent} onClick={sendAbsenceReport}>
-            <Send size={17} aria-hidden="true" />
-            <span>{tr(language, 'sendAbsenceReport')}</span>
-          </button>
-        </div>
-      </div>
-
-      <div className="panel">
-        <div className="panel-heading">
-          <div>
-            <p>{tr(language, 'chooseAbsenceTarget')}</p>
-            <h2>{tr(language, 'absenceClasses')}</h2>
-          </div>
-          <CalendarDays size={24} aria-hidden="true" />
-        </div>
-        <div className="absence-target-grid">
           <label>
             <span>{tr(language, 'schoolYear')}</span>
             <select value={selectedYear} onChange={(event) => setSelectedYear(Number(event.target.value))}>
@@ -1303,6 +1264,53 @@ function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: Co
           </label>
         </div>
         {classGroups.length === 0 && <p className="empty-state">{tr(language, 'noClassesForAbsence')}</p>}
+      </div>
+
+      <div className="panel full">
+        <div className="panel-heading">
+          <div>
+            <p>{selectedClass ? classLabel(language, selectedClass, currentUser.stage) : tr(language, 'chooseAbsenceTarget')}</p>
+            <h2>{tr(language, 'scheduleTemplates')}</h2>
+          </div>
+          <CalendarDays size={24} aria-hidden="true" />
+        </div>
+        <div className="supervisor-session-templates">
+          {sessionSchedules.map((schedule) => (
+            <article className="schedule-template-card supervisor-schedule-card" key={schedule.id}>
+              <div>
+                <strong>{schedule.name}</strong>
+                <span>{scheduleWeekdayLabel(language, schedule)}</span>
+                <small>{formatAbsenceDate(language, selectedDate)}</small>
+              </div>
+              <div className="checkbox-grid">
+                {schedule.sessions.map((session) => {
+                  const key = `${schedule.id}:${session.id}`;
+                  return (
+                    <label className="check-option" key={key}>
+                      <input
+                        type="checkbox"
+                        value={key}
+                        checked={selectedSessionKeys.includes(key)}
+                        onChange={() => toggleSessionChoice(key)}
+                      />
+                      <span>{`${session.name} ${session.startsAt}-${session.endsAt}`}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </article>
+          ))}
+          {selectedClass && sessionSchedules.length === 0 && <p className="empty-state">{tr(language, 'noScheduleForClassDay')}</p>}
+        </div>
+        <div className="absence-flow-summary">
+          <span>{tr(language, 'draftAbsenceCount')}: {draftAbsenceCount}</span>
+          <span>{tr(language, 'reportedClassCount')}: {draftClassCount}</span>
+          <strong>{allSelectedSessionsSent ? tr(language, 'absenceReportAlreadySent') : tr(language, 'draftReport')}</strong>
+          <button className="button primary" type="button" disabled={!sessionReady || allSelectedSessionsSent} onClick={sendAbsenceReport}>
+            <Send size={17} aria-hidden="true" />
+            <span>{tr(language, 'sendAbsenceReport')}</span>
+          </button>
+        </div>
       </div>
 
       <div className="panel full">
