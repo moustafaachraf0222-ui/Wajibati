@@ -159,8 +159,8 @@ function scheduleAppliesToDate(schedule: AbsenceSchedule, date: string) {
   return weekday === undefined || weekdays.includes(weekday);
 }
 
-function scheduleSessionLabel(schedule: AbsenceSchedule, session: AbsenceSchedule['sessions'][number]) {
-  return `${schedule.name} - ${session.name} ${session.startsAt}-${session.endsAt}`;
+function sessionTimeLabel(choice: AbsenceSessionChoice) {
+  return `${choice.session.startsAt}-${choice.session.endsAt}`;
 }
 
 function scheduleWeekdayLabel(language: Language, schedule: AbsenceSchedule) {
@@ -853,7 +853,6 @@ function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: Co
     [currentUser.schoolId, currentUser.stage, data.absenceSchedules]
   );
   const [selectedDate, setSelectedDate] = useState(todayIso);
-  const [selectedSessionKeys, setSelectedSessionKeys] = useState<string[]>([]);
   const [selectedYear, setSelectedYear] = useState<number | ''>('');
   const [selectedStream, setSelectedStream] = useState<SecondaryStream | ''>('');
   const [selectedClassKey, setSelectedClassKey] = useState('');
@@ -946,30 +945,10 @@ function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: Co
           schedule,
           session
         }))
-      ),
+      ).sort((left, right) => left.session.startsAt.localeCompare(right.session.startsAt) || left.session.endsAt.localeCompare(right.session.endsAt)),
     [sessionSchedules]
   );
-
-  useEffect(() => {
-    const validKeys = new Set(sessionChoices.map((choice) => choice.key));
-    setSelectedSessionKeys((previous) => {
-      const next = previous.filter((key) => validKeys.has(key));
-      if (next.length === 0) {
-        next.push(...sessionChoices.map((choice) => choice.key));
-      }
-
-      if (next.length === previous.length && next.every((key, index) => key === previous[index])) {
-        return previous;
-      }
-
-      return next;
-    });
-  }, [sessionChoices]);
-
-  const selectedSessionChoices = useMemo(
-    () => sessionChoices.filter((choice) => selectedSessionKeys.includes(choice.key)),
-    [selectedSessionKeys, sessionChoices]
-  );
+  const selectedSessionChoices = sessionChoices;
   const sessionReady = Boolean(selectedDate && selectedSessionChoices.length > 0);
   const selectedSessionIds = useMemo(
     () => selectedSessionChoices.map((choice) => sessionIdFor(selectedDate, choice.schedule.id, choice.session.id)),
@@ -1204,16 +1183,6 @@ function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: Co
     setNotice(tr(language, 'absenceReportSent'));
   };
 
-  const toggleSessionChoice = (key: string) => {
-    setSelectedSessionKeys((previous) => {
-      if (!previous.includes(key)) {
-        return [...previous, key];
-      }
-
-      return previous.length > 1 ? previous.filter((item) => item !== key) : previous;
-    });
-  };
-
   return (
     <section className="content-grid absences-view">
       <div className="panel full">
@@ -1270,7 +1239,7 @@ function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: Co
         <div className="panel-heading">
           <div>
             <p>{selectedClass ? classLabel(language, selectedClass, currentUser.stage) : tr(language, 'chooseAbsenceTarget')}</p>
-            <h2>{tr(language, 'scheduleTemplates')}</h2>
+            <h2>{tr(language, 'dailySchedule')}</h2>
           </div>
           <CalendarDays size={24} aria-hidden="true" />
         </div>
@@ -1283,20 +1252,12 @@ function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: Co
                 <small>{formatAbsenceDate(language, selectedDate)}</small>
               </div>
               <div className="checkbox-grid">
-                {schedule.sessions.map((session) => {
-                  const key = `${schedule.id}:${session.id}`;
-                  return (
-                    <label className="check-option" key={key}>
-                      <input
-                        type="checkbox"
-                        value={key}
-                        checked={selectedSessionKeys.includes(key)}
-                        onChange={() => toggleSessionChoice(key)}
-                      />
-                      <span>{`${session.name} ${session.startsAt}-${session.endsAt}`}</span>
-                    </label>
-                  );
-                })}
+                {schedule.sessions.map((session) => (
+                  <span className="timetable-session-chip" key={`${schedule.id}:${session.id}`}>
+                    <strong>{session.name}</strong>
+                    <small>{session.startsAt}-{session.endsAt}</small>
+                  </span>
+                ))}
               </div>
             </article>
           ))}
@@ -1344,7 +1305,7 @@ function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: Co
         {notice && <p className="success-message">{notice}</p>}
         {selectedClass ? (
           <ResponsiveTable
-            columns={[tr(language, 'fullName'), ...selectedSessionChoices.map((choice) => scheduleSessionLabel(choice.schedule, choice.session))]}
+            columns={[tr(language, 'fullName'), ...selectedSessionChoices.map(sessionTimeLabel)]}
             emptyText={tr(language, 'noRecords')}
           >
             {selectedClass.students.map((student) => {

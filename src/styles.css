@@ -2567,6 +2567,28 @@ summary.subject-group-heading:hover .subject-icon svg {
   gap: 6px;
 }
 
+.timetable-session-chip {
+  align-items: center;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 42px;
+  padding: 8px 10px;
+}
+
+.timetable-session-chip strong {
+  color: var(--ink);
+}
+
+.timetable-session-chip small {
+  color: var(--muted);
+  direction: ltr;
+}
+
 .absence-session-grid,
 .absence-target-grid {
   display: grid;
