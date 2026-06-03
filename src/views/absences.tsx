@@ -56,6 +56,26 @@ function todayIso() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function normalizeTypedTime(value: string) {
+  const match = value.trim().replace('.', ':').match(/^(\d{1,2})(?::(\d{1,2}))?$/);
+  if (!match) {
+    return '';
+  }
+
+  const hours = Number(match[1]);
+  const minutes = Number(match[2] ?? '0');
+  if (hours > 23 || minutes > 59) {
+    return '';
+  }
+
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+}
+
+function timeToMinutes(value: string) {
+  const [hours, minutes] = value.split(':').map(Number);
+  return hours * 60 + minutes;
+}
+
 function classKey(schoolYear: number, stream: SecondaryStream | undefined, classGroup: string) {
   return `${schoolYear}:${stream ?? ''}:${classGroup.trim().toLowerCase()}`;
 }
@@ -616,17 +636,28 @@ function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: Co
       return;
     }
 
-    const sessions = templateDraft.sessions
-      .map((session, index) => ({
+    const typedSessions = templateDraft.sessions.map((session, index) => ({
+      ...session,
+      name: session.name.trim() || String(index + 1),
+      startsAt: session.startsAt.trim(),
+      endsAt: session.endsAt.trim()
+    }));
+
+    const sessions = typedSessions
+      .filter((session) => session.startsAt || session.endsAt)
+      .map((session) => ({
         ...session,
-        name: session.name.trim() || String(index + 1),
-        startsAt: session.startsAt.trim(),
-        endsAt: session.endsAt.trim()
-      }))
-      .filter((session) => session.startsAt && session.endsAt);
+        startsAt: normalizeTypedTime(session.startsAt),
+        endsAt: normalizeTypedTime(session.endsAt)
+      }));
 
     if (sessions.length === 0) {
       setError(tr(language, 'sessionRequired'));
+      return;
+    }
+
+    if (sessions.some((session) => !session.startsAt || !session.endsAt || timeToMinutes(session.endsAt) <= timeToMinutes(session.startsAt))) {
+      setError(tr(language, 'timeFormatRequired'));
       return;
     }
 
@@ -788,15 +819,21 @@ function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: Co
                 />
                 <input
                   aria-label={tr(language, 'startsAt')}
-                  type="time"
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="08:00"
                   value={session.startsAt}
                   onChange={(event) => updateTemplateSession(session.id, { startsAt: event.target.value })}
+                  onBlur={(event) => updateTemplateSession(session.id, { startsAt: normalizeTypedTime(event.target.value) || event.target.value.trim() })}
                 />
                 <input
                   aria-label={tr(language, 'endsAt')}
-                  type="time"
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="09:00"
                   value={session.endsAt}
                   onChange={(event) => updateTemplateSession(session.id, { endsAt: event.target.value })}
+                  onBlur={(event) => updateTemplateSession(session.id, { endsAt: normalizeTypedTime(event.target.value) || event.target.value.trim() })}
                 />
                 <button className="icon-button danger" type="button" title={tr(language, 'removeSession')} onClick={() => removeTemplateSession(session.id)}>
                   <X size={16} aria-hidden="true" />
