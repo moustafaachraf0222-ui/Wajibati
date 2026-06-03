@@ -1,5 +1,5 @@
-import { CalendarDays, Check, ClipboardCheck, FileText, Printer, Save, Send, X } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { CalendarDays, Check, ClipboardCheck, FileText, Plus, Printer, Save, Send, Trash2, X } from 'lucide-react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import type {
   AbsenceRecord,
   AbsenceReport,
@@ -8,7 +8,8 @@ import type {
   Language,
   PlatformData,
   PlatformUser,
-  SecondaryStream
+  SecondaryStream,
+  Stage
 } from '../types';
 import { localeNames, schoolYearLabel, tr } from '../i18n';
 import { sameClassGroup, secondaryStreamLabel } from '../education';
@@ -57,6 +58,13 @@ type CommonViewProps = {
 };
 
 const ABSENCE_REPORT_CURRENT_MS = 24 * 60 * 60 * 1000;
+const DEFAULT_SCHOOL_WEEKDAYS = [0, 1, 2, 3, 4];
+
+const weekdayNames: Record<Language, string[]> = {
+  ar: ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'],
+  fr: ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'],
+  en: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+};
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10);
@@ -127,9 +135,9 @@ function classesForAbsences(data: PlatformData, currentUser: PlatformUser): Abse
     );
 }
 
-function classLabel(language: Language, group: Pick<AbsenceClassGroup, 'schoolYear' | 'stream' | 'classGroup'>) {
+function classLabel(language: Language, group: Pick<AbsenceClassGroup, 'schoolYear' | 'stream' | 'classGroup'>, stage?: Stage) {
   const stream = group.stream ? ` - ${secondaryStreamLabel(language, group.stream, group.schoolYear)}` : '';
-  return `${schoolYearLabel(language, undefined, group.schoolYear)}${stream} - ${tr(language, 'classGroup')} ${group.classGroup}`;
+  return `${schoolYearLabel(language, stage, group.schoolYear)}${stream} - ${tr(language, 'classGroup')} ${group.classGroup}`;
 }
 
 function targetMatchesClass(target: NonNullable<AbsenceSchedule['targets']>[number], group: Pick<AbsenceClassGroup, 'schoolYear' | 'stream' | 'classGroup'>) {
@@ -140,8 +148,25 @@ function scheduleAppliesToClass(schedule: AbsenceSchedule, group: AbsenceClassGr
   return !schedule.targets?.length || schedule.targets.some((target) => targetMatchesClass(target, group));
 }
 
+function weekdayForDate(date: string) {
+  const parsed = new Date(`${date}T00:00:00`);
+  return Number.isNaN(parsed.getTime()) ? undefined : parsed.getDay();
+}
+
+function scheduleAppliesToDate(schedule: AbsenceSchedule, date: string) {
+  const weekday = weekdayForDate(date);
+  const weekdays = schedule.weekdays?.length ? schedule.weekdays : DEFAULT_SCHOOL_WEEKDAYS;
+  return weekday === undefined || weekdays.includes(weekday);
+}
+
 function scheduleSessionLabel(schedule: AbsenceSchedule, session: AbsenceSchedule['sessions'][number]) {
   return `${schedule.name} - ${session.name} ${session.startsAt}-${session.endsAt}`;
+}
+
+function scheduleWeekdayLabel(language: Language, schedule: AbsenceSchedule) {
+  return (schedule.weekdays?.length ? schedule.weekdays : DEFAULT_SCHOOL_WEEKDAYS)
+    .map((weekday) => weekdayNames[language][weekday] ?? String(weekday))
+    .join('، ');
 }
 
 function formatAbsenceDate(language: Language, value: string) {
@@ -378,7 +403,7 @@ function AbsenceReportList({
             {section.entries.length === 0 && <p className="empty-state">{tr(language, 'noAbsenceReports')}</p>}
             {buildAbsenceReportGroups(section.entries).map((group) => (
               <div className="absence-report-class" key={`${section.report.id}-${group.key}`}>
-                <strong>{classLabel(language, group)}</strong>
+                <strong>{classLabel(language, group, section.report.stage)}</strong>
                 <ResponsiveTable columns={[tr(language, 'fullName'), tr(language, 'session')]} emptyText={tr(language, 'noAbsenceReports')}>
                   {group.entries.map((entry) => (
                     <tr key={entry.record.id}>
@@ -398,13 +423,255 @@ function AbsenceReportList({
 
 export function AbsencesView({ data, setData, currentUser, language }: CommonViewProps & { setData: DataSetter }) {
   if (currentUser.role === 'director') {
-    return <DirectorAbsenceReports data={data} currentUser={currentUser} language={language} />;
+    return <DirectorAbsenceReports data={data} setData={setData} currentUser={currentUser} language={language} />;
   }
 
   return <SupervisorAbsenceWorkspace data={data} setData={setData} currentUser={currentUser} language={language} />;
 }
 
-function DirectorAbsenceReports({ data, currentUser, language }: CommonViewProps) {
+function defaultScheduleSessions(): AbsenceSchedule['sessions'] {
+  return [{ id: makeId('session'), name: '1', startsAt: '08:00', endsAt: '09:00' }];
+}
+
+function sessionTimesAreValid(sessions: AbsenceSchedule['sessions']) {
+  const timePattern = /^([01]\d|2[0-3]):[0-5]\d$/;
+  return sessions.every((session) => timePattern.test(session.startsAt) && timePattern.test(session.endsAt) && session.startsAt < session.endsAt);
+}
+
+function DirectorScheduleManager({ data, setData, currentUser, language }: CommonViewProps & { setData: DataSetter }) {
+  const classGroups = useMemo(() => classesForAbsences(data, currentUser), [data, currentUser]);
+  const schedules = useMemo(
+    () => data.absenceSchedules.filter((schedule) => schedule.schoolId === currentUser.schoolId && (!schedule.stage || schedule.stage === currentUser.stage)),
+    [currentUser.schoolId, currentUser.stage, data.absenceSchedules]
+  );
+  const [form, setForm] = useState({
+    name: '',
+    sessions: defaultScheduleSessions(),
+    targetKeys: [] as string[],
+    weekdays: [...DEFAULT_SCHOOL_WEEKDAYS]
+  });
+  const [notice, setNotice] = useState('');
+  const [error, setError] = useState('');
+
+  const updateSession = (index: number, patch: Partial<AbsenceSchedule['sessions'][number]>) => {
+    setForm((previous) => ({
+      ...previous,
+      sessions: previous.sessions.map((session, sessionIndex) => (sessionIndex === index ? { ...session, ...patch } : session))
+    }));
+  };
+
+  const addSession = () => {
+    setForm((previous) => {
+      const previousSession = previous.sessions[previous.sessions.length - 1];
+      return {
+        ...previous,
+        sessions: [
+          ...previous.sessions,
+          {
+            id: makeId('session'),
+            name: String(previous.sessions.length + 1),
+            startsAt: previousSession?.endsAt ?? '08:00',
+            endsAt: previousSession?.endsAt ?? '09:00'
+          }
+        ]
+      };
+    });
+  };
+
+  const removeSession = (index: number) => {
+    setForm((previous) => ({
+      ...previous,
+      sessions: previous.sessions.length > 1 ? previous.sessions.filter((_, sessionIndex) => sessionIndex !== index) : previous.sessions
+    }));
+  };
+
+  const toggleWeekday = (weekday: number) => {
+    setForm((previous) => {
+      const weekdays = previous.weekdays.includes(weekday)
+        ? previous.weekdays.filter((item) => item !== weekday)
+        : [...previous.weekdays, weekday].sort((left, right) => left - right);
+
+      return { ...previous, weekdays: weekdays.length > 0 ? weekdays : previous.weekdays };
+    });
+  };
+
+  const toggleTarget = (key: string) => {
+    setForm((previous) => ({
+      ...previous,
+      targetKeys: previous.targetKeys.includes(key) ? previous.targetKeys.filter((item) => item !== key) : [...previous.targetKeys, key]
+    }));
+  };
+
+  const saveSchedule = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setNotice('');
+    setError('');
+
+    if (!currentUser.schoolId || !currentUser.stage || !form.name.trim()) {
+      setError(tr(language, 'scheduleRequired'));
+      return;
+    }
+
+    if (form.sessions.length === 0) {
+      setError(tr(language, 'sessionRequired'));
+      return;
+    }
+
+    if (!sessionTimesAreValid(form.sessions)) {
+      setError(tr(language, 'timeFormatRequired'));
+      return;
+    }
+
+    if (form.targetKeys.length === 0) {
+      setError(tr(language, 'scheduleTargetRequired'));
+      return;
+    }
+
+    const targets = classGroups
+      .filter((group) => form.targetKeys.includes(group.key))
+      .map((group) => ({
+        schoolYear: group.schoolYear,
+        stream: group.stream,
+        classGroup: group.classGroup
+      }));
+
+    if (targets.length === 0) {
+      setError(tr(language, 'scheduleTargetRequired'));
+      return;
+    }
+
+    const schedule: AbsenceSchedule = {
+      id: makeId('schedule'),
+      schoolId: currentUser.schoolId,
+      stage: currentUser.stage,
+      name: form.name.trim(),
+      sessions: form.sessions.map((session) => ({ ...session, name: session.name.trim() || '1' })),
+      targets,
+      weekdays: [...form.weekdays],
+      createdBy: currentUser.id,
+      createdAt: new Date().toISOString()
+    };
+
+    setData((previous) => ({
+      ...previous,
+      absenceSchedules: [...previous.absenceSchedules, schedule]
+    }));
+    setForm({ name: '', sessions: defaultScheduleSessions(), targetKeys: [], weekdays: [...DEFAULT_SCHOOL_WEEKDAYS] });
+    setNotice(tr(language, 'scheduleTemplateSaved'));
+  };
+
+  const deleteSchedule = (scheduleId: string) => {
+    setData((previous) => ({
+      ...previous,
+      absenceSchedules: previous.absenceSchedules.filter((schedule) => schedule.id !== scheduleId)
+    }));
+  };
+
+  return (
+    <div className="panel full">
+      <div className="panel-heading">
+        <div>
+          <p>{tr(language, 'classTimetableHint')}</p>
+          <h2>{tr(language, 'classTimetables')}</h2>
+        </div>
+        <CalendarDays size={24} aria-hidden="true" />
+      </div>
+
+      <form className="absence-schedule-form" onSubmit={saveSchedule}>
+        <label>
+          <span>{tr(language, 'scheduleName')}</span>
+          <input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder={tr(language, 'dailySchedule')} />
+        </label>
+
+        <div className="form-field">
+          <span>{tr(language, 'scheduleWeekdays')}</span>
+          <div className="checkbox-grid">
+            {weekdayNames[language].map((label, weekday) => (
+              <label className="check-option" key={label}>
+                <input type="checkbox" checked={form.weekdays.includes(weekday)} onChange={() => toggleWeekday(weekday)} />
+                <span>{label}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div className="form-field">
+          <span>{tr(language, 'assignedClasses')}</span>
+          <div className="checkbox-grid">
+            {classGroups.map((group) => (
+              <label className="check-option" key={group.key}>
+                <input type="checkbox" checked={form.targetKeys.includes(group.key)} onChange={() => toggleTarget(group.key)} />
+                <span>{classLabel(language, group, currentUser.stage)}</span>
+              </label>
+            ))}
+          </div>
+          {classGroups.length === 0 && <p className="empty-state">{tr(language, 'noClassesForAbsence')}</p>}
+        </div>
+
+        <div className="schedule-session-editor">
+          <div className="schedule-session-heading">
+            <span>{tr(language, 'sessions')}</span>
+            <button className="button ghost" type="button" onClick={addSession}>
+              <Plus size={17} aria-hidden="true" />
+              <span>{tr(language, 'addSession')}</span>
+            </button>
+          </div>
+          {form.sessions.map((session, index) => (
+            <div className="schedule-session-row" key={session.id}>
+              <label>
+                <span>{tr(language, 'sessionName')}</span>
+                <input value={session.name} onChange={(event) => updateSession(index, { name: event.target.value })} />
+              </label>
+              <label>
+                <span>{tr(language, 'startsAt')}</span>
+                <input type="time" value={session.startsAt} onChange={(event) => updateSession(index, { startsAt: event.target.value })} />
+              </label>
+              <label>
+                <span>{tr(language, 'endsAt')}</span>
+                <input type="time" value={session.endsAt} onChange={(event) => updateSession(index, { endsAt: event.target.value })} />
+              </label>
+              <button className="icon-button danger" type="button" title={tr(language, 'removeSession')} onClick={() => removeSession(index)}>
+                <X size={16} aria-hidden="true" />
+              </button>
+            </div>
+          ))}
+        </div>
+
+        {error && <p className="form-error full">{error}</p>}
+        {notice && <p className="success-message full">{notice}</p>}
+        <button className="button primary form-submit" type="submit">
+          <Save size={17} aria-hidden="true" />
+          <span>{tr(language, 'saveSchedule')}</span>
+        </button>
+      </form>
+
+      <div className="schedule-template-list">
+        {schedules.length === 0 && <p className="empty-state">{tr(language, 'noSchedules')}</p>}
+        {schedules.map((schedule) => (
+          <article className="schedule-template-card" key={schedule.id}>
+            <div>
+              <strong>{schedule.name}</strong>
+              <span>{scheduleWeekdayLabel(language, schedule)}</span>
+              <small>{schedule.sessions.map((session) => `${session.name} ${session.startsAt}-${session.endsAt}`).join(' | ')}</small>
+            </div>
+            <div className="schedule-template-targets">
+              {(schedule.targets ?? []).map((target) => (
+                <span className="assignment-chip" key={`${schedule.id}-${target.schoolYear}-${target.stream ?? ''}-${target.classGroup}`}>
+                  {classLabel(language, target, currentUser.stage)}
+                </span>
+              ))}
+            </div>
+            <button className="icon-button danger" type="button" title={tr(language, 'deleteSchedule')} onClick={() => deleteSchedule(schedule.id)}>
+              <Trash2 size={16} aria-hidden="true" />
+            </button>
+          </article>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DirectorAbsenceReports({ data, setData, currentUser, language }: CommonViewProps & { setData: DataSetter }) {
   const school = getSchool(data, currentUser);
   const [selectedDate, setSelectedDate] = useState('all');
   const [now, setNow] = useState(() => Date.now());
@@ -436,6 +703,8 @@ function DirectorAbsenceReports({ data, currentUser, language }: CommonViewProps
 
   return (
     <section className="content-grid absences-view">
+      <DirectorScheduleManager data={data} setData={setData} currentUser={currentUser} language={language} />
+
       <div className="panel full">
         <div className="panel-heading">
           <div>
@@ -544,30 +813,6 @@ function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: Co
     () => data.absenceSchedules.filter((schedule) => schedule.schoolId === currentUser.schoolId && (!schedule.stage || schedule.stage === currentUser.stage)),
     [currentUser.schoolId, currentUser.stage, data.absenceSchedules]
   );
-  const fallbackSchedule = useMemo<AbsenceSchedule>(
-    () => ({
-      id: `fixed:${currentUser.schoolId ?? 'school'}:${currentUser.stage ?? 'stage'}`,
-      schoolId: currentUser.schoolId ?? '',
-      stage: currentUser.stage,
-      name: tr(language, 'dailySchedule'),
-      sessions: fallbackSessions,
-      createdBy: 'system',
-      createdAt: ''
-    }),
-    [currentUser.schoolId, currentUser.stage, language]
-  );
-  const effectiveSchedules = schedules.length > 0 ? schedules : [fallbackSchedule];
-  const sessionChoices = useMemo<AbsenceSessionChoice[]>(
-    () =>
-      effectiveSchedules.flatMap((schedule) =>
-        schedule.sessions.map((session) => ({
-          key: `${schedule.id}:${session.id}`,
-          schedule,
-          session
-        }))
-      ),
-    [effectiveSchedules]
-  );
   const [selectedDate, setSelectedDate] = useState(todayIso);
   const [selectedSessionKeys, setSelectedSessionKeys] = useState<string[]>([]);
   const [selectedYear, setSelectedYear] = useState<number | ''>('');
@@ -576,22 +821,6 @@ function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: Co
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   const yearOptions = useMemo(() => [...new Set(classGroups.map((group) => group.schoolYear))].sort((left, right) => left - right), [classGroups]);
-
-  useEffect(() => {
-    const validKeys = new Set(sessionChoices.map((choice) => choice.key));
-    setSelectedSessionKeys((previous) => {
-      const next = previous.filter((key) => validKeys.has(key));
-      if (next.length === 0 && sessionChoices[0]) {
-        next.push(sessionChoices[0].key);
-      }
-
-      if (next.length === previous.length && next.every((key, index) => key === previous[index])) {
-        return previous;
-      }
-
-      return next;
-    });
-  }, [sessionChoices]);
 
   useEffect(() => {
     if ((!selectedYear || !yearOptions.includes(selectedYear)) && yearOptions[0]) {
@@ -637,6 +866,67 @@ function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: Co
   }, [classOptions, selectedClassKey]);
 
   const selectedClass = classOptions.find((group) => group.key === selectedClassKey);
+  const fallbackSchedule = useMemo<AbsenceSchedule>(
+    () => ({
+      id: `fixed:${currentUser.schoolId ?? 'school'}:${currentUser.stage ?? 'stage'}`,
+      schoolId: currentUser.schoolId ?? '',
+      stage: currentUser.stage,
+      name: tr(language, 'dailySchedule'),
+      sessions: fallbackSessions,
+      targets: selectedClass
+        ? [
+            {
+              schoolYear: selectedClass.schoolYear,
+              stream: selectedClass.stream,
+              classGroup: selectedClass.classGroup
+            }
+          ]
+        : undefined,
+      weekdays: DEFAULT_SCHOOL_WEEKDAYS,
+      createdBy: 'system',
+      createdAt: ''
+    }),
+    [currentUser.schoolId, currentUser.stage, language, selectedClass]
+  );
+  const effectiveSchedules = useMemo(
+    () =>
+      selectedClass
+        ? schedules.filter((schedule) => scheduleAppliesToClass(schedule, selectedClass) && scheduleAppliesToDate(schedule, selectedDate))
+        : [],
+    [schedules, selectedClass, selectedDate]
+  );
+  const sessionSchedules = useMemo(
+    () => (effectiveSchedules.length > 0 ? effectiveSchedules : schedules.length === 0 && selectedClass ? [fallbackSchedule] : []),
+    [effectiveSchedules, fallbackSchedule, schedules.length, selectedClass]
+  );
+  const sessionChoices = useMemo<AbsenceSessionChoice[]>(
+    () =>
+      sessionSchedules.flatMap((schedule) =>
+        schedule.sessions.map((session) => ({
+          key: `${schedule.id}:${session.id}`,
+          schedule,
+          session
+        }))
+      ),
+    [sessionSchedules]
+  );
+
+  useEffect(() => {
+    const validKeys = new Set(sessionChoices.map((choice) => choice.key));
+    setSelectedSessionKeys((previous) => {
+      const next = previous.filter((key) => validKeys.has(key));
+      if (next.length === 0 && sessionChoices[0]) {
+        next.push(sessionChoices[0].key);
+      }
+
+      if (next.length === previous.length && next.every((key, index) => key === previous[index])) {
+        return previous;
+      }
+
+      return next;
+    });
+  }, [sessionChoices]);
+
   const selectedSessionChoices = useMemo(
     () => sessionChoices.filter((choice) => selectedSessionKeys.includes(choice.key)),
     [selectedSessionKeys, sessionChoices]
@@ -688,7 +978,9 @@ function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: Co
   const draftClassCount = new Set(recordsForSession.map(reportGroupKey)).size;
   const absentCount = recordsForSelection.length;
   const selectedSessionAppliesToClass = Boolean(
-    selectedClass && selectedSessionChoices.length > 0 && selectedSessionChoices.every((choice) => scheduleAppliesToClass(choice.schedule, selectedClass))
+    selectedClass &&
+      selectedSessionChoices.length > 0 &&
+      selectedSessionChoices.every((choice) => scheduleAppliesToClass(choice.schedule, selectedClass) && scheduleAppliesToDate(choice.schedule, selectedDate))
   );
   const editableSessionChoices =
     selectedClass && selectedSessionAppliesToClass
@@ -723,6 +1015,7 @@ function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: Co
       selectedClass &&
         sessionReady &&
         scheduleAppliesToClass(choice.schedule, selectedClass) &&
+        scheduleAppliesToDate(choice.schedule, selectedDate) &&
         !sentSessionIds.has(sessionIdFor(selectedDate, choice.schedule.id, choice.session.id))
     );
 
@@ -914,6 +1207,7 @@ function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: Co
                 </label>
               ))}
             </div>
+            {selectedClass && sessionChoices.length === 0 && <p className="empty-state">{tr(language, 'noScheduleForClassDay')}</p>}
           </div>
         </div>
         <div className="absence-flow-summary">
@@ -975,7 +1269,7 @@ function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: Co
       <div className="panel full">
         <div className="panel-heading">
           <div>
-            <p>{selectedClass ? classLabel(language, selectedClass) : tr(language, 'selectedClass')}</p>
+            <p>{selectedClass ? classLabel(language, selectedClass, currentUser.stage) : tr(language, 'selectedClass')}</p>
             <h2>{tr(language, 'markAbsences')}</h2>
           </div>
           <ClipboardCheck size={24} aria-hidden="true" />

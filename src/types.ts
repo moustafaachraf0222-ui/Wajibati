@@ -165,6 +165,7 @@ export type AbsenceSchedule = {
   name: string;
   sessions: AbsenceSession[];
   targets?: AbsenceScheduleTarget[];
+  weekdays?: number[];
   createdBy: string;
   createdAt: string;
 };

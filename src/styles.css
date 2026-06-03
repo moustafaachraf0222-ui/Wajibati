@@ -2484,6 +2484,84 @@ summary.subject-group-heading:hover .subject-icon svg {
   padding: 10px 12px;
 }
 
+.absence-schedule-form {
+  display: grid;
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.absence-schedule-form > label {
+  display: grid;
+  gap: 6px;
+}
+
+.absence-schedule-form > label > span,
+.schedule-session-row label > span,
+.schedule-session-heading > span {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.schedule-session-editor,
+.schedule-template-list {
+  display: grid;
+  gap: 10px;
+}
+
+.schedule-session-heading {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.schedule-session-row {
+  align-items: end;
+  background: var(--paper-soft);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(120px, 1fr) 150px 150px auto;
+  padding: 10px;
+}
+
+.schedule-session-row label,
+.schedule-template-card > div:first-child {
+  display: grid;
+  gap: 5px;
+}
+
+.schedule-template-list {
+  margin-top: 16px;
+}
+
+.schedule-template-card {
+  align-items: center;
+  background: var(--paper-soft);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(180px, 1.1fr) minmax(220px, 2fr) auto;
+  padding: 12px;
+}
+
+.schedule-template-card strong {
+  color: var(--ink);
+}
+
+.schedule-template-card span,
+.schedule-template-card small {
+  color: var(--muted);
+}
+
+.schedule-template-targets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
 .absence-session-grid,
 .absence-target-grid {
   display: grid;
@@ -2824,6 +2902,8 @@ summary.subject-group-heading:hover .subject-icon svg {
   .absence-report-toolbar,
   .absence-session-grid,
   .absence-target-grid,
+  .schedule-session-row,
+  .schedule-template-card,
   .account-type-grid,
   .form-grid,
   .exercise-grid,
