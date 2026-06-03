@@ -256,12 +256,12 @@ function printAbsenceReports(language: Language, schoolName: string, sections: A
           ? `<tr><td colspan="4">${escapeHtml(tr(language, 'noAbsenceReports'))}</td></tr>`
           : section.entries
               .map(
-                (entry, index) => `
+                (entry) => `
                   <tr>
-                    <td>${index + 1}</td>
-                    <td>${escapeHtml(classLabel(language, entry.record))}</td>
                     <td>${escapeHtml(entry.student.name)}</td>
-                    <td>${escapeHtml(reportSessionLabel(section.report))}</td>
+                    <td>${escapeHtml(schoolYearLabel(language, section.report.stage, entry.record.schoolYear))}</td>
+                    <td>${entry.record.stream ? escapeHtml(secondaryStreamLabel(language, entry.record.stream, entry.record.schoolYear)) : '-'}</td>
+                    <td>${escapeHtml(entry.record.classGroup)}</td>
                   </tr>`
               )
               .join('');
@@ -273,10 +273,10 @@ function printAbsenceReports(language: Language, schoolName: string, sections: A
           <table>
             <thead>
               <tr>
-                <th>#</th>
-                <th>${escapeHtml(tr(language, 'classGroup'))}</th>
                 <th>${escapeHtml(tr(language, 'fullName'))}</th>
-                <th>${escapeHtml(tr(language, 'session'))}</th>
+                <th>${escapeHtml(tr(language, 'schoolYear'))}</th>
+                <th>${escapeHtml(tr(language, 'stream'))}</th>
+                <th>${escapeHtml(tr(language, 'classGroup'))}</th>
               </tr>
             </thead>
             <tbody>${rows}</tbody>
