@@ -57,13 +57,13 @@ function todayIso() {
 }
 
 function normalizeTypedTime(value: string) {
-  const match = value.trim().replace('.', ':').match(/^(\d{1,2})(?::(\d{1,2}))?$/);
+  const match = value.trim().replace('.', ':').match(/^(\d{1,2}):(\d{1,2})$/);
   if (!match) {
     return '';
   }
 
   const hours = Number(match[1]);
-  const minutes = Number(match[2] ?? '0');
+  const minutes = Number(match[2]);
   if (hours > 23 || minutes > 59) {
     return '';
   }
@@ -71,9 +71,66 @@ function normalizeTypedTime(value: string) {
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
 }
 
+function timeParts(value: string) {
+  const [hours = '', minutes = ''] = value.split(':');
+  return {
+    hours: hours.replace(/\D/g, '').slice(0, 2),
+    minutes: minutes.replace(/\D/g, '').slice(0, 2)
+  };
+}
+
+function updateTimePart(value: string, part: 'hours' | 'minutes', rawValue: string) {
+  const cleaned = rawValue.trim().replace('.', ':');
+  const pastedTime = normalizeTypedTime(cleaned);
+  if (pastedTime) {
+    return pastedTime;
+  }
+
+  const current = timeParts(value);
+  const digits = cleaned.replace(/\D/g, '').slice(0, 2);
+  return part === 'hours' ? `${digits}:${current.minutes}` : `${current.hours}:${digits}`;
+}
+
 function timeToMinutes(value: string) {
   const [hours, minutes] = value.split(':').map(Number);
   return hours * 60 + minutes;
+}
+
+function TimeEntry({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  const parts = timeParts(value);
+  const updatePart = (part: 'hours' | 'minutes', rawValue: string, normalize = false) => {
+    const nextValue = updateTimePart(value, part, rawValue);
+    onChange(normalize ? normalizeTypedTime(nextValue) || nextValue : nextValue);
+  };
+
+  return (
+    <label className="time-entry-label">
+      <span>{label}</span>
+      <span className="time-entry" dir="ltr">
+        <input
+          aria-label={`${label} HH`}
+          inputMode="numeric"
+          maxLength={2}
+          placeholder="HH"
+          type="text"
+          value={parts.hours}
+          onBlur={(event) => updatePart('hours', event.target.value, true)}
+          onChange={(event) => updatePart('hours', event.target.value)}
+        />
+        <span aria-hidden="true">:</span>
+        <input
+          aria-label={`${label} MM`}
+          inputMode="numeric"
+          maxLength={2}
+          placeholder="MM"
+          type="text"
+          value={parts.minutes}
+          onBlur={(event) => updatePart('minutes', event.target.value, true)}
+          onChange={(event) => updatePart('minutes', event.target.value)}
+        />
+      </span>
+    </label>
+  );
 }
 
 function classKey(schoolYear: number, stream: SecondaryStream | undefined, classGroup: string) {
@@ -817,24 +874,8 @@ function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: Co
                   placeholder={`${tr(language, 'sessionName')} ${index + 1}`}
                   onChange={(event) => updateTemplateSession(session.id, { name: event.target.value })}
                 />
-                <input
-                  aria-label={tr(language, 'startsAt')}
-                  type="text"
-                  inputMode="numeric"
-                  placeholder="08:00"
-                  value={session.startsAt}
-                  onChange={(event) => updateTemplateSession(session.id, { startsAt: event.target.value })}
-                  onBlur={(event) => updateTemplateSession(session.id, { startsAt: normalizeTypedTime(event.target.value) || event.target.value.trim() })}
-                />
-                <input
-                  aria-label={tr(language, 'endsAt')}
-                  type="text"
-                  inputMode="numeric"
-                  placeholder="09:00"
-                  value={session.endsAt}
-                  onChange={(event) => updateTemplateSession(session.id, { endsAt: event.target.value })}
-                  onBlur={(event) => updateTemplateSession(session.id, { endsAt: normalizeTypedTime(event.target.value) || event.target.value.trim() })}
-                />
+                <TimeEntry label={tr(language, 'startsAt')} value={session.startsAt} onChange={(value) => updateTemplateSession(session.id, { startsAt: value })} />
+                <TimeEntry label={tr(language, 'endsAt')} value={session.endsAt} onChange={(value) => updateTemplateSession(session.id, { endsAt: value })} />
                 <button className="icon-button danger" type="button" title={tr(language, 'removeSession')} onClick={() => removeTemplateSession(session.id)}>
                   <X size={16} aria-hidden="true" />
                 </button>

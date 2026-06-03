@@ -2480,7 +2480,58 @@ summary.subject-group-heading:hover .subject-icon svg {
   align-items: end;
   display: grid;
   gap: 8px;
-  grid-template-columns: minmax(120px, 1fr) 120px 120px auto;
+  grid-template-columns: minmax(120px, 1fr) 150px 150px auto;
+}
+
+.time-entry-label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.time-entry-label > span:first-child {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.time-entry {
+  min-height: 40px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--ink);
+  padding: 4px 8px;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, background-color 0.16s ease;
+}
+
+.time-entry:focus-within {
+  border-color: var(--teal);
+  box-shadow: 0 0 0 3px var(--focus);
+}
+
+.time-entry input {
+  width: 100%;
+  min-height: 30px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  box-shadow: none;
+  padding: 4px 2px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.time-entry input:focus {
+  box-shadow: none;
+}
+
+.time-entry > span {
+  color: var(--muted);
+  font-weight: 800;
 }
 
 .template-target-grid {
