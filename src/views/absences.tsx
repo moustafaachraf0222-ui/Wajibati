@@ -822,16 +822,24 @@ function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: Co
             <span>{tr(language, 'absenceDate')}</span>
             <input type="date" value={selectedDate} onChange={(event) => setSelectedDate(event.target.value)} />
           </label>
-          <label>
+          <div className="form-field absence-session-choice">
             <span>{tr(language, 'session')}</span>
-            <select value={selectedSessionKey} disabled={sessionChoices.length === 0} onChange={(event) => setSelectedSessionKey(event.target.value)}>
+            <div className="checkbox-grid">
               {sessionChoices.map((choice) => (
-                <option value={choice.key} key={choice.key}>
-                  {scheduleSessionLabel(choice.schedule, choice.session)}
-                </option>
+                <label className="check-option" key={choice.key}>
+                  <input
+                    type="radio"
+                    name="absence-session"
+                    value={choice.key}
+                    checked={selectedSessionKey === choice.key}
+                    disabled={sessionChoices.length === 0}
+                    onChange={(event) => setSelectedSessionKey(event.target.value)}
+                  />
+                  <span>{scheduleSessionLabel(choice.schedule, choice.session)}</span>
+                </label>
               ))}
-            </select>
-          </label>
+            </div>
+          </div>
         </div>
         <div className="absence-flow-summary">
           <span>{tr(language, 'draftAbsenceCount')}: {draftAbsenceCount}</span>

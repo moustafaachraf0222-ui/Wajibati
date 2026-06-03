@@ -2496,16 +2496,21 @@ summary.subject-group-heading:hover .subject-icon svg {
   grid-template-columns: repeat(3, minmax(160px, 1fr));
 }
 
-.absence-session-grid label,
-.absence-target-grid label {
+.absence-session-grid > label,
+.absence-target-grid > label {
   display: grid;
   gap: 6px;
 }
 
-.absence-session-grid label > span,
-.absence-target-grid label > span {
+.absence-session-grid > label > span,
+.absence-target-grid > label > span,
+.absence-session-choice > span {
   color: var(--muted);
   font-size: 0.9rem;
+}
+
+.absence-session-choice {
+  grid-column: span 3;
 }
 
 .absence-flow-summary,
@@ -2828,6 +2833,10 @@ summary.subject-group-heading:hover .subject-icon svg {
 
   .assignment-stream {
     grid-template-columns: 1fr;
+  }
+
+  .absence-session-choice {
+    grid-column: auto;
   }
 
   .button-row .button {
