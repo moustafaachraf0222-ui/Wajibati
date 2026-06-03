@@ -185,6 +185,7 @@ export type AbsenceRecord = {
   markedBy: string;
   reportId?: string;
   sentAt?: string;
+  deletedAt?: string;
   createdAt: string;
   updatedAt?: string;
 };

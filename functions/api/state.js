@@ -29,6 +29,9 @@ const seedData = {
   completions: {},
   completionDates: {},
   feedback: {},
+  absenceSchedules: [],
+  absenceRecords: [],
+  absenceReports: [],
   pushTokens: {},
   deletedSchoolIds: [],
   deletedExerciseIds: [],
@@ -67,6 +70,9 @@ function applyDeletedSchoolTombstones(data) {
     exercises: data.exercises.filter((exercise) => !deletedSchoolIds.has(exercise.schoolId)),
     announcements: data.announcements.filter((announcement) => !deletedSchoolIds.has(announcement.schoolId)),
     notes: data.notes.filter((note) => !deletedSchoolIds.has(note.schoolId)),
+    absenceSchedules: data.absenceSchedules.filter((schedule) => !deletedSchoolIds.has(schedule.schoolId)),
+    absenceRecords: data.absenceRecords.filter((record) => !deletedSchoolIds.has(record.schoolId)),
+    absenceReports: data.absenceReports.filter((report) => !deletedSchoolIds.has(report.schoolId)),
     completions: Object.fromEntries(
       Object.entries(data.completions).filter(([userId]) => !removedUserIds.has(userId)).map(([userId, done]) => [
         userId,
@@ -167,6 +173,9 @@ function normalizeState(value) {
     completions: value.completions && typeof value.completions === 'object' ? value.completions : {},
     completionDates: value.completionDates && typeof value.completionDates === 'object' ? value.completionDates : {},
     feedback: value.feedback && typeof value.feedback === 'object' ? value.feedback : {},
+    absenceSchedules: Array.isArray(value.absenceSchedules) ? value.absenceSchedules : [],
+    absenceRecords: Array.isArray(value.absenceRecords) ? value.absenceRecords : [],
+    absenceReports: Array.isArray(value.absenceReports) ? value.absenceReports : [],
     pushTokens: value.pushTokens && typeof value.pushTokens === 'object' ? value.pushTokens : {},
     deletedSchoolIds: Array.isArray(value.deletedSchoolIds) ? uniqueStrings(value.deletedSchoolIds) : [],
     deletedExerciseIds: Array.isArray(value.deletedExerciseIds) ? uniqueStrings(value.deletedExerciseIds) : [],
@@ -194,6 +203,10 @@ function chooseLatestRecord(existingRecord, incomingRecord) {
   }
 
   return { ...existingRecord, ...incomingRecord };
+}
+
+function chooseLatestWholeRecord(existingRecord, incomingRecord) {
+  return timestampValue(existingRecord) > timestampValue(incomingRecord) ? existingRecord : incomingRecord;
 }
 
 function mergeRecordsById(existingRecords = [], incomingRecords = [], chooseRecord = (_existingRecord, incomingRecord) => incomingRecord) {
@@ -315,6 +328,9 @@ function mergeState(existingData, incomingData) {
     exercises: mergeRecordsById(existingData.exercises, incomingData.exercises, chooseLatestRecord),
     announcements: mergeRecordsById(existingData.announcements, incomingData.announcements),
     notes: mergeRecordsById(existingData.notes, incomingData.notes),
+    absenceSchedules: mergeRecordsById(existingData.absenceSchedules, incomingData.absenceSchedules),
+    absenceRecords: mergeRecordsById(existingData.absenceRecords, incomingData.absenceRecords, chooseLatestWholeRecord),
+    absenceReports: mergeRecordsById(existingData.absenceReports, incomingData.absenceReports, chooseLatestRecord),
     completions: mergeCompletions(existingData.completions, incomingData.completions),
     completionDates: mergeNestedMaps(existingData.completionDates, incomingData.completionDates, chooseCompletionDate),
     feedback: mergeNestedMaps(existingData.feedback, incomingData.feedback, chooseLatestFeedback),

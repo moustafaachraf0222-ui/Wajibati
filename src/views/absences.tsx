@@ -217,7 +217,7 @@ function reportSectionsForDirector(data: PlatformData, currentUser: PlatformUser
       }
 
       const entries = data.absenceRecords
-        .filter((record) => record.reportId === report.id)
+        .filter((record) => record.reportId === report.id && !record.deletedAt)
         .map((record) => {
           const student = data.users.find((user) => user.id === record.studentId);
           if (!student) {
@@ -567,9 +567,10 @@ function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: Co
           report.sessionId === currentSessionId
       )
     : undefined;
-  const recordsForSession = currentSessionId
+  const allRecordsForSession = currentSessionId
     ? data.absenceRecords.filter((record) => recordMatchesSession(record, currentUser.schoolId ?? '', currentUser.id, selectedDate, currentSessionId))
     : [];
+  const recordsForSession = allRecordsForSession.filter((record) => !record.deletedAt);
   const recordsForSelection =
     selectedClass && currentSessionId
       ? recordsForSession.filter(
@@ -634,7 +635,30 @@ function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: Co
       if (existing) {
         return {
           ...previous,
-          absenceRecords: previous.absenceRecords.filter((record) => record.id !== existing.id)
+          absenceRecords: previous.absenceRecords.map((record) => {
+            if (record.id !== existing.id) {
+              return record;
+            }
+
+            const updatedAt = new Date().toISOString();
+            if (existing.deletedAt) {
+              const { deletedAt: _deletedAt, ...restoredRecord } = record;
+              return {
+                ...restoredRecord,
+                scheduleId: selectedSchedule.id,
+                sessionName: currentSessionName,
+                startsAt: selectedSession.startsAt,
+                endsAt: selectedSession.endsAt,
+                updatedAt
+              };
+            }
+
+            return {
+              ...record,
+              deletedAt: updatedAt,
+              updatedAt
+            };
+          })
         };
       }
 
@@ -656,7 +680,8 @@ function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: Co
             endsAt: selectedSession.endsAt,
             studentId: student.id,
             markedBy: currentUser.id,
-            createdAt: new Date().toISOString()
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
           }
         ]
       };
@@ -696,7 +721,7 @@ function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: Co
       ...previous,
       absenceReports: [...previous.absenceReports, report],
       absenceRecords: previous.absenceRecords.map((record) =>
-        recordMatchesSession(record, currentUser.schoolId!, currentUser.id, selectedDate, currentSessionId) && !record.sentAt
+        recordMatchesSession(record, currentUser.schoolId!, currentUser.id, selectedDate, currentSessionId) && !record.sentAt && !record.deletedAt
           ? {
               ...record,
               reportId: report.id,
