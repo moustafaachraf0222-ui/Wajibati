@@ -10,6 +10,8 @@ import {
   saveSharedData
 } from './data';
 
+const LOCAL_EDIT_REMOTE_PAUSE_MS = 2_500;
+
 export function useSharedDataSync(data: PlatformData, setData: DataSetter, currentUserId?: string | null) {
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('checking');
   const latestDataRef = useRef(data);
@@ -19,20 +21,37 @@ export function useSharedDataSync(data: PlatformData, setData: DataSetter, curre
   const remoteUpdatedAtRef = useRef<string | null>(null);
   const sharedSaveInFlightRef = useRef(false);
   const sharedRefreshInFlightRef = useRef(false);
+  const localChangeVersionRef = useRef(0);
+  const savedLocalChangeVersionRef = useRef(0);
+  const latestLocalChangeAtRef = useRef(0);
 
   useEffect(() => {
     latestDataRef.current = data;
   }, [data]);
 
+  const setSyncStatusIfChanged = useCallback((nextStatus: SyncStatus) => {
+    setSyncStatus((previousStatus) => (previousStatus === nextStatus ? previousStatus : nextStatus));
+  }, []);
+
+  const hasPendingLocalChanges = useCallback(() => {
+    return localChangeVersionRef.current !== savedLocalChangeVersionRef.current;
+  }, []);
+
+  const isLocalEditSettling = useCallback(() => {
+    return Date.now() - latestLocalChangeAtRef.current < LOCAL_EDIT_REMOTE_PAUSE_MS;
+  }, []);
+
   const applySharedData = useCallback(
     (nextData: PlatformData) => {
+      const nextDataJson = JSON.stringify(nextData);
       setData((previous) => {
         const mergedData = mergeDeletionTombstones(nextData, previous);
-        if (JSON.stringify(previous) === JSON.stringify(mergedData)) {
+        const mergedDataJson = JSON.stringify(mergedData);
+        if (JSON.stringify(previous) === mergedDataJson) {
           return previous;
         }
 
-        skipNextSharedSaveRef.current = JSON.stringify(mergedData) === JSON.stringify(nextData);
+        skipNextSharedSaveRef.current = mergedDataJson === nextDataJson;
         return mergedData;
       });
     },
@@ -43,12 +62,12 @@ export function useSharedDataSync(data: PlatformData, setData: DataSetter, curre
     const currentData = latestDataRef.current;
 
     try {
-      setSyncStatus('checking');
+      setSyncStatusIfChanged('checking');
       const sharedSnapshot = await fetchSharedData();
       if (!sharedSnapshot) {
         remoteEnabledRef.current = false;
         remoteLoadedRef.current = true;
-        setSyncStatus('local');
+        setSyncStatusIfChanged('local');
         return currentData;
       }
 
@@ -57,15 +76,15 @@ export function useSharedDataSync(data: PlatformData, setData: DataSetter, curre
       remoteEnabledRef.current = true;
       remoteLoadedRef.current = true;
       applySharedData(nextData);
-      setSyncStatus('shared');
+      setSyncStatusIfChanged('shared');
       return nextData;
     } catch {
       remoteEnabledRef.current = false;
       remoteLoadedRef.current = true;
-      setSyncStatus('local');
+      setSyncStatusIfChanged('local');
       return currentData;
     }
-  }, [applySharedData]);
+  }, [applySharedData, setSyncStatusIfChanged]);
 
   useEffect(() => {
     let cancelled = false;
@@ -79,7 +98,7 @@ export function useSharedDataSync(data: PlatformData, setData: DataSetter, curre
 
         if (!sharedSnapshot) {
           remoteEnabledRef.current = false;
-          setSyncStatus('local');
+          setSyncStatusIfChanged('local');
           return;
         }
 
@@ -87,11 +106,11 @@ export function useSharedDataSync(data: PlatformData, setData: DataSetter, curre
         const nextData = await promoteLocalDataIfRemoteIsEmpty(sharedSnapshot.data, latestDataRef.current);
         remoteEnabledRef.current = true;
         applySharedData(nextData);
-        setSyncStatus('shared');
+        setSyncStatusIfChanged('shared');
       } catch {
         if (!cancelled) {
           remoteEnabledRef.current = false;
-          setSyncStatus('local');
+          setSyncStatusIfChanged('local');
         }
       } finally {
         if (!cancelled) {
@@ -105,7 +124,7 @@ export function useSharedDataSync(data: PlatformData, setData: DataSetter, curre
     return () => {
       cancelled = true;
     };
-  }, [applySharedData]);
+  }, [applySharedData, setSyncStatusIfChanged]);
 
   useEffect(() => {
     localStorage.setItem(DATA_KEY, JSON.stringify(data));
@@ -120,18 +139,22 @@ export function useSharedDataSync(data: PlatformData, setData: DataSetter, curre
       return;
     }
 
-    sharedSaveInFlightRef.current = true;
-    setSyncStatus('saving');
+    const saveVersion = localChangeVersionRef.current + 1;
+    localChangeVersionRef.current = saveVersion;
+    latestLocalChangeAtRef.current = Date.now();
+
     const saveTimer = window.setTimeout(() => {
+      sharedSaveInFlightRef.current = true;
+      setSyncStatusIfChanged('saving');
       saveSharedData(data)
         .then((snapshot) => {
           remoteUpdatedAtRef.current = snapshot?.updatedAt ?? remoteUpdatedAtRef.current;
-          if (snapshot) {
-            applySharedData(snapshot.data);
+          if (localChangeVersionRef.current === saveVersion) {
+            savedLocalChangeVersionRef.current = saveVersion;
+            setSyncStatusIfChanged('shared');
           }
-          setSyncStatus('shared');
         })
-        .catch(() => setSyncStatus('error'))
+        .catch(() => setSyncStatusIfChanged('error'))
         .finally(() => {
           sharedSaveInFlightRef.current = false;
         });
@@ -140,7 +163,7 @@ export function useSharedDataSync(data: PlatformData, setData: DataSetter, curre
     return () => {
       window.clearTimeout(saveTimer);
     };
-  }, [applySharedData, data]);
+  }, [data, setSyncStatusIfChanged]);
 
   useEffect(() => {
     if (!currentUserId) {
@@ -155,7 +178,9 @@ export function useSharedDataSync(data: PlatformData, setData: DataSetter, curre
         !remoteEnabledRef.current ||
         document.visibilityState === 'hidden' ||
         sharedSaveInFlightRef.current ||
-        sharedRefreshInFlightRef.current
+        sharedRefreshInFlightRef.current ||
+        hasPendingLocalChanges() ||
+        isLocalEditSettling()
       ) {
         return;
       }
@@ -168,7 +193,6 @@ export function useSharedDataSync(data: PlatformData, setData: DataSetter, curre
         }
 
         if (updatedAt && updatedAt === remoteUpdatedAtRef.current) {
-          setSyncStatus('shared');
           return;
         }
 
@@ -178,11 +202,11 @@ export function useSharedDataSync(data: PlatformData, setData: DataSetter, curre
           remoteEnabledRef.current = true;
           remoteLoadedRef.current = true;
           applySharedData(sharedSnapshot.data);
-          setSyncStatus('shared');
+          setSyncStatusIfChanged('shared');
         }
       } catch {
         if (!cancelled) {
-          setSyncStatus('error');
+          setSyncStatusIfChanged('error');
         }
       } finally {
         sharedRefreshInFlightRef.current = false;
@@ -208,7 +232,7 @@ export function useSharedDataSync(data: PlatformData, setData: DataSetter, curre
       window.removeEventListener('focus', refreshOnFocus);
       document.removeEventListener('visibilitychange', refreshOnVisibility);
     };
-  }, [applySharedData, currentUserId]);
+  }, [applySharedData, currentUserId, hasPendingLocalChanges, isLocalEditSettling, setSyncStatusIfChanged]);
 
   return { refreshSharedData, syncStatus };
 }
