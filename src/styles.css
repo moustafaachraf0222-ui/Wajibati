@@ -2501,6 +2501,100 @@ summary.subject-group-heading:hover .subject-icon svg {
   padding: 10px 12px;
 }
 
+.absence-report-toolbar {
+  display: grid;
+  grid-template-columns: minmax(180px, 260px);
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.absence-report-toolbar label {
+  display: grid;
+  gap: 6px;
+}
+
+.absence-report-toolbar label > span {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.absence-report-stats {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(4, minmax(140px, 1fr));
+  margin-top: 14px;
+}
+
+.absence-report-stat {
+  background: var(--paper-soft);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 5px;
+  padding: 12px;
+  border-inline-start: 3px solid var(--teal);
+}
+
+.absence-report-stat span {
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.absence-report-stat strong {
+  color: var(--ink);
+  font-size: 1.35rem;
+  line-height: 1.1;
+}
+
+.absence-report-list {
+  display: grid;
+  gap: 10px;
+}
+
+.absence-report-group {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  overflow: hidden;
+}
+
+.absence-report-group summary {
+  min-height: 48px;
+  padding: 10px 12px;
+  background: var(--paper-soft);
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+}
+
+.absence-report-group summary::-webkit-details-marker {
+  display: none;
+}
+
+.absence-report-group-title {
+  display: grid;
+  gap: 2px;
+}
+
+.absence-report-group-title small {
+  color: var(--muted);
+}
+
+.absence-report-count {
+  min-width: 30px;
+  min-height: 28px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: var(--teal-soft);
+  color: var(--teal);
+  display: inline-grid;
+  place-items: center;
+  font-weight: 800;
+}
+
 .absence-check {
   display: inline-flex;
 }
@@ -2564,6 +2658,10 @@ summary.subject-group-heading:hover .subject-icon svg {
 
   .stats-grid {
     grid-template-columns: repeat(2, minmax(160px, 1fr));
+  }
+
+  .absence-report-stats {
+    grid-template-columns: repeat(2, minmax(140px, 1fr));
   }
 
   .absence-toolbar,
@@ -2655,6 +2753,8 @@ summary.subject-group-heading:hover .subject-icon svg {
 
   .nav-list,
   .stats-grid,
+  .absence-report-stats,
+  .absence-report-toolbar,
   .account-type-grid,
   .form-grid,
   .exercise-grid,

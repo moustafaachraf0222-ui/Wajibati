@@ -1,7 +1,7 @@
-import { CalendarDays, Check, ClipboardCheck, Clock, Plus, Save, X } from 'lucide-react';
+import { CalendarDays, Check, ClipboardCheck, Clock, FileText, Plus, Save, X } from 'lucide-react';
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import type { AbsenceSchedule, AbsenceSession, DataSetter, Language, PlatformData, PlatformUser, SecondaryStream } from '../types';
-import { schoolYearLabel, tr } from '../i18n';
+import type { AbsenceRecord, AbsenceSchedule, AbsenceSession, DataSetter, Language, PlatformData, PlatformUser, SecondaryStream } from '../types';
+import { localeNames, schoolYearLabel, tr } from '../i18n';
 import { sameClassGroup, secondaryStreamLabel } from '../education';
 import { getSchool, makeId } from '../data';
 import { Field, ResponsiveTable } from '../ui';
@@ -18,6 +18,23 @@ type CommonViewProps = {
   data: PlatformData;
   currentUser: PlatformUser;
   language: Language;
+};
+
+type AbsenceReportEntry = {
+  marker: PlatformUser;
+  record: AbsenceRecord;
+  schedule: AbsenceSchedule | undefined;
+  session: AbsenceSession | undefined;
+  student: PlatformUser;
+};
+
+type AbsenceReportGroup = {
+  key: string;
+  date: string;
+  schoolYear: number;
+  stream?: SecondaryStream;
+  classGroup: string;
+  entries: AbsenceReportEntry[];
 };
 
 function todayIso() {
@@ -69,7 +86,7 @@ function classesForAbsences(data: PlatformData, currentUser: PlatformUser): Abse
     .sort((left, right) => left.schoolYear - right.schoolYear || left.classGroup.localeCompare(right.classGroup, undefined, { numeric: true }));
 }
 
-function classLabel(language: Language, group: AbsenceClassGroup) {
+function classLabel(language: Language, group: Pick<AbsenceClassGroup, 'schoolYear' | 'stream' | 'classGroup'>) {
   const stream = group.stream ? ` - ${secondaryStreamLabel(language, group.stream, group.schoolYear)}` : '';
   return `${schoolYearLabel(language, undefined, group.schoolYear)}${stream} - ${tr(language, 'classGroup')} ${group.classGroup}`;
 }
@@ -88,6 +105,214 @@ function scheduleLabel(schedule: AbsenceSchedule) {
 }
 
 export function AbsencesView({ data, setData, currentUser, language }: CommonViewProps & { setData: DataSetter }) {
+  if (currentUser.role === 'director') {
+    return <DirectorAbsenceReports data={data} currentUser={currentUser} language={language} />;
+  }
+
+  return <SupervisorAbsenceWorkspace data={data} setData={setData} currentUser={currentUser} language={language} />;
+}
+
+function formatAbsenceDate(language: Language, value: string) {
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat(localeNames[language], { dateStyle: 'medium' }).format(date);
+}
+
+function reportGroupKey(record: AbsenceRecord) {
+  return `${record.date}:${record.schoolYear}:${record.stream ?? ''}:${record.classGroup.trim().toLowerCase()}`;
+}
+
+function reportSessionLabel(language: Language, entry: AbsenceReportEntry) {
+  if (!entry.session) {
+    return entry.record.sessionId;
+  }
+
+  return `${entry.session.name} ${entry.session.startsAt}-${entry.session.endsAt}`;
+}
+
+function buildAbsenceReportGroups(entries: AbsenceReportEntry[]) {
+  const groups = new Map<string, AbsenceReportGroup>();
+
+  entries.forEach((entry) => {
+    const key = reportGroupKey(entry.record);
+    const existing = groups.get(key);
+
+    if (existing) {
+      existing.entries.push(entry);
+      return;
+    }
+
+    groups.set(key, {
+      key,
+      date: entry.record.date,
+      schoolYear: entry.record.schoolYear,
+      stream: entry.record.stream,
+      classGroup: entry.record.classGroup,
+      entries: [entry]
+    });
+  });
+
+  return [...groups.values()]
+    .map((group) => ({
+      ...group,
+      entries: [...group.entries].sort(
+        (left, right) =>
+          left.student.name.localeCompare(right.student.name, undefined, { numeric: true, sensitivity: 'base' }) ||
+          reportSessionLabel('ar', left).localeCompare(reportSessionLabel('ar', right), undefined, { numeric: true, sensitivity: 'base' })
+      )
+    }))
+    .sort(
+      (left, right) =>
+        right.date.localeCompare(left.date) ||
+        left.schoolYear - right.schoolYear ||
+        left.classGroup.localeCompare(right.classGroup, undefined, { numeric: true, sensitivity: 'base' })
+    );
+}
+
+function DirectorAbsenceReports({ data, currentUser, language }: CommonViewProps) {
+  const school = getSchool(data, currentUser);
+  const [selectedDate, setSelectedDate] = useState('all');
+  const sessionLookup = useMemo(() => {
+    const lookup = new Map<string, { schedule: AbsenceSchedule; session: AbsenceSession }>();
+    data.absenceSchedules
+      .filter((schedule) => schedule.schoolId === currentUser.schoolId)
+      .forEach((schedule) => {
+        schedule.sessions.forEach((session) => {
+          lookup.set(session.id, { schedule, session });
+        });
+      });
+
+    return lookup;
+  }, [currentUser.schoolId, data.absenceSchedules]);
+
+  const reportEntries = useMemo(
+    () =>
+      data.absenceRecords
+        .map((record) => {
+          const student = data.users.find((user) => user.id === record.studentId);
+          if (!student || student.schoolId !== currentUser.schoolId || student.stage !== currentUser.stage) {
+            return null;
+          }
+
+          const marker = data.users.find((user) => user.id === record.markedBy);
+          if (marker?.role !== 'supervisor') {
+            return null;
+          }
+
+          const sessionInfo = sessionLookup.get(record.sessionId);
+          return {
+            marker,
+            record,
+            schedule: sessionInfo?.schedule,
+            session: sessionInfo?.session,
+            student
+          };
+        })
+        .filter((entry): entry is AbsenceReportEntry => Boolean(entry)),
+    [currentUser.schoolId, currentUser.stage, data.absenceRecords, data.users, sessionLookup]
+  );
+
+  const dateOptions = useMemo(() => [...new Set(reportEntries.map((entry) => entry.record.date))].sort((left, right) => right.localeCompare(left)), [reportEntries]);
+  const filteredEntries = selectedDate === 'all' ? reportEntries : reportEntries.filter((entry) => entry.record.date === selectedDate);
+  const reportGroups = buildAbsenceReportGroups(filteredEntries);
+  const uniqueClasses = new Set(filteredEntries.map((entry) => reportGroupKey(entry.record)));
+  const uniqueStudents = new Set(filteredEntries.map((entry) => entry.student.id));
+  const uniqueMarkers = new Set(filteredEntries.map((entry) => entry.marker.id));
+
+  useEffect(() => {
+    if (selectedDate !== 'all' && !dateOptions.includes(selectedDate)) {
+      setSelectedDate('all');
+    }
+  }, [dateOptions, selectedDate]);
+
+  return (
+    <section className="content-grid absences-view">
+      <div className="panel full">
+        <div className="panel-heading">
+          <div>
+            <p>{school?.name ?? tr(language, 'school')}</p>
+            <h2>{tr(language, 'finalAbsenceReport')}</h2>
+          </div>
+          <FileText size={24} aria-hidden="true" />
+        </div>
+        <p className="hint">{tr(language, 'directorAbsenceReportHint')}</p>
+        <div className="absence-report-toolbar">
+          <label>
+            <span>{tr(language, 'reportDateFilter')}</span>
+            <select value={selectedDate} onChange={(event) => setSelectedDate(event.target.value)}>
+              <option value="all">{tr(language, 'allDates')}</option>
+              {dateOptions.map((date) => (
+                <option value={date} key={date}>
+                  {formatAbsenceDate(language, date)}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <div className="absence-report-stats">
+          <div className="absence-report-stat">
+            <span>{tr(language, 'absenceMarkCount')}</span>
+            <strong>{filteredEntries.length}</strong>
+          </div>
+          <div className="absence-report-stat">
+            <span>{tr(language, 'reportedClassCount')}</span>
+            <strong>{uniqueClasses.size}</strong>
+          </div>
+          <div className="absence-report-stat">
+            <span>{tr(language, 'reportedStudentCount')}</span>
+            <strong>{uniqueStudents.size}</strong>
+          </div>
+          <div className="absence-report-stat">
+            <span>{tr(language, 'reportingSupervisors')}</span>
+            <strong>{uniqueMarkers.size}</strong>
+          </div>
+        </div>
+      </div>
+
+      <div className="panel full">
+        <div className="panel-heading">
+          <div>
+            <p>{tr(language, 'directorAbsenceReportHint')}</p>
+            <h2>{tr(language, 'finalAbsenceReport')}</h2>
+          </div>
+          <ClipboardCheck size={24} aria-hidden="true" />
+        </div>
+        <div className="absence-report-list">
+          {reportGroups.length === 0 && <p className="empty-state">{tr(language, 'noAbsenceReports')}</p>}
+          {reportGroups.map((group) => (
+            <details className="absence-report-group" key={group.key} open>
+              <summary>
+                <span className="absence-report-group-title">
+                  <strong>{classLabel(language, group)}</strong>
+                  <small>{formatAbsenceDate(language, group.date)}</small>
+                </span>
+                <span className="absence-report-count">{group.entries.length}</span>
+              </summary>
+              <ResponsiveTable
+                columns={[tr(language, 'fullName'), tr(language, 'session'), tr(language, 'reportedBy'), tr(language, 'absenceDate')]}
+                emptyText={tr(language, 'noAbsenceReports')}
+              >
+                {group.entries.map((entry) => (
+                  <tr key={entry.record.id}>
+                    <td>{entry.student.name}</td>
+                    <td>{reportSessionLabel(language, entry)}</td>
+                    <td>{entry.marker?.name ?? '-'}</td>
+                    <td>{formatAbsenceDate(language, entry.record.date)}</td>
+                  </tr>
+                ))}
+              </ResponsiveTable>
+            </details>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: CommonViewProps & { setData: DataSetter }) {
   const school = getSchool(data, currentUser);
   const classGroups = useMemo(() => classesForAbsences(data, currentUser), [data, currentUser]);
   const schedules = data.absenceSchedules.filter((schedule) => schedule.schoolId === currentUser.schoolId);
