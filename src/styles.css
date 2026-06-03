@@ -956,6 +956,37 @@ select option {
   font-size: 0.9rem;
 }
 
+.account-type-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(130px, 1fr));
+}
+
+.account-type-option {
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper-soft);
+  color: var(--ink);
+  cursor: pointer;
+  padding: 10px 12px;
+  transition: transform 0.16s ease, border-color 0.16s ease, background-color 0.16s ease;
+}
+
+.account-type-option:hover,
+.account-type-option.active {
+  background: var(--teal-soft);
+  border-color: var(--teal);
+  transform: translateY(-1px);
+}
+
+.account-type-option.active .role-label {
+  color: var(--teal);
+}
+
 .remember-row {
   min-height: 28px;
   display: flex !important;
@@ -2624,6 +2655,7 @@ summary.subject-group-heading:hover .subject-icon svg {
 
   .nav-list,
   .stats-grid,
+  .account-type-grid,
   .form-grid,
   .exercise-grid,
   .detail-list {
