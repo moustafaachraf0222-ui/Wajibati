@@ -5,6 +5,33 @@ import { normalizePlatformData } from './data-normalization';
 import { isSeedOnlyData } from './data-seed';
 import { applyDeletionTombstones } from './data-tombstones';
 
+function activationTimestamp(value: string | undefined) {
+  if (!value) {
+    return 0;
+  }
+
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function mergeStudentActivations(baseData: PlatformData, sourceData: PlatformData) {
+  const recordsById = new Map(baseData.studentActivations.map((activation) => [activation.id, activation]));
+
+  sourceData.studentActivations.forEach((sourceActivation) => {
+    const baseActivation = recordsById.get(sourceActivation.id);
+    if (!baseActivation) {
+      recordsById.set(sourceActivation.id, sourceActivation);
+      return;
+    }
+
+    if (activationTimestamp(sourceActivation.activatedAt) > activationTimestamp(baseActivation.activatedAt)) {
+      recordsById.set(sourceActivation.id, sourceActivation);
+    }
+  });
+
+  return [...recordsById.values()];
+}
+
 export async function fetchSharedData(): Promise<SharedDataSnapshot | null> {
   if (window.location.protocol === 'file:' && !REMOTE_STATE_ENDPOINT.startsWith('http')) {
     return null;
@@ -73,6 +100,7 @@ export async function saveSharedData(data: PlatformData): Promise<SharedDataSnap
 export function mergeDeletionTombstones(baseData: PlatformData, sourceData: PlatformData): PlatformData {
   return applyDeletionTombstones({
     ...baseData,
+    studentActivations: mergeStudentActivations(baseData, sourceData),
     deletedSchoolIds: uniqueStrings([...baseData.deletedSchoolIds, ...sourceData.deletedSchoolIds]),
     deletedExerciseIds: uniqueStrings([...baseData.deletedExerciseIds, ...sourceData.deletedExerciseIds]),
     deletedNoteIds: uniqueStrings([...baseData.deletedNoteIds, ...sourceData.deletedNoteIds])
@@ -107,6 +135,7 @@ export async function promoteLocalDataIfRemoteIsEmpty(sharedData: PlatformData, 
 
   const mergedData = mergeDeletionTombstones(sharedData, localData);
   if (
+    JSON.stringify(mergedData.studentActivations) !== JSON.stringify(sharedData.studentActivations) ||
     mergedData.deletedSchoolIds.length !== sharedData.deletedSchoolIds.length ||
     mergedData.deletedExerciseIds.length !== sharedData.deletedExerciseIds.length ||
     mergedData.deletedNoteIds.length !== sharedData.deletedNoteIds.length
