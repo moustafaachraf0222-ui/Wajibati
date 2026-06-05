@@ -1300,7 +1300,17 @@ function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: Co
     }
 
     const sentAt = new Date().toISOString();
-    const reportChoices = selectedSessionChoices.filter((choice) => !sentSessionIds.has(sessionIdFor(selectedDate, choice.schedule.id, choice.session.id)));
+    const unsentAbsenceSessionIds = new Set(recordsForSession.filter((record) => !record.sentAt).map((record) => record.sessionId));
+    const reportChoices = selectedSessionChoices.filter((choice) => {
+      const choiceSessionId = sessionIdFor(selectedDate, choice.schedule.id, choice.session.id);
+      return unsentAbsenceSessionIds.has(choiceSessionId) && !sentSessionIds.has(choiceSessionId);
+    });
+
+    if (reportChoices.length === 0) {
+      setError(tr(language, 'noUnsentAbsences'));
+      return;
+    }
+
     const reports = reportChoices.map<AbsenceReport>((choice) => ({
       id: makeId('absence-report'),
       schoolId: currentUser.schoolId!,
