@@ -179,10 +179,12 @@ export type AbsenceSchedule = {
   stage?: Stage;
   name: string;
   sessions: AbsenceSession[];
+  appliesToAll?: boolean;
   targets?: AbsenceScheduleTarget[];
   weekdays?: number[];
   createdBy: string;
   createdAt: string;
+  updatedAt?: string;
 };
 
 export type AbsenceRecord = {

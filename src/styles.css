@@ -1060,6 +1060,10 @@ select option {
   padding: 8px 10px;
 }
 
+.check-option.inline-check {
+  justify-content: flex-start;
+}
+
 .check-option input {
   width: 18px;
   min-height: 18px;
@@ -2642,6 +2646,13 @@ summary.subject-group-heading:hover .subject-icon svg {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+}
+
+.schedule-template-actions {
+  align-items: center;
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
 }
 
 .timetable-session-chip {

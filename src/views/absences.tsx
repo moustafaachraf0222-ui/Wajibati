@@ -1,4 +1,4 @@
-import { CalendarDays, Check, ClipboardCheck, FileText, Plus, Printer, Save, Send, Trash2, X } from 'lucide-react';
+import { CalendarDays, Check, ClipboardCheck, Edit3, FileText, Plus, Printer, Save, Send, Trash2, X } from 'lucide-react';
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import type {
   AbsenceRecord,
@@ -149,6 +149,10 @@ function targetMatchesClass(target: NonNullable<AbsenceSchedule['targets']>[numb
 }
 
 function scheduleAppliesToClass(schedule: AbsenceSchedule, group: AbsenceClassGroup) {
+  if (schedule.appliesToAll) {
+    return true;
+  }
+
   return Boolean(schedule.targets?.some((target) => targetMatchesClass(target, group)));
 }
 
@@ -196,8 +200,21 @@ function sessionIdFor(date: string, scheduleId: string, sessionId: string) {
 }
 
 function scheduleTimestamp(schedule: AbsenceSchedule) {
-  const timestamp = Date.parse(schedule.createdAt);
+  const timestamp = Date.parse(schedule.updatedAt ?? schedule.createdAt);
   return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function compareSchedulesForClass(group: AbsenceClassGroup) {
+  return (left: AbsenceSchedule, right: AbsenceSchedule) => {
+    const leftDirectMatch = Boolean(left.targets?.some((target) => targetMatchesClass(target, group)));
+    const rightDirectMatch = Boolean(right.targets?.some((target) => targetMatchesClass(target, group)));
+
+    if (leftDirectMatch !== rightDirectMatch) {
+      return leftDirectMatch ? -1 : 1;
+    }
+
+    return compareSchedulesByNewest(left, right);
+  };
 }
 
 function compareSchedulesByNewest(left: AbsenceSchedule, right: AbsenceSchedule) {
@@ -483,8 +500,10 @@ function DirectorScheduleManager({ data, setData, currentUser, language }: Commo
     name: '',
     sessions: defaultScheduleSessions(),
     targetKeys: [] as string[],
-    weekdays: [...DEFAULT_SCHOOL_WEEKDAYS]
+    weekdays: [...DEFAULT_SCHOOL_WEEKDAYS],
+    appliesToAll: false
   });
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
 
@@ -537,6 +556,26 @@ function DirectorScheduleManager({ data, setData, currentUser, language }: Commo
     }));
   };
 
+  const resetForm = () => {
+    setEditingId(null);
+    setForm({ name: '', sessions: defaultScheduleSessions(), targetKeys: [], weekdays: [...DEFAULT_SCHOOL_WEEKDAYS], appliesToAll: false });
+  };
+
+  const editSchedule = (schedule: AbsenceSchedule) => {
+    setNotice('');
+    setError('');
+    setEditingId(schedule.id);
+    setForm({
+      name: schedule.name,
+      sessions: schedule.sessions.map((session) => ({ ...session })),
+      targetKeys: schedule.appliesToAll
+        ? []
+        : classGroups.filter((group) => schedule.targets?.some((target) => targetMatchesClass(target, group))).map((group) => group.key),
+      weekdays: schedule.weekdays?.length ? [...schedule.weekdays] : [...DEFAULT_SCHOOL_WEEKDAYS],
+      appliesToAll: Boolean(schedule.appliesToAll)
+    });
+  };
+
   const saveSchedule = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setNotice('');
@@ -558,34 +597,39 @@ function DirectorScheduleManager({ data, setData, currentUser, language }: Commo
       return;
     }
 
-    if (form.targetKeys.length === 0) {
+    if (!form.appliesToAll && form.targetKeys.length === 0) {
       setError(tr(language, 'scheduleTargetRequired'));
       return;
     }
 
+    const selectedTargetKeys = form.appliesToAll ? classGroups.map((group) => group.key) : form.targetKeys;
     const targets = classGroups
-      .filter((group) => form.targetKeys.includes(group.key))
+      .filter((group) => selectedTargetKeys.includes(group.key))
       .map((group) => ({
         schoolYear: group.schoolYear,
         stream: group.stream,
         classGroup: group.classGroup
       }));
 
-    if (targets.length === 0) {
+    if (!form.appliesToAll && targets.length === 0) {
       setError(tr(language, 'scheduleTargetRequired'));
       return;
     }
 
+    const existingSchedule = editingId ? schedules.find((scheduleItem) => scheduleItem.id === editingId) : undefined;
+    const savedAt = new Date().toISOString();
     const schedule: AbsenceSchedule = {
-      id: makeId('schedule'),
+      id: editingId ?? makeId('schedule'),
       schoolId: currentUser.schoolId,
       stage: currentUser.stage,
       name: form.name.trim(),
       sessions: normalizedSessions.map((session) => ({ ...session, name: session.name.trim() || '1' })),
-      targets,
+      appliesToAll: form.appliesToAll || undefined,
+      targets: form.appliesToAll ? undefined : targets,
       weekdays: [...form.weekdays],
       createdBy: currentUser.id,
-      createdAt: new Date().toISOString()
+      createdAt: existingSchedule?.createdAt ?? savedAt,
+      updatedAt: savedAt
     };
     const assignedTargetKeys = new Set(targets.map(classTargetKey));
 
@@ -593,29 +637,51 @@ function DirectorScheduleManager({ data, setData, currentUser, language }: Commo
       ...previous,
       absenceSchedules: [
         ...previous.absenceSchedules.map((existingSchedule) => {
+          if (existingSchedule.id === schedule.id) {
+            return undefined;
+          }
+
           if (
             existingSchedule.schoolId !== currentUser.schoolId ||
-            (existingSchedule.stage && existingSchedule.stage !== currentUser.stage) ||
-            !existingSchedule.targets?.length
+            (existingSchedule.stage && existingSchedule.stage !== currentUser.stage)
           ) {
+            return existingSchedule;
+          }
+
+          if (form.appliesToAll) {
+            return undefined;
+          }
+
+          if (!existingSchedule.targets?.length) {
             return existingSchedule;
           }
 
           const nextTargets = existingSchedule.targets.filter((target) => !assignedTargetKeys.has(classTargetKey(target)));
           return nextTargets.length === existingSchedule.targets.length ? existingSchedule : { ...existingSchedule, targets: nextTargets };
-        }),
+        }).filter((scheduleItem): scheduleItem is AbsenceSchedule => Boolean(scheduleItem)),
         schedule
       ]
     }));
-    setForm({ name: '', sessions: defaultScheduleSessions(), targetKeys: [], weekdays: [...DEFAULT_SCHOOL_WEEKDAYS] });
-    setNotice(tr(language, 'scheduleTemplateSaved'));
+    resetForm();
+    setNotice(tr(language, editingId ? 'scheduleTemplateUpdated' : 'scheduleTemplateSaved'));
   };
 
   const deleteSchedule = (scheduleId: string) => {
+    const schedule = schedules.find((scheduleItem) => scheduleItem.id === scheduleId);
+    const message = `${tr(language, 'deleteScheduleQuestion')}\n\n${schedule?.name ?? tr(language, 'scheduleName')}\n${tr(language, 'deleteScheduleWarning')}`;
+
+    if (!window.confirm(message)) {
+      return;
+    }
+
     setData((previous) => ({
       ...previous,
       absenceSchedules: previous.absenceSchedules.filter((schedule) => schedule.id !== scheduleId)
     }));
+
+    if (editingId === scheduleId) {
+      resetForm();
+    }
   };
 
   return (
@@ -647,11 +713,23 @@ function DirectorScheduleManager({ data, setData, currentUser, language }: Commo
         </div>
 
         <div className="form-field">
+          <span>{tr(language, 'scheduleScope')}</span>
+          <label className="check-option inline-check">
+            <input
+              type="checkbox"
+              checked={form.appliesToAll}
+              onChange={(event) => setForm({ ...form, appliesToAll: event.target.checked, targetKeys: event.target.checked ? [] : form.targetKeys })}
+            />
+            <span>{tr(language, 'applyScheduleToSchool')}</span>
+          </label>
+        </div>
+
+        <div className="form-field">
           <span>{tr(language, 'assignedClasses')}</span>
           <div className="checkbox-grid">
             {classGroups.map((group) => (
               <label className="check-option" key={group.key}>
-                <input type="checkbox" checked={form.targetKeys.includes(group.key)} onChange={() => toggleTarget(group.key)} />
+                <input type="checkbox" checked={form.appliesToAll || form.targetKeys.includes(group.key)} disabled={form.appliesToAll} onChange={() => toggleTarget(group.key)} />
                 <span>{classLabel(language, group, currentUser.stage)}</span>
               </label>
             ))}
@@ -708,8 +786,14 @@ function DirectorScheduleManager({ data, setData, currentUser, language }: Commo
         {notice && <p className="success-message full">{notice}</p>}
         <button className="button primary form-submit" type="submit">
           <Save size={17} aria-hidden="true" />
-          <span>{tr(language, 'saveSchedule')}</span>
+          <span>{tr(language, editingId ? 'updateSchedule' : 'saveSchedule')}</span>
         </button>
+        {editingId && (
+          <button className="button ghost form-submit" type="button" onClick={resetForm}>
+            <X size={17} aria-hidden="true" />
+            <span>{tr(language, 'cancelEdit')}</span>
+          </button>
+        )}
       </form>
 
       <div className="schedule-template-list">
@@ -722,15 +806,24 @@ function DirectorScheduleManager({ data, setData, currentUser, language }: Commo
               <small>{schedule.sessions.map((session) => `${session.name} ${session.startsAt}-${session.endsAt}`).join(' | ')}</small>
             </div>
             <div className="schedule-template-targets">
-              {(schedule.targets ?? []).map((target) => (
-                <span className="assignment-chip" key={`${schedule.id}-${target.schoolYear}-${target.stream ?? ''}-${target.classGroup}`}>
-                  {classLabel(language, target, currentUser.stage)}
-                </span>
-              ))}
+              {schedule.appliesToAll ? (
+                <span className="assignment-chip">{tr(language, 'allSchoolClasses')}</span>
+              ) : (
+                (schedule.targets ?? []).map((target) => (
+                  <span className="assignment-chip" key={`${schedule.id}-${target.schoolYear}-${target.stream ?? ''}-${target.classGroup}`}>
+                    {classLabel(language, target, currentUser.stage)}
+                  </span>
+                ))
+              )}
             </div>
-            <button className="icon-button danger" type="button" title={tr(language, 'deleteSchedule')} onClick={() => deleteSchedule(schedule.id)}>
-              <Trash2 size={16} aria-hidden="true" />
-            </button>
+            <div className="schedule-template-actions">
+              <button className="icon-button" type="button" title={tr(language, 'editSchedule')} onClick={() => editSchedule(schedule)}>
+                <Edit3 size={16} aria-hidden="true" />
+              </button>
+              <button className="icon-button danger" type="button" title={tr(language, 'deleteSchedule')} onClick={() => deleteSchedule(schedule.id)}>
+                <Trash2 size={16} aria-hidden="true" />
+              </button>
+            </div>
           </article>
         ))}
       </div>
@@ -959,7 +1052,7 @@ function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: Co
       selectedClass
         ? [...schedules]
             .filter((schedule) => scheduleAppliesToClass(schedule, selectedClass) && scheduleAppliesToDate(schedule, selectedDate))
-            .sort(compareSchedulesByNewest)[0]
+            .sort(compareSchedulesForClass(selectedClass))[0]
         : undefined,
     [schedules, selectedClass, selectedDate]
   );
