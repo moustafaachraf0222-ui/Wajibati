@@ -357,6 +357,64 @@ img {
   box-shadow: 0 8px 18px rgba(0, 98, 51, 0.1);
 }
 
+.student-signup-box {
+  border-block-start: 1px solid var(--line);
+  padding-block-start: 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.login-signup-form {
+  grid-template-columns: 1fr;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper-soft);
+  padding: 12px;
+}
+
+.signup-school-strip,
+.created-account-box {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.signup-school-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  background: var(--paper);
+}
+
+.signup-school-strip span {
+  border-radius: 999px;
+  background: var(--teal-soft);
+  color: var(--teal);
+  padding: 5px 9px;
+  font-size: 0.85rem;
+  font-weight: 800;
+}
+
+.created-account-box {
+  display: grid;
+  gap: 5px;
+  background: var(--teal-soft);
+  color: var(--ink);
+}
+
+.created-account-box strong {
+  color: var(--teal);
+}
+
+.created-account-box span {
+  overflow-wrap: anywhere;
+  color: var(--muted);
+}
+
+.created-account-box b {
+  color: var(--ink);
+}
+
 .app-shell {
   min-height: 100vh;
   display: grid;
