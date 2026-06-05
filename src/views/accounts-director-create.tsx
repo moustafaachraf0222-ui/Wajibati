@@ -32,6 +32,54 @@ import {
 import { generateSchoolEmail, generateUniqueAccountCode, makeId } from '../data';
 import { Field, RoleLabel } from '../ui';
 
+const initialBulkStudentForm = {
+  names: '',
+  schoolYear: 1,
+  classChoice: '1',
+  customClassGroup: '',
+  stream: '' as SecondaryStream | ''
+};
+
+function parseStudentNameList(value: string) {
+  return value
+    .split(/\r?\n/)
+    .map((line) => line.replace(/^\s*(?:[-*]|\d+[\).-])\s*/, '').trim())
+    .filter(Boolean);
+}
+
+function createStudentAccount({
+  name,
+  school,
+  currentUser,
+  schoolYear,
+  classGroup,
+  stream,
+  users
+}: {
+  name: string;
+  school: SchoolRecord;
+  currentUser: PlatformUser;
+  schoolYear: number;
+  classGroup: string;
+  stream?: SecondaryStream;
+  users: PlatformUser[];
+}): PlatformUser {
+  return {
+    id: makeId('student'),
+    name,
+    email: generateSchoolEmail(name, 'student', school.domain, users),
+    password: generateUniqueAccountCode(users),
+    role: 'student',
+    status: 'active',
+    schoolId: currentUser.schoolId,
+    stage: currentUser.stage,
+    schoolYear,
+    classGroup,
+    stream,
+    createdBy: currentUser.id
+  };
+}
+
 export function DirectorCreateAccountPanel({
   data,
   setData,
@@ -63,6 +111,9 @@ export function DirectorCreateAccountPanel({
     stream: '' as SecondaryStream | ''
   });
   const [error, setError] = useState('');
+  const [bulkForm, setBulkForm] = useState(initialBulkStudentForm);
+  const [bulkError, setBulkError] = useState('');
+  const [bulkCreatedCount, setBulkCreatedCount] = useState(0);
 
   const createAccount = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -155,33 +206,41 @@ export function DirectorCreateAccountPanel({
             ? studentClassGroup.trim()
             : undefined;
     setData((previous) => {
-      const accountCode = generateUniqueAccountCode(previous.users);
+      const users = [...previous.users];
+      const nextUser: PlatformUser =
+        form.role === 'student'
+          ? createStudentAccount({
+              name: accountName,
+              school,
+              currentUser,
+              schoolYear: form.schoolYear,
+              classGroup: primaryClassGroup ?? '',
+              stream: form.stream || undefined,
+              users
+            })
+          : {
+              id: makeId(form.role),
+              name: accountName,
+              email: generateSchoolEmail(accountName, form.role, school.domain, users),
+              password: generateUniqueAccountCode(users),
+              role: form.role,
+              status: 'active',
+              schoolId: currentUser.schoolId,
+              stage: currentUser.stage,
+              subject: primarySubject,
+              subjectsByYear: form.role === 'teacher' ? teacherSubjectsByYear : undefined,
+              schoolYear: primaryYear,
+              classGroup: primaryClassGroup,
+              schoolYears: form.role === 'teacher' ? form.schoolYears : undefined,
+              classGroups: undefined,
+              yearClassGroups: form.role === 'teacher' && currentUser.stage !== 'secondary' ? teacherYearClassGroups : undefined,
+              yearStreamClassGroups: form.role === 'teacher' && currentUser.stage === 'secondary' ? teacherYearStreamClassGroups : undefined,
+              createdBy: currentUser.id
+            };
 
       return {
         ...previous,
-        users: [
-          ...previous.users,
-          {
-            id: makeId(form.role),
-            name: accountName,
-            email: generateSchoolEmail(accountName, form.role, school.domain, previous.users),
-            password: accountCode,
-            role: form.role,
-            status: 'active',
-            schoolId: currentUser.schoolId,
-            stage: currentUser.stage,
-            subject: primarySubject,
-            subjectsByYear: form.role === 'teacher' ? teacherSubjectsByYear : undefined,
-            schoolYear: primaryYear,
-            classGroup: primaryClassGroup,
-            schoolYears: form.role === 'teacher' ? form.schoolYears : undefined,
-            classGroups: undefined,
-            yearClassGroups: form.role === 'teacher' && currentUser.stage !== 'secondary' ? teacherYearClassGroups : undefined,
-            yearStreamClassGroups: form.role === 'teacher' && currentUser.stage === 'secondary' ? teacherYearStreamClassGroups : undefined,
-            stream: form.role === 'student' && form.stream ? form.stream : undefined,
-            createdBy: currentUser.id
-          }
-        ]
+        users: [...users, nextUser]
       };
     });
 
@@ -205,9 +264,66 @@ export function DirectorCreateAccountPanel({
     setError('');
   };
 
+  const importStudentList = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!school || !currentUser.stage) {
+      return;
+    }
+
+    const studentNames = parseStudentNameList(bulkForm.names);
+    if (studentNames.length === 0) {
+      setBulkError(tr(language, 'studentListRequired'));
+      setBulkCreatedCount(0);
+      return;
+    }
+
+    const classGroup = bulkForm.classChoice === 'custom' ? normalizeClassGroup(bulkForm.customClassGroup) : bulkForm.classChoice;
+    if (!classGroup.trim()) {
+      setBulkError(tr(language, 'classRequired'));
+      setBulkCreatedCount(0);
+      return;
+    }
+
+    const streamOptions = secondaryStreamsForYear(school, bulkForm.schoolYear);
+    if (currentUser.stage === 'secondary' && streamOptions.length === 0) {
+      setBulkError(tr(language, 'noStreamsEnabled'));
+      setBulkCreatedCount(0);
+      return;
+    }
+
+    if (currentUser.stage === 'secondary' && (!bulkForm.stream || !streamOptions.includes(bulkForm.stream))) {
+      setBulkError(tr(language, 'streamRequired'));
+      setBulkCreatedCount(0);
+      return;
+    }
+
+    setData((previous) => {
+      const users = [...previous.users];
+      studentNames.forEach((name) => {
+        users.push(
+          createStudentAccount({
+            name,
+            school,
+            currentUser,
+            schoolYear: bulkForm.schoolYear,
+            classGroup: classGroup.trim(),
+            stream: currentUser.stage === 'secondary' && bulkForm.stream ? bulkForm.stream : undefined,
+            users
+          })
+        );
+      });
+
+      return { ...previous, users };
+    });
+
+    setBulkForm((previous) => ({ ...previous, names: '' }));
+    setBulkCreatedCount(studentNames.length);
+    setBulkError('');
+  };
 
   const availableYearLabels = currentUser.stage ? schoolYearNames[language][currentUser.stage] : [];
   const studentStreamOptions = secondaryStreamsForYear(school, form.schoolYear);
+  const bulkStudentStreamOptions = secondaryStreamsForYear(school, bulkForm.schoolYear);
   const generatedEmailPreview = school && form.name.trim() ? generateSchoolEmail(form.name, form.role, school.domain, data.users) : '';
 
   const chooseAccountRole = (role: 'supervisor' | 'teacher' | 'student') => {
@@ -268,6 +384,18 @@ export function DirectorCreateAccountPanel({
       setForm((previous) => ({ ...previous, stream: nextStream }));
     }
   }, [currentUser.stage, form.role, form.schoolYear, form.stream, studentStreamOptions]);
+
+  useEffect(() => {
+    if (currentUser.stage !== 'secondary') {
+      return;
+    }
+
+    const nextStream = bulkStudentStreamOptions.includes(bulkForm.stream as SecondaryStream) ? bulkForm.stream : bulkStudentStreamOptions[0] ?? '';
+
+    if (nextStream !== bulkForm.stream) {
+      setBulkForm((previous) => ({ ...previous, stream: nextStream }));
+    }
+  }, [bulkForm.schoolYear, bulkForm.stream, bulkStudentStreamOptions, currentUser.stage]);
 
   const toggleTeacherYear = (year: number) => {
     setForm((previous) => {
@@ -687,6 +815,93 @@ export function DirectorCreateAccountPanel({
           <span>{tr(language, 'create')}</span>
         </button>
       </form>
+      <section className="bulk-student-import">
+        <div className="bulk-student-import-head">
+          <div>
+            <p>{tr(language, 'bulkStudentImportHint')}</p>
+            <h3>{tr(language, 'bulkStudentImport')}</h3>
+          </div>
+          <UserPlus size={20} aria-hidden="true" />
+        </div>
+        <form className="form-grid" onSubmit={importStudentList}>
+          {currentUser.stage && (
+            <label>
+              <span>{tr(language, 'schoolYear')}</span>
+              <select
+                value={bulkForm.schoolYear}
+                onChange={(event) => {
+                  const schoolYear = Number(event.target.value);
+                  const streamsForYear = secondaryStreamsForYear(school, schoolYear);
+                  const nextStream = streamsForYear.includes(bulkForm.stream as SecondaryStream) ? bulkForm.stream : streamsForYear[0] ?? '';
+                  setBulkForm({ ...bulkForm, schoolYear, stream: currentUser.stage === 'secondary' ? nextStream : bulkForm.stream });
+                }}
+              >
+                {schoolYearNames[language][currentUser.stage].map((label, index) => (
+                  <option value={index + 1} key={label}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          {currentUser.stage === 'secondary' && (
+            <label>
+              <span>{tr(language, 'stream')}</span>
+              <select
+                value={bulkForm.stream}
+                disabled={bulkStudentStreamOptions.length === 0}
+                onChange={(event) => setBulkForm({ ...bulkForm, stream: event.target.value as SecondaryStream | '' })}
+              >
+                <option value="">{bulkStudentStreamOptions.length === 0 ? tr(language, 'noStreamsEnabled') : tr(language, 'stream')}</option>
+                {bulkStudentStreamOptions.map((stream) => (
+                  <option value={stream} key={stream}>
+                    {secondaryStreamLabel(language, stream, bulkForm.schoolYear)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          <label>
+            <span>{tr(language, 'classGroup')}</span>
+            <select value={bulkForm.classChoice} onChange={(event) => setBulkForm({ ...bulkForm, classChoice: event.target.value })}>
+              {defaultClassGroups.map((classGroup) => (
+                <option value={classGroup} key={classGroup}>
+                  {classGroup}
+                </option>
+              ))}
+              <option value="custom">{tr(language, 'customClass')}</option>
+            </select>
+          </label>
+          {bulkForm.classChoice === 'custom' && (
+            <Field label={tr(language, 'customClass')} value={bulkForm.customClassGroup} onChange={(value) => setBulkForm({ ...bulkForm, customClassGroup: value })} required />
+          )}
+          <label className="full">
+            <span>{tr(language, 'studentNamesList')}</span>
+            <textarea
+              value={bulkForm.names}
+              onChange={(event) => {
+                setBulkForm({ ...bulkForm, names: event.target.value });
+                setBulkError('');
+                setBulkCreatedCount(0);
+              }}
+              placeholder={tr(language, 'studentNamesPlaceholder')}
+              rows={7}
+              required
+            />
+          </label>
+          <p className="hint full">{tr(language, 'bulkActivationCodeHint')}</p>
+          {bulkCreatedCount > 0 && (
+            <p className="success-message full">
+              {tr(language, 'studentsImported')} {tr(language, 'studentsImportedCount')}: <strong>{bulkCreatedCount}</strong>
+            </p>
+          )}
+          {bulkError && <p className="form-error full">{bulkError}</p>}
+          <button className="button primary form-submit" type="submit">
+            <Plus size={17} aria-hidden="true" />
+            <span>{tr(language, 'importStudents')}</span>
+          </button>
+        </form>
+      </section>
     </div>
   );
 }

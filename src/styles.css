@@ -1089,6 +1089,41 @@ select option {
   padding: 10px;
 }
 
+.bulk-student-import {
+  margin-top: 18px;
+  border-top: 1px solid var(--line);
+  padding-top: 18px;
+  display: grid;
+  gap: 12px;
+}
+
+.bulk-student-import-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.bulk-student-import-head h3,
+.bulk-student-import-head p {
+  margin: 0;
+}
+
+.bulk-student-import-head h3 {
+  color: var(--ink);
+  font-size: 1rem;
+}
+
+.bulk-student-import-head p {
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.bulk-student-import-head svg {
+  color: var(--teal);
+  flex: 0 0 auto;
+}
+
 .year-class-row {
   display: grid;
   gap: 10px;
