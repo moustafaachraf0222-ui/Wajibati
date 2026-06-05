@@ -36,8 +36,8 @@ export function generateAccountCode() {
   return characters.join('');
 }
 
-export function generateUniqueAccountCode(users: PlatformUser[]) {
-  const usedCodes = new Set(users.map((user) => user.password.trim().toUpperCase()));
+export function generateUniqueCode(existingCodes: string[]) {
+  const usedCodes = new Set(existingCodes.map((code) => code.trim().toUpperCase()));
 
   for (let attempt = 0; attempt < 1000; attempt += 1) {
     const code = generateAccountCode();
@@ -47,6 +47,10 @@ export function generateUniqueAccountCode(users: PlatformUser[]) {
   }
 
   throw new Error('Could not generate a unique 6-character account code.');
+}
+
+export function generateUniqueAccountCode(users: PlatformUser[]) {
+  return generateUniqueCode(users.map((user) => user.password));
 }
 
 export function normalizeEmailDomain(domain: string) {

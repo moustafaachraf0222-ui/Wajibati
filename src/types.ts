@@ -96,6 +96,21 @@ export type PlatformUser = {
   createdBy?: string;
 };
 
+export type StudentActivationRecord = {
+  id: string;
+  name: string;
+  code: string;
+  schoolId: string;
+  stage: Stage;
+  schoolYear: number;
+  classGroup: string;
+  stream?: SecondaryStream;
+  createdBy: string;
+  createdAt: string;
+  activatedUserId?: string;
+  activatedAt?: string;
+};
+
 export type Exercise = {
   id: string;
   title: string;
@@ -214,6 +229,7 @@ export type PushTokenRecord = {
 export type PlatformData = {
   schools: SchoolRecord[];
   users: PlatformUser[];
+  studentActivations: StudentActivationRecord[];
   exercises: Exercise[];
   announcements: Announcement[];
   notes: TeacherNote[];

@@ -83,6 +83,7 @@ export function hasUserData(data: PlatformData) {
   return (
     data.schools.length > 0 ||
     data.users.length > 1 ||
+    data.studentActivations.length > 0 ||
     data.exercises.length > 0 ||
     data.announcements.length > 0 ||
     data.notes.length > 0 ||

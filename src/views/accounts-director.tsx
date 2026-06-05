@@ -71,7 +71,14 @@ export function DirectorUsersPanel({
         <DirectorCreateAccountPanel data={data} setData={setData} currentUser={currentUser} language={language} school={school} />
       )}
 
-      {accountMode === 'database' && <CredentialDatabasePanel users={schoolUsers} school={school} language={language} />}
+      {accountMode === 'database' && (
+        <CredentialDatabasePanel
+          users={schoolUsers}
+          studentActivations={data.studentActivations.filter((activation) => activation.schoolId === currentUser.schoolId)}
+          school={school}
+          language={language}
+        />
+      )}
 
       {accountMode === 'view' && editingUser && (
         <AccountEditPanel

@@ -7,6 +7,7 @@ import type {
   PlatformUser,
   SchoolRecord,
   SecondaryStream,
+  StudentActivationRecord,
   Subject,
   YearStreamClassGroups
 } from '../types';
@@ -29,7 +30,7 @@ import {
   subjectOptionsForTeacherYear,
   uniqueNumbers
 } from '../education';
-import { generateSchoolEmail, generateUniqueAccountCode, makeId } from '../data';
+import { generateSchoolEmail, generateUniqueCode, makeId } from '../data';
 import { Field, RoleLabel } from '../ui';
 
 const initialBulkStudentForm = {
@@ -54,7 +55,8 @@ function createStudentAccount({
   schoolYear,
   classGroup,
   stream,
-  users
+  users,
+  existingCodes
 }: {
   name: string;
   school: SchoolRecord;
@@ -63,12 +65,13 @@ function createStudentAccount({
   classGroup: string;
   stream?: SecondaryStream;
   users: PlatformUser[];
+  existingCodes: string[];
 }): PlatformUser {
   return {
     id: makeId('student'),
     name,
     email: generateSchoolEmail(name, 'student', school.domain, users),
-    password: generateUniqueAccountCode(users),
+    password: generateUniqueCode(existingCodes),
     role: 'student',
     status: 'active',
     schoolId: currentUser.schoolId,
@@ -77,6 +80,35 @@ function createStudentAccount({
     classGroup,
     stream,
     createdBy: currentUser.id
+  };
+}
+
+function createStudentActivationRecord({
+  name,
+  currentUser,
+  schoolYear,
+  classGroup,
+  stream,
+  existingCodes
+}: {
+  name: string;
+  currentUser: PlatformUser;
+  schoolYear: number;
+  classGroup: string;
+  stream?: SecondaryStream;
+  existingCodes: string[];
+}): StudentActivationRecord {
+  return {
+    id: makeId('activation'),
+    name,
+    code: generateUniqueCode(existingCodes),
+    schoolId: currentUser.schoolId ?? '',
+    stage: currentUser.stage ?? 'middle',
+    schoolYear,
+    classGroup,
+    stream,
+    createdBy: currentUser.id,
+    createdAt: new Date().toISOString()
   };
 }
 
@@ -207,6 +239,7 @@ export function DirectorCreateAccountPanel({
             : undefined;
     setData((previous) => {
       const users = [...previous.users];
+      const existingCodes = [...users.map((user) => user.password), ...previous.studentActivations.map((activation) => activation.code)];
       const nextUser: PlatformUser =
         form.role === 'student'
           ? createStudentAccount({
@@ -216,13 +249,14 @@ export function DirectorCreateAccountPanel({
               schoolYear: form.schoolYear,
               classGroup: primaryClassGroup ?? '',
               stream: form.stream || undefined,
-              users
+              users,
+              existingCodes
             })
           : {
               id: makeId(form.role),
               name: accountName,
               email: generateSchoolEmail(accountName, form.role, school.domain, users),
-              password: generateUniqueAccountCode(users),
+              password: generateUniqueCode(existingCodes),
               role: form.role,
               status: 'active',
               schoolId: currentUser.schoolId,
@@ -298,22 +332,22 @@ export function DirectorCreateAccountPanel({
     }
 
     setData((previous) => {
-      const users = [...previous.users];
+      const studentActivations = [...previous.studentActivations];
+      const usedCodes = [...previous.users.map((user) => user.password), ...studentActivations.map((activation) => activation.code)];
       studentNames.forEach((name) => {
-        users.push(
-          createStudentAccount({
-            name,
-            school,
-            currentUser,
-            schoolYear: bulkForm.schoolYear,
-            classGroup: classGroup.trim(),
-            stream: currentUser.stage === 'secondary' && bulkForm.stream ? bulkForm.stream : undefined,
-            users
-          })
-        );
+        const activation = createStudentActivationRecord({
+          name,
+          currentUser,
+          schoolYear: bulkForm.schoolYear,
+          classGroup: classGroup.trim(),
+          stream: currentUser.stage === 'secondary' && bulkForm.stream ? bulkForm.stream : undefined,
+          existingCodes: usedCodes
+        });
+        studentActivations.push(activation);
+        usedCodes.push(activation.code);
       });
 
-      return { ...previous, users };
+      return { ...previous, studentActivations };
     });
 
     setBulkForm((previous) => ({ ...previous, names: '' }));

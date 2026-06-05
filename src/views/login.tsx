@@ -1,11 +1,13 @@
 import { Info, KeyRound, Moon, ShieldCheck, Sun, Users, X } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
-import type { Language, PlatformData, PlatformUser, RememberedAccount, SchoolRecord, SyncStatus, Theme } from '../types';
+import type { DataSetter, Language, PlatformData, PlatformUser, RememberedAccount, SchoolRecord, StudentActivationRecord, SyncStatus, Theme } from '../types';
 import { tr } from '../i18n';
 import {
   canAuthenticateUser,
   forgetStoredAccount,
+  generateSchoolEmail,
   loadRememberedAccounts,
+  makeId,
   normalizeEmailDomain,
   pruneRememberedAccounts,
   rememberStoredAccount,
@@ -15,6 +17,7 @@ import { AppInfoDialog, LanguageMenu, SyncIndicator } from '../ui';
 
 type LoginProps = {
   data: PlatformData;
+  setData: DataSetter;
   language: Language;
   theme: Theme;
   onLanguageChange: (language: Language) => void;
@@ -25,6 +28,7 @@ type LoginProps = {
 };
 
 const initialStudentActivationForm = {
+  name: '',
   domain: '',
   code: ''
 };
@@ -42,21 +46,31 @@ function normalizeActivationCode(code: string) {
   return code.trim().replace(/\s+/g, '').toUpperCase();
 }
 
-function findStudentByActivationCode(data: PlatformData, school: SchoolRecord, code: string): PlatformUser | undefined {
+function normalizeFullName(name: string) {
+  return name.trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+function findStudentActivationRecord(
+  data: PlatformData,
+  school: SchoolRecord,
+  name: string,
+  code: string
+): StudentActivationRecord | undefined {
   const normalizedCode = normalizeActivationCode(code);
-  if (!normalizedCode) {
+  const normalizedName = normalizeFullName(name);
+  if (!normalizedCode || !normalizedName) {
     return undefined;
   }
 
-  return data.users.find(
-    (user) =>
-      user.role === 'student' &&
-      user.schoolId === school.id &&
-      normalizeActivationCode(user.password) === normalizedCode
+  return data.studentActivations.find(
+    (activation) =>
+      activation.schoolId === school.id &&
+      normalizeActivationCode(activation.code) === normalizedCode &&
+      normalizeFullName(activation.name) === normalizedName
   );
 }
 
-export function LoginPage({ data, language, theme, onLanguageChange, onThemeChange, onLogin, onRefreshData, syncStatus }: LoginProps) {
+export function LoginPage({ data, setData, language, theme, onLanguageChange, onThemeChange, onLogin, onRefreshData, syncStatus }: LoginProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
@@ -134,6 +148,11 @@ export function LoginPage({ data, language, theme, onLanguageChange, onThemeChan
     setStudentSignupError('');
     setStudentSignupSuccess(null);
 
+    if (!studentSignupForm.name.trim()) {
+      setStudentSignupError(tr(language, 'nameRequired'));
+      return;
+    }
+
     if (!studentSignupForm.code.trim()) {
       setStudentSignupError(tr(language, 'activationCodeRequired'));
       return;
@@ -149,25 +168,74 @@ export function LoginPage({ data, language, theme, onLanguageChange, onThemeChan
       return;
     }
 
-    const activatedAccount = findStudentByActivationCode(latestData, school, studentSignupForm.code);
+    const activationRecord = findStudentActivationRecord(latestData, school, studentSignupForm.name, studentSignupForm.code);
     setIsCreatingStudent(false);
 
-    if (!activatedAccount) {
+    if (!activationRecord) {
       setStudentSignupError(tr(language, 'invalidActivationCode'));
       return;
     }
+
+    const existingAccount = activationRecord.activatedUserId
+      ? latestData.users.find((user) => user.id === activationRecord.activatedUserId)
+      : undefined;
+    if (existingAccount) {
+      if (!canAuthenticateUser(latestData, existingAccount)) {
+        setStudentSignupError(tr(language, 'disabledAccount'));
+        return;
+      }
+
+      rememberAccount(existingAccount);
+      setEmail(existingAccount.email);
+      setPassword(existingAccount.password);
+      setRememberMe(true);
+      setStudentSignupSuccess({ email: existingAccount.email, password: existingAccount.password });
+      setStudentSignupForm(initialStudentActivationForm);
+      onLogin(existingAccount.id);
+      return;
+    }
+
+    if (activationRecord.activatedUserId) {
+      setStudentSignupError(tr(language, 'activationCodeUsed'));
+      return;
+    }
+
+    const activatedAccount: PlatformUser = {
+      id: makeId('student'),
+      name: activationRecord.name,
+      email: generateSchoolEmail(activationRecord.name, 'student', school.domain, latestData.users),
+      password: activationRecord.code,
+      role: 'student',
+      status: 'active',
+      schoolId: school.id,
+      stage: activationRecord.stage,
+      schoolYear: activationRecord.schoolYear,
+      classGroup: activationRecord.classGroup,
+      stream: activationRecord.stream,
+      createdBy: 'student-activation'
+    };
 
     if (!canAuthenticateUser(latestData, activatedAccount)) {
       setStudentSignupError(tr(language, 'disabledAccount'));
       return;
     }
 
+    setData((previous) => ({
+      ...previous,
+      users: previous.users.some((user) => user.id === activatedAccount.id) ? previous.users : [...previous.users, activatedAccount],
+      studentActivations: previous.studentActivations.map((activation) =>
+        activation.id === activationRecord.id
+          ? { ...activation, activatedUserId: activatedAccount.id, activatedAt: new Date().toISOString() }
+          : activation
+      )
+    }));
     rememberAccount(activatedAccount);
     setEmail(activatedAccount.email);
     setPassword(activatedAccount.password);
     setRememberMe(true);
     setStudentSignupSuccess({ email: activatedAccount.email, password: activatedAccount.password });
     setStudentSignupForm(initialStudentActivationForm);
+    onLogin(activatedAccount.id);
   };
 
   return (
@@ -255,6 +323,19 @@ export function LoginPage({ data, language, theme, onLanguageChange, onThemeChan
               <form className="form-grid login-signup-form" onSubmit={submitStudentSignup}>
                 <p className="hint full">{tr(language, 'studentSignupHint')}</p>
                 <label className="full">
+                  <span>{tr(language, 'fullName')}</span>
+                  <input
+                    value={studentSignupForm.name}
+                    onChange={(event) => {
+                      setStudentSignupForm({ ...studentSignupForm, name: event.target.value });
+                      setStudentSignupError('');
+                      setStudentSignupSuccess(null);
+                    }}
+                    autoComplete="name"
+                    required
+                  />
+                </label>
+                <label className="full">
                   <span>{tr(language, 'schoolDomain')}</span>
                   <input
                     dir="ltr"
@@ -293,7 +374,11 @@ export function LoginPage({ data, language, theme, onLanguageChange, onThemeChan
                   </div>
                 )}
                 {studentSignupError && <p className="form-error full">{studentSignupError}</p>}
-                <button className="button primary form-submit" type="submit" disabled={isCreatingStudent || !studentSignupForm.domain.trim() || !studentSignupForm.code.trim()}>
+                <button
+                  className="button primary form-submit"
+                  type="submit"
+                  disabled={isCreatingStudent || !studentSignupForm.name.trim() || !studentSignupForm.domain.trim() || !studentSignupForm.code.trim()}
+                >
                   <KeyRound size={17} aria-hidden="true" />
                   <span>{tr(language, 'activateAccount')}</span>
                 </button>

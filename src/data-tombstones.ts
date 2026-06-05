@@ -79,6 +79,7 @@ export function applyDeletedSchoolTombstones(data: PlatformData): PlatformData {
     ...data,
     schools: data.schools.filter((school) => !deletedSchoolIds.has(school.id)),
     users: data.users.filter((user) => !user.schoolId || !deletedSchoolIds.has(user.schoolId)),
+    studentActivations: data.studentActivations.filter((activation) => !deletedSchoolIds.has(activation.schoolId)),
     exercises: data.exercises.filter((exercise) => !deletedSchoolIds.has(exercise.schoolId)),
     announcements: data.announcements.filter((announcement) => !deletedSchoolIds.has(announcement.schoolId)),
     notes: data.notes.filter((note) => !deletedSchoolIds.has(note.schoolId)),

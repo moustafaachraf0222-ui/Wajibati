@@ -79,6 +79,7 @@ export function normalizePlatformData(value: Partial<PlatformData> | null | unde
         )
       : fallback.schools,
     users: Array.isArray(source.users) ? source.users : fallback.users,
+    studentActivations: Array.isArray(source.studentActivations) ? source.studentActivations : fallback.studentActivations,
     exercises: Array.isArray(source.exercises) ? source.exercises : fallback.exercises,
     announcements: Array.isArray(source.announcements) ? source.announcements : fallback.announcements,
     notes: Array.isArray(source.notes) ? source.notes : fallback.notes,
