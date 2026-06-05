@@ -39,7 +39,6 @@ function App() {
     return (
       <LoginPage
         data={data}
-        setData={setData}
         language={language}
         theme={theme}
         onLanguageChange={setLanguage}

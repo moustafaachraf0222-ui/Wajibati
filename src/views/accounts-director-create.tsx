@@ -29,7 +29,7 @@ import {
   subjectOptionsForTeacherYear,
   uniqueNumbers
 } from '../education';
-import { generateAccountCode, generateSchoolEmail, makeId } from '../data';
+import { generateSchoolEmail, generateUniqueAccountCode, makeId } from '../data';
 import { Field, RoleLabel } from '../ui';
 
 export function DirectorCreateAccountPanel({
@@ -154,34 +154,36 @@ export function DirectorCreateAccountPanel({
           : form.role === 'student'
             ? studentClassGroup.trim()
             : undefined;
-    const accountCode = generateAccountCode();
+    setData((previous) => {
+      const accountCode = generateUniqueAccountCode(previous.users);
 
-    setData((previous) => ({
-      ...previous,
-      users: [
-        ...previous.users,
-        {
-          id: makeId(form.role),
-          name: accountName,
-          email: generateSchoolEmail(accountName, form.role, school.domain, previous.users),
-          password: accountCode,
-          role: form.role,
-          status: 'active',
-          schoolId: currentUser.schoolId,
-          stage: currentUser.stage,
-          subject: primarySubject,
-          subjectsByYear: form.role === 'teacher' ? teacherSubjectsByYear : undefined,
-          schoolYear: primaryYear,
-          classGroup: primaryClassGroup,
-          schoolYears: form.role === 'teacher' ? form.schoolYears : undefined,
-          classGroups: undefined,
-          yearClassGroups: form.role === 'teacher' && currentUser.stage !== 'secondary' ? teacherYearClassGroups : undefined,
-          yearStreamClassGroups: form.role === 'teacher' && currentUser.stage === 'secondary' ? teacherYearStreamClassGroups : undefined,
-          stream: form.role === 'student' && form.stream ? form.stream : undefined,
-          createdBy: currentUser.id
-        }
-      ]
-    }));
+      return {
+        ...previous,
+        users: [
+          ...previous.users,
+          {
+            id: makeId(form.role),
+            name: accountName,
+            email: generateSchoolEmail(accountName, form.role, school.domain, previous.users),
+            password: accountCode,
+            role: form.role,
+            status: 'active',
+            schoolId: currentUser.schoolId,
+            stage: currentUser.stage,
+            subject: primarySubject,
+            subjectsByYear: form.role === 'teacher' ? teacherSubjectsByYear : undefined,
+            schoolYear: primaryYear,
+            classGroup: primaryClassGroup,
+            schoolYears: form.role === 'teacher' ? form.schoolYears : undefined,
+            classGroups: undefined,
+            yearClassGroups: form.role === 'teacher' && currentUser.stage !== 'secondary' ? teacherYearClassGroups : undefined,
+            yearStreamClassGroups: form.role === 'teacher' && currentUser.stage === 'secondary' ? teacherYearStreamClassGroups : undefined,
+            stream: form.role === 'student' && form.stream ? form.stream : undefined,
+            createdBy: currentUser.id
+          }
+        ]
+      };
+    });
 
     setForm({
       role: 'teacher',

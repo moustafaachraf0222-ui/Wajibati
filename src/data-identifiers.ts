@@ -36,6 +36,19 @@ export function generateAccountCode() {
   return characters.join('');
 }
 
+export function generateUniqueAccountCode(users: PlatformUser[]) {
+  const usedCodes = new Set(users.map((user) => user.password.trim().toUpperCase()));
+
+  for (let attempt = 0; attempt < 1000; attempt += 1) {
+    const code = generateAccountCode();
+    if (!usedCodes.has(code.toUpperCase())) {
+      return code;
+    }
+  }
+
+  throw new Error('Could not generate a unique 6-character account code.');
+}
+
 export function normalizeEmailDomain(domain: string) {
   return domain.replace(/^@/, '').trim().toLowerCase();
 }
