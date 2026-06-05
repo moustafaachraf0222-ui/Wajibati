@@ -1,7 +1,8 @@
-import { Globe2, Settings, Trash2 } from 'lucide-react';
+import { useEffect, useState, type FormEvent } from 'react';
+import { Globe2, Phone, Settings, Trash2 } from 'lucide-react';
 import type { DataSetter, Language, PlatformData, PlatformUser, Theme } from '../types';
 import { languageFlags, languageNames, tr } from '../i18n';
-import { languages } from '../ui';
+import { Field, languages } from '../ui';
 type CommonViewProps = {
   data: PlatformData;
   currentUser: PlatformUser;
@@ -24,6 +25,26 @@ export function SettingsView({
   onThemeChange: (theme: Theme) => void;
   onResetDemo: () => void;
 }) {
+  const [guardianPhone, setGuardianPhone] = useState(currentUser.guardianPhone ?? '');
+  const [studentSaved, setStudentSaved] = useState(false);
+
+  useEffect(() => {
+    setGuardianPhone(currentUser.guardianPhone ?? '');
+    setStudentSaved(false);
+  }, [currentUser.id, currentUser.guardianPhone]);
+
+  const saveGuardianPhone = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const normalizedPhone = guardianPhone.trim();
+
+    setData((previous) => ({
+      ...previous,
+      users: previous.users.map((user) => (user.id === currentUser.id ? { ...user, guardianPhone: normalizedPhone } : user))
+    }));
+    setGuardianPhone(normalizedPhone);
+    setStudentSaved(true);
+  };
+
   return (
     <section className="content-grid">
       <div className="panel">
@@ -56,6 +77,26 @@ export function SettingsView({
           />
         </label>
       </div>
+
+      {currentUser.role === 'student' && (
+        <div className="panel">
+          <div className="panel-heading">
+            <div>
+              <p>{tr(language, 'guardianPhoneHint')}</p>
+              <h2>{tr(language, 'guardianPhone')}</h2>
+            </div>
+            <Phone size={24} aria-hidden="true" />
+          </div>
+          <form className="form-grid" onSubmit={saveGuardianPhone}>
+            <Field label={tr(language, 'guardianPhone')} value={guardianPhone} type="tel" onChange={setGuardianPhone} />
+            <button className="button primary form-submit" type="submit">
+              <Phone size={17} aria-hidden="true" />
+              <span>{tr(language, 'save')}</span>
+            </button>
+            {studentSaved && <p className="success-message full">{tr(language, 'saved')}</p>}
+          </form>
+        </div>
+      )}
 
       {currentUser.role === 'admin' && (
         <div className="panel">

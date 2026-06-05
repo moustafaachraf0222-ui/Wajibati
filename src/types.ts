@@ -93,6 +93,7 @@ export type PlatformUser = {
   yearClassGroups?: Record<string, string[]>;
   yearStreamClassGroups?: YearStreamClassGroups;
   stream?: SecondaryStream;
+  guardianPhone?: string;
   createdBy?: string;
 };
 

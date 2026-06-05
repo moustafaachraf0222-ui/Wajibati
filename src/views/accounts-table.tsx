@@ -40,18 +40,36 @@ export function UsersTable({
 }) {
   const [expandedUsers, setExpandedUsers] = useState<Record<string, boolean>>({});
   const [pendingDeleteUser, setPendingDeleteUser] = useState<PlatformUser | null>(null);
-  const columns = [
-    tr(language, 'fullName'),
-    tr(language, 'email'),
-    tr(language, 'role'),
-    tr(language, 'school'),
-    tr(language, 'subject'),
-    tr(language, 'status'),
-    tr(language, 'assignments'),
-    tr(language, 'actions')
-  ];
+  const columnsForUsers = (tableUsers: PlatformUser[]) => {
+    const hasStudents = tableUsers.some((user) => user.role === 'student');
+    const hasNonStudents = tableUsers.some((user) => user.role !== 'student');
+    const subjectColumn = hasStudents && !hasNonStudents
+      ? tr(language, 'guardianPhone')
+      : hasStudents
+        ? tr(language, 'subjectOrGuardianPhone')
+        : tr(language, 'subject');
 
-  const rowsForUsers = (tableUsers: PlatformUser[]) =>
+    return [
+      tr(language, 'fullName'),
+      tr(language, 'email'),
+      tr(language, 'role'),
+      tr(language, 'school'),
+      subjectColumn,
+      tr(language, 'status'),
+      tr(language, 'assignments'),
+      tr(language, 'actions')
+    ];
+  };
+
+  const subjectCellForUser = (user: PlatformUser) => {
+    if (user.role === 'student') {
+      return user.guardianPhone?.trim() || '-';
+    }
+
+    return user.role === 'teacher' ? teacherSubjectsLabel(language, user) : user.subject ? subjectNames[language][user.subject] : '-';
+  };
+
+  const rowsForUsers = (tableUsers: PlatformUser[], tableColumns: string[]) =>
     tableUsers.flatMap((user) => {
       const school = getSchool(data, user);
       const detailsOpen = Boolean(expandedUsers[user.id]);
@@ -64,7 +82,7 @@ export function UsersTable({
             <RoleLabel role={user.role} language={language} />
           </td>
           <td>{school?.name ?? '-'}</td>
-          <td>{user.role === 'teacher' ? teacherSubjectsLabel(language, user) : user.subject ? subjectNames[language][user.subject] : '-'}</td>
+          <td>{subjectCellForUser(user)}</td>
           <td>
             <span className={`status ${user.status}`}>{statusNames[language][user.status]}</span>
           </td>
@@ -120,18 +138,22 @@ export function UsersTable({
       return [
         row,
         <tr className="account-details-row" key={`${user.id}-details`}>
-          <td colSpan={columns.length}>
+          <td colSpan={tableColumns.length}>
             <AccountAssignmentDetails user={user} language={language} />
           </td>
         </tr>
       ];
     });
 
-  const renderTable = (tableUsers: PlatformUser[]) => (
-    <ResponsiveTable columns={columns} emptyText={tr(language, 'noRecords')}>
-      {rowsForUsers(tableUsers)}
-    </ResponsiveTable>
-  );
+  const renderTable = (tableUsers: PlatformUser[]) => {
+    const tableColumns = columnsForUsers(tableUsers);
+
+    return (
+      <ResponsiveTable columns={tableColumns} emptyText={tr(language, 'noRecords')}>
+        {rowsForUsers(tableUsers, tableColumns)}
+      </ResponsiveTable>
+    );
+  };
 
   const compareStudentsByClass = (left: PlatformUser, right: PlatformUser) =>
     (left.schoolYear ?? 999) - (right.schoolYear ?? 999) ||

@@ -243,6 +243,12 @@ export function OverviewView({ data, currentUser, language }: CommonViewProps) {
               <dd>{currentUser.role === 'teacher' ? teacherSubjectsLabel(language, currentUser) : subjectNames[language][currentUser.subject]}</dd>
             </div>
           )}
+          {currentUser.role === 'student' && (
+            <div>
+              <dt>{tr(language, 'guardianPhone')}</dt>
+              <dd>{currentUser.guardianPhone?.trim() || '-'}</dd>
+            </div>
+          )}
           {assignedSchoolYears(currentUser).length > 0 && (
             <div>
               <dt>{currentUser.role === 'teacher' ? tr(language, 'schoolYears') : tr(language, 'schoolYear')}</dt>
