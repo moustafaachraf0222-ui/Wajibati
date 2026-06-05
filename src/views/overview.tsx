@@ -1,4 +1,4 @@
-import { BarChart3, BookOpen, CalendarDays, CheckCircle2, CircleOff, Download, LockKeyhole, Trophy, Users } from 'lucide-react';
+import { BookOpen, CalendarDays, CheckCircle2, CircleOff, Download, LockKeyhole, Users } from 'lucide-react';
 import type { Language, PlatformData, PlatformUser } from '../types';
 import { localeNames, stageNames, statusNames, subjectNames, tr } from '../i18n';
 import {
@@ -12,11 +12,8 @@ import {
 } from '../education';
 import { getSchool, scopedExercises, scopedUsers } from '../data';
 import {
-  completionRateForExercises,
   reportLinesForDirector,
   todayIso,
-  topSubjectByHomework,
-  topTeacherByActivity,
   weekRangeLabel
 } from '../homework';
 import { RoleLabel, StatCard } from '../ui';
@@ -190,10 +187,18 @@ export function OverviewView({ data, currentUser, language }: CommonViewProps) {
   const activeCount = users.filter((user) => user.status === 'active').length;
   const disabledCount = users.filter((user) => user.status === 'disabled').length;
   const completed = currentUser.role === 'student' ? data.completions[currentUser.id]?.length ?? 0 : 0;
-  const directorCompletion = currentUser.role === 'director' ? completionRateForExercises(data, exercises) : { total: 0, completed: 0 };
-  const directorCompletionPercent = directorCompletion.total > 0 ? Math.round((directorCompletion.completed / directorCompletion.total) * 100) : 0;
-  const topTeacher = currentUser.role === 'director' ? topTeacherByActivity(data, exercises, language) : null;
-  const topSubject = currentUser.role === 'director' ? topSubjectByHomework(exercises, language) : null;
+  const absenceCount =
+    currentUser.role === 'student'
+      ? data.absenceRecords.filter((record) => record.studentId === currentUser.id && record.sentAt && !record.deletedAt).length
+      : 0;
+
+  if (currentUser.role === 'director') {
+    return (
+      <section className="content-grid">
+        <DirectorWeeklyReport data={data} currentUser={currentUser} language={language} />
+      </section>
+    );
+  }
 
   return (
     <section className="content-grid">
@@ -204,14 +209,8 @@ export function OverviewView({ data, currentUser, language }: CommonViewProps) {
         {currentUser.role === 'student' && (
           <StatCard icon={CheckCircle2} label={tr(language, 'completedExercises')} value={completed.toString()} tone="green" />
         )}
-        {currentUser.role === 'director' && topTeacher && (
-          <StatCard icon={Trophy} label={tr(language, 'topTeacher')} value={`${topTeacher.name} (${topTeacher.count})`} tone="green" />
-        )}
-        {currentUser.role === 'director' && topSubject && (
-          <StatCard icon={BookOpen} label={tr(language, 'topSubject')} value={`${topSubject.name} (${topSubject.count})`} tone="blue" />
-        )}
-        {currentUser.role === 'director' && (
-          <StatCard icon={BarChart3} label={tr(language, 'generalCompletion')} value={`${directorCompletionPercent}%`} tone="teal" />
+        {currentUser.role === 'student' && (
+          <StatCard icon={CircleOff} label={tr(language, 'absentCount')} value={absenceCount.toString()} tone="amber" />
         )}
       </div>
 
@@ -268,7 +267,6 @@ export function OverviewView({ data, currentUser, language }: CommonViewProps) {
           </div>
         </dl>
       </div>
-      {currentUser.role === 'director' && <DirectorWeeklyReport data={data} currentUser={currentUser} language={language} />}
     </section>
   );
 }
