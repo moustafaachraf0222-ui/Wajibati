@@ -245,6 +245,7 @@ export type PlatformData = {
   deletedSchoolIds: string[];
   deletedExerciseIds: string[];
   deletedNoteIds: string[];
+  deletedScheduleIds: string[];
   settings: {
     allowExerciseImages: boolean;
     maintenanceMode: boolean;

@@ -12,7 +12,7 @@ import type {
   Stage
 } from '../types';
 import { localeNames, schoolYearLabel, tr } from '../i18n';
-import { sameClassGroup, secondaryStreamLabel } from '../education';
+import { sameClassGroup, secondaryStreamLabel, uniqueStrings } from '../education';
 import { getSchool, makeId } from '../data';
 import { ResponsiveTable } from '../ui';
 
@@ -703,7 +703,8 @@ function DirectorScheduleManager({ data, setData, currentUser, language }: Commo
 
     setData((previous) => ({
       ...previous,
-      absenceSchedules: previous.absenceSchedules.filter((schedule) => schedule.id !== scheduleId)
+      absenceSchedules: previous.absenceSchedules.filter((schedule) => schedule.id !== scheduleId),
+      deletedScheduleIds: uniqueStrings([...previous.deletedScheduleIds, scheduleId])
     }));
 
     if (editingId === scheduleId) {

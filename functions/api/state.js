@@ -37,6 +37,7 @@ const seedData = {
   deletedSchoolIds: [],
   deletedExerciseIds: [],
   deletedNoteIds: [],
+  deletedScheduleIds: [],
   settings: {
     allowExerciseImages: true,
     maintenanceMode: false
@@ -139,8 +140,20 @@ function applyDeletedNoteTombstones(data) {
   };
 }
 
+function applyDeletedScheduleTombstones(data) {
+  const deletedScheduleIds = new Set(data.deletedScheduleIds ?? []);
+  if (deletedScheduleIds.size === 0) {
+    return data;
+  }
+
+  return {
+    ...data,
+    absenceSchedules: data.absenceSchedules.filter((schedule) => !deletedScheduleIds.has(schedule.id))
+  };
+}
+
 function applyDeletionTombstones(data) {
-  return applyDeletedNoteTombstones(applyDeletedExerciseTombstones(applyDeletedSchoolTombstones(data)));
+  return applyDeletedScheduleTombstones(applyDeletedNoteTombstones(applyDeletedExerciseTombstones(applyDeletedSchoolTombstones(data))));
 }
 
 function jsonResponse(body, init = {}) {
@@ -183,6 +196,7 @@ function normalizeState(value) {
     deletedSchoolIds: Array.isArray(value.deletedSchoolIds) ? uniqueStrings(value.deletedSchoolIds) : [],
     deletedExerciseIds: Array.isArray(value.deletedExerciseIds) ? uniqueStrings(value.deletedExerciseIds) : [],
     deletedNoteIds: Array.isArray(value.deletedNoteIds) ? uniqueStrings(value.deletedNoteIds) : [],
+    deletedScheduleIds: Array.isArray(value.deletedScheduleIds) ? uniqueStrings(value.deletedScheduleIds) : [],
     settings: {
       ...seedData.settings,
       ...(value.settings ?? {})
@@ -373,7 +387,8 @@ function mergeState(existingData, incomingData) {
     pushTokens: mergePushTokens(existingData.pushTokens, incomingData.pushTokens),
     deletedSchoolIds: uniqueStrings([...(existingData.deletedSchoolIds ?? []), ...(incomingData.deletedSchoolIds ?? [])]),
     deletedExerciseIds: uniqueStrings([...(existingData.deletedExerciseIds ?? []), ...(incomingData.deletedExerciseIds ?? [])]),
-    deletedNoteIds: uniqueStrings([...(existingData.deletedNoteIds ?? []), ...(incomingData.deletedNoteIds ?? [])])
+    deletedNoteIds: uniqueStrings([...(existingData.deletedNoteIds ?? []), ...(incomingData.deletedNoteIds ?? [])]),
+    deletedScheduleIds: uniqueStrings([...(existingData.deletedScheduleIds ?? []), ...(incomingData.deletedScheduleIds ?? [])])
   });
 }
 

@@ -26,6 +26,7 @@ const seedData: PlatformData = {
   deletedSchoolIds: [],
   deletedExerciseIds: [],
   deletedNoteIds: [],
+  deletedScheduleIds: [],
   settings: {
     allowExerciseImages: true,
     maintenanceMode: false
@@ -48,6 +49,7 @@ export function isSeedOnlyData(data: PlatformData) {
     data.deletedSchoolIds.length === 0 &&
     data.deletedExerciseIds.length === 0 &&
     data.deletedNoteIds.length === 0 &&
+    data.deletedScheduleIds.length === 0 &&
     Object.keys(data.completions).length === 0 &&
     Object.keys(data.completionDates).length === 0 &&
     Object.keys(data.feedback).length === 0 &&

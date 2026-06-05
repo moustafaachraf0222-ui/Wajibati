@@ -67,6 +67,9 @@ function normalizeAbsenceSchedules(schedules: AbsenceSchedule[]) {
 export function normalizePlatformData(value: Partial<PlatformData> | null | undefined): PlatformData {
   const fallback = cloneSeedData();
   const source = value ?? {};
+  const deletedScheduleIds = Array.isArray(source.deletedScheduleIds)
+    ? uniqueStrings(source.deletedScheduleIds.filter((id): id is string => typeof id === 'string'))
+    : fallback.deletedScheduleIds;
 
   const normalized = {
     ...fallback,
@@ -87,7 +90,9 @@ export function normalizePlatformData(value: Partial<PlatformData> | null | unde
     completionDates:
       source.completionDates && typeof source.completionDates === 'object' ? source.completionDates : fallback.completionDates,
     feedback: source.feedback && typeof source.feedback === 'object' ? source.feedback : fallback.feedback,
-    absenceSchedules: Array.isArray(source.absenceSchedules) ? normalizeAbsenceSchedules(source.absenceSchedules) : fallback.absenceSchedules,
+    absenceSchedules: Array.isArray(source.absenceSchedules)
+      ? normalizeAbsenceSchedules(source.absenceSchedules.filter((schedule) => !deletedScheduleIds.includes(schedule.id)))
+      : fallback.absenceSchedules,
     absenceRecords: Array.isArray(source.absenceRecords) ? source.absenceRecords : fallback.absenceRecords,
     absenceReports: Array.isArray(source.absenceReports) ? source.absenceReports : fallback.absenceReports,
     pushTokens: source.pushTokens && typeof source.pushTokens === 'object' ? source.pushTokens : fallback.pushTokens,
@@ -100,6 +105,7 @@ export function normalizePlatformData(value: Partial<PlatformData> | null | unde
     deletedNoteIds: Array.isArray(source.deletedNoteIds)
       ? uniqueStrings(source.deletedNoteIds.filter((id): id is string => typeof id === 'string'))
       : fallback.deletedNoteIds,
+    deletedScheduleIds,
     settings: {
       ...fallback.settings,
       ...(source.settings ?? {})

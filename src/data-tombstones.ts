@@ -28,6 +28,7 @@ export function deleteUserRecords(previous: PlatformData, target: PlatformUser):
   const removedExerciseIds =
     target.role === 'teacher' ? previous.exercises.filter((exercise) => exercise.teacherId === target.id).map((exercise) => exercise.id) : [];
   const removedNoteIds = target.role === 'teacher' ? previous.notes.filter((note) => note.teacherId === target.id).map((note) => note.id) : [];
+  const removedScheduleIds = previous.absenceSchedules.filter((schedule) => schedule.createdBy === target.id).map((schedule) => schedule.id);
 
   return {
     ...previous,
@@ -62,7 +63,8 @@ export function deleteUserRecords(previous: PlatformData, target: PlatformUser):
     ),
     pushTokens: Object.fromEntries(Object.entries(previous.pushTokens).filter(([userId]) => userId !== target.id)),
     deletedExerciseIds: uniqueStrings([...previous.deletedExerciseIds, ...removedExerciseIds]),
-    deletedNoteIds: uniqueStrings([...previous.deletedNoteIds, ...removedNoteIds])
+    deletedNoteIds: uniqueStrings([...previous.deletedNoteIds, ...removedNoteIds]),
+    deletedScheduleIds: uniqueStrings([...previous.deletedScheduleIds, ...removedScheduleIds])
   };
 }
 
@@ -150,8 +152,20 @@ export function applyDeletedNoteTombstones(data: PlatformData): PlatformData {
   };
 }
 
+export function applyDeletedScheduleTombstones(data: PlatformData): PlatformData {
+  const deletedScheduleIds = new Set(data.deletedScheduleIds);
+  if (deletedScheduleIds.size === 0) {
+    return data;
+  }
+
+  return {
+    ...data,
+    absenceSchedules: data.absenceSchedules.filter((schedule) => !deletedScheduleIds.has(schedule.id))
+  };
+}
+
 export function applyDeletionTombstones(data: PlatformData): PlatformData {
-  return applyDeletedNoteTombstones(applyDeletedExerciseTombstones(applyDeletedSchoolTombstones(data)));
+  return applyDeletedScheduleTombstones(applyDeletedNoteTombstones(applyDeletedExerciseTombstones(applyDeletedSchoolTombstones(data))));
 }
 
 export function deleteSchoolRecords(previous: PlatformData, target: SchoolRecord): PlatformData {

@@ -103,7 +103,8 @@ export function mergeDeletionTombstones(baseData: PlatformData, sourceData: Plat
     studentActivations: mergeStudentActivations(baseData, sourceData),
     deletedSchoolIds: uniqueStrings([...baseData.deletedSchoolIds, ...sourceData.deletedSchoolIds]),
     deletedExerciseIds: uniqueStrings([...baseData.deletedExerciseIds, ...sourceData.deletedExerciseIds]),
-    deletedNoteIds: uniqueStrings([...baseData.deletedNoteIds, ...sourceData.deletedNoteIds])
+    deletedNoteIds: uniqueStrings([...baseData.deletedNoteIds, ...sourceData.deletedNoteIds]),
+    deletedScheduleIds: uniqueStrings([...baseData.deletedScheduleIds, ...sourceData.deletedScheduleIds])
   });
 }
 
@@ -121,6 +122,7 @@ export function hasUserData(data: PlatformData) {
     data.deletedSchoolIds.length > 0 ||
     data.deletedExerciseIds.length > 0 ||
     data.deletedNoteIds.length > 0 ||
+    data.deletedScheduleIds.length > 0 ||
     Object.keys(data.completions).length > 0 ||
     Object.keys(data.completionDates).length > 0 ||
     Object.keys(data.feedback).length > 0
@@ -138,7 +140,8 @@ export async function promoteLocalDataIfRemoteIsEmpty(sharedData: PlatformData, 
     JSON.stringify(mergedData.studentActivations) !== JSON.stringify(sharedData.studentActivations) ||
     mergedData.deletedSchoolIds.length !== sharedData.deletedSchoolIds.length ||
     mergedData.deletedExerciseIds.length !== sharedData.deletedExerciseIds.length ||
-    mergedData.deletedNoteIds.length !== sharedData.deletedNoteIds.length
+    mergedData.deletedNoteIds.length !== sharedData.deletedNoteIds.length ||
+    mergedData.deletedScheduleIds.length !== sharedData.deletedScheduleIds.length
   ) {
     await saveSharedData(mergedData);
     return mergedData;
