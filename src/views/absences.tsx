@@ -66,8 +66,24 @@ const weekdayNames: Record<Language, string[]> = {
   en: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 };
 
+function localDateIso(date: Date) {
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
 function todayIso() {
-  return new Date().toISOString().slice(0, 10);
+  return localDateIso(new Date());
+}
+
+function addDaysIso(date: string, days: number) {
+  const parsed = new Date(`${date}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) {
+    return todayIso();
+  }
+
+  parsed.setDate(parsed.getDate() + days);
+  return localDateIso(parsed);
 }
 
 const fallbackSessions = [
@@ -165,6 +181,17 @@ function scheduleAppliesToDate(schedule: AbsenceSchedule, date: string) {
   const weekday = weekdayForDate(date);
   const weekdays = schedule.weekdays?.length ? schedule.weekdays : DEFAULT_SCHOOL_WEEKDAYS;
   return weekday === undefined || weekdays.includes(weekday);
+}
+
+function closestScheduleDate(date: string, schedules: AbsenceSchedule[]) {
+  for (let offset = 0; offset <= 14; offset += 1) {
+    const candidate = addDaysIso(date, offset);
+    if (schedules.some((schedule) => scheduleAppliesToDate(schedule, candidate))) {
+      return candidate;
+    }
+  }
+
+  return date;
 }
 
 function sessionTimeLabel(choice: AbsenceSessionChoice) {
@@ -1047,14 +1074,25 @@ function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: Co
     }),
     [currentUser.schoolId, currentUser.stage, language, selectedClass]
   );
+  const classSchedules = useMemo(
+    () => (selectedClass ? [...schedules].filter((schedule) => scheduleAppliesToClass(schedule, selectedClass)).sort(compareSchedulesForClass(selectedClass)) : []),
+    [schedules, selectedClass]
+  );
+
+  useEffect(() => {
+    if (classSchedules.length === 0 || classSchedules.some((schedule) => scheduleAppliesToDate(schedule, selectedDate))) {
+      return;
+    }
+
+    const nextDate = closestScheduleDate(selectedDate, classSchedules);
+    if (nextDate !== selectedDate) {
+      setSelectedDate(nextDate);
+    }
+  }, [classSchedules, selectedDate]);
+
   const effectiveSchedule = useMemo(
-    () =>
-      selectedClass
-        ? [...schedules]
-            .filter((schedule) => scheduleAppliesToClass(schedule, selectedClass) && scheduleAppliesToDate(schedule, selectedDate))
-            .sort(compareSchedulesForClass(selectedClass))[0]
-        : undefined,
-    [schedules, selectedClass, selectedDate]
+    () => classSchedules.filter((schedule) => scheduleAppliesToDate(schedule, selectedDate))[0],
+    [classSchedules, selectedDate]
   );
   const sessionSchedules = useMemo(
     () => (effectiveSchedule ? [effectiveSchedule] : schedules.length === 0 && selectedClass ? [fallbackSchedule] : []),
@@ -1384,7 +1422,9 @@ function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: Co
               </div>
             </article>
           ))}
-          {selectedClass && sessionSchedules.length === 0 && <p className="empty-state">{tr(language, 'noScheduleForClassDay')}</p>}
+          {selectedClass && sessionSchedules.length === 0 && (
+            <p className="empty-state">{tr(language, classSchedules.length > 0 ? 'scheduleNotActiveOnDate' : 'noScheduleForClassDay')}</p>
+          )}
         </div>
         <div className="absence-flow-summary">
           <span>{tr(language, 'draftAbsenceCount')}: {draftAbsenceCount}</span>
