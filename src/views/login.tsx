@@ -1,7 +1,18 @@
 import { Info, KeyRound, Moon, ShieldCheck, Sun, Users, X } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
-import type { DataSetter, Language, PlatformData, PlatformUser, RememberedAccount, SchoolRecord, StudentActivationRecord, SyncStatus, Theme } from '../types';
-import { tr } from '../i18n';
+import type {
+  DataSetter,
+  Language,
+  PlatformData,
+  PlatformUser,
+  RememberedAccount,
+  SchoolRecord,
+  SecondaryStream,
+  StudentActivationRecord,
+  SyncStatus,
+  Theme
+} from '../types';
+import { schoolYearNames, tr } from '../i18n';
 import {
   canAuthenticateUser,
   forgetStoredAccount,
@@ -13,6 +24,7 @@ import {
   rememberStoredAccount,
   rememberedAccountListsEqual
 } from '../data';
+import { defaultClassGroups, normalizeClassGroup, secondaryStreamLabel, secondaryStreamsForYear } from '../education';
 import { AppInfoDialog, LanguageMenu, SyncIndicator } from '../ui';
 
 type LoginProps = {
@@ -30,7 +42,11 @@ type LoginProps = {
 const initialStudentActivationForm = {
   name: '',
   domain: '',
-  code: ''
+  code: '',
+  schoolYear: 1,
+  stream: '' as SecondaryStream | '',
+  classChoice: '1',
+  customClassGroup: ''
 };
 
 function findSchoolByDomain(data: PlatformData, domain: string): SchoolRecord | undefined {
@@ -86,11 +102,33 @@ export function LoginPage({ data, setData, language, theme, onLanguageChange, on
   const visibleRememberedAccounts = rememberedAccounts
     .map((remembered) => data.users.find((user) => user.id === remembered.id || user.email.toLowerCase() === remembered.email.toLowerCase()))
     .filter((user): user is PlatformUser => Boolean(user && canAuthenticateUser(data, user)));
+  const activationSchool = findSchoolByDomain(data, studentSignupForm.domain);
+  const activationStreamOptions = secondaryStreamsForYear(activationSchool, studentSignupForm.schoolYear);
 
   useEffect(() => {
     const next = pruneRememberedAccounts(data.users);
     setRememberedAccounts((previous) => (rememberedAccountListsEqual(previous, next) ? previous : next));
   }, [data]);
+
+  useEffect(() => {
+    if (!activationSchool) {
+      return;
+    }
+
+    setStudentSignupForm((previous) => {
+      const yearCount = schoolYearNames[language][activationSchool.stage].length;
+      const schoolYear = previous.schoolYear >= 1 && previous.schoolYear <= yearCount ? previous.schoolYear : 1;
+      const streamOptions = secondaryStreamsForYear(activationSchool, schoolYear);
+      const stream =
+        activationSchool.stage === 'secondary'
+          ? streamOptions.includes(previous.stream as SecondaryStream)
+            ? previous.stream
+            : streamOptions[0] ?? ''
+          : '';
+
+      return schoolYear === previous.schoolYear && stream === previous.stream ? previous : { ...previous, schoolYear, stream };
+    });
+  }, [activationSchool, language]);
 
   const rememberAccount = (account: PlatformUser) => {
     const next = rememberStoredAccount(account);
@@ -200,6 +238,24 @@ export function LoginPage({ data, setData, language, theme, onLanguageChange, on
       return;
     }
 
+    const classGroup =
+      studentSignupForm.classChoice === 'custom' ? normalizeClassGroup(studentSignupForm.customClassGroup) : studentSignupForm.classChoice;
+    if (!classGroup.trim()) {
+      setStudentSignupError(tr(language, 'classRequired'));
+      return;
+    }
+
+    const streamOptions = secondaryStreamsForYear(school, studentSignupForm.schoolYear);
+    if (school.stage === 'secondary' && streamOptions.length === 0) {
+      setStudentSignupError(tr(language, 'noStreamsEnabled'));
+      return;
+    }
+
+    if (school.stage === 'secondary' && (!studentSignupForm.stream || !streamOptions.includes(studentSignupForm.stream))) {
+      setStudentSignupError(tr(language, 'streamRequired'));
+      return;
+    }
+
     const activatedAccount: PlatformUser = {
       id: makeId('student'),
       name: activationRecord.name,
@@ -208,10 +264,10 @@ export function LoginPage({ data, setData, language, theme, onLanguageChange, on
       role: 'student',
       status: 'active',
       schoolId: school.id,
-      stage: activationRecord.stage,
-      schoolYear: activationRecord.schoolYear,
-      classGroup: activationRecord.classGroup,
-      stream: activationRecord.stream,
+      stage: school.stage,
+      schoolYear: studentSignupForm.schoolYear,
+      classGroup: classGroup.trim(),
+      stream: school.stage === 'secondary' && studentSignupForm.stream ? studentSignupForm.stream : undefined,
       createdBy: 'student-activation'
     };
 
@@ -225,7 +281,14 @@ export function LoginPage({ data, setData, language, theme, onLanguageChange, on
       users: previous.users.some((user) => user.id === activatedAccount.id) ? previous.users : [...previous.users, activatedAccount],
       studentActivations: previous.studentActivations.map((activation) =>
         activation.id === activationRecord.id
-          ? { ...activation, activatedUserId: activatedAccount.id, activatedAt: new Date().toISOString() }
+          ? {
+              ...activation,
+              schoolYear: activatedAccount.schoolYear,
+              classGroup: activatedAccount.classGroup,
+              stream: activatedAccount.stream,
+              activatedUserId: activatedAccount.id,
+              activatedAt: new Date().toISOString()
+            }
           : activation
       )
     }));
@@ -364,6 +427,71 @@ export function LoginPage({ data, setData, language, theme, onLanguageChange, on
                     required
                   />
                 </label>
+                {activationSchool && (
+                  <>
+                    <label>
+                      <span>{tr(language, 'schoolYear')}</span>
+                      <select
+                        value={studentSignupForm.schoolYear}
+                        onChange={(event) => {
+                          const schoolYear = Number(event.target.value);
+                          const streamsForYear = secondaryStreamsForYear(activationSchool, schoolYear);
+                          const stream =
+                            activationSchool.stage === 'secondary'
+                              ? streamsForYear.includes(studentSignupForm.stream as SecondaryStream)
+                                ? studentSignupForm.stream
+                                : streamsForYear[0] ?? ''
+                              : '';
+                          setStudentSignupForm({ ...studentSignupForm, schoolYear, stream });
+                        }}
+                      >
+                        {schoolYearNames[language][activationSchool.stage].map((label, index) => (
+                          <option value={index + 1} key={label}>
+                            {label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    {activationSchool.stage === 'secondary' && (
+                      <label>
+                        <span>{tr(language, 'stream')}</span>
+                        <select
+                          value={studentSignupForm.stream}
+                          disabled={activationStreamOptions.length === 0}
+                          onChange={(event) => setStudentSignupForm({ ...studentSignupForm, stream: event.target.value as SecondaryStream | '' })}
+                        >
+                          <option value="">{activationStreamOptions.length === 0 ? tr(language, 'noStreamsEnabled') : tr(language, 'stream')}</option>
+                          {activationStreamOptions.map((stream) => (
+                            <option value={stream} key={stream}>
+                              {secondaryStreamLabel(language, stream, studentSignupForm.schoolYear)}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    )}
+                    <label>
+                      <span>{tr(language, 'classGroup')}</span>
+                      <select value={studentSignupForm.classChoice} onChange={(event) => setStudentSignupForm({ ...studentSignupForm, classChoice: event.target.value })}>
+                        {defaultClassGroups.map((classGroup) => (
+                          <option value={classGroup} key={classGroup}>
+                            {classGroup}
+                          </option>
+                        ))}
+                        <option value="custom">{tr(language, 'customClass')}</option>
+                      </select>
+                    </label>
+                    {studentSignupForm.classChoice === 'custom' && (
+                      <label>
+                        <span>{tr(language, 'customClass')}</span>
+                        <input
+                          value={studentSignupForm.customClassGroup}
+                          onChange={(event) => setStudentSignupForm({ ...studentSignupForm, customClassGroup: event.target.value })}
+                          required
+                        />
+                      </label>
+                    )}
+                  </>
+                )}
                 {!studentSignupSuccess && <p className="hint full">{tr(language, 'validSchoolDomainHint')}</p>}
 
                 {studentSignupSuccess && (
@@ -377,7 +505,13 @@ export function LoginPage({ data, setData, language, theme, onLanguageChange, on
                 <button
                   className="button primary form-submit"
                   type="submit"
-                  disabled={isCreatingStudent || !studentSignupForm.name.trim() || !studentSignupForm.domain.trim() || !studentSignupForm.code.trim()}
+                  disabled={
+                    isCreatingStudent ||
+                    !activationSchool ||
+                    !studentSignupForm.name.trim() ||
+                    !studentSignupForm.domain.trim() ||
+                    !studentSignupForm.code.trim()
+                  }
                 >
                   <KeyRound size={17} aria-hidden="true" />
                   <span>{tr(language, 'activateAccount')}</span>

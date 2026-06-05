@@ -117,7 +117,7 @@ function printActivationTable(language: Language, title: string, school: SchoolR
           <td>${escapeHtml(activation.name)}</td>
           <td>${escapeHtml(schoolYearLabel(language, activation.stage, activation.schoolYear))}</td>
           <td>${activation.stream ? escapeHtml(secondaryStreamLabel(language, activation.stream, activation.schoolYear)) : '-'}</td>
-          <td>${escapeHtml(activation.classGroup)}</td>
+          <td>${escapeHtml(activation.classGroup ?? '-')}</td>
           <td dir="ltr">${escapeHtml(activation.code)}</td>
           <td>${escapeHtml(tr(language, activation.activatedUserId ? 'activated' : 'pendingActivation'))}</td>
         </tr>`
@@ -261,7 +261,7 @@ function StudentActivationDatabaseCard({
             <td>{activation.name}</td>
             <td>{schoolYearLabel(language, activation.stage, activation.schoolYear)}</td>
             <td>{activation.stream ? secondaryStreamLabel(language, activation.stream, activation.schoolYear) : '-'}</td>
-            <td>{activation.classGroup}</td>
+            <td>{activation.classGroup ?? '-'}</td>
             <td dir="ltr">{activation.code}</td>
             <td>
               <span className={activation.activatedUserId ? 'status active' : 'status disabled'}>

@@ -102,8 +102,8 @@ export type StudentActivationRecord = {
   code: string;
   schoolId: string;
   stage: Stage;
-  schoolYear: number;
-  classGroup: string;
+  schoolYear?: number;
+  classGroup?: string;
   stream?: SecondaryStream;
   createdBy: string;
   createdAt: string;
