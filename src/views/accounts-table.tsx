@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import type { Language, PlatformData, PlatformUser, Role } from '../types';
-import { schoolYearLabel, statusNames, subjectNames, tr } from '../i18n';
+import { schoolYearLabel, statusNames, tr } from '../i18n';
 import { assignmentSummaryLabel, hasAccountDetails, secondaryStreamLabel, teacherSubjectsLabel } from '../education';
 import { canDeleteUser, canEditUser, canToggleUser, getSchool } from '../data';
 import { AccountAssignmentDetails, ResponsiveTable, RoleLabel } from '../ui';
@@ -40,7 +40,10 @@ export function UsersTable({
 }) {
   const [expandedUsers, setExpandedUsers] = useState<Record<string, boolean>>({});
   const [pendingDeleteUser, setPendingDeleteUser] = useState<PlatformUser | null>(null);
+  const subjectColumnIsVisible = (tableUsers: PlatformUser[]) => tableUsers.some((user) => user.role === 'teacher' || user.role === 'student');
+
   const columnsForUsers = (tableUsers: PlatformUser[]) => {
+    const showSubjectColumn = subjectColumnIsVisible(tableUsers);
     const hasStudents = tableUsers.some((user) => user.role === 'student');
     const hasNonStudents = tableUsers.some((user) => user.role !== 'student');
     const subjectColumn = hasStudents && !hasNonStudents
@@ -54,7 +57,7 @@ export function UsersTable({
       tr(language, 'email'),
       tr(language, 'role'),
       tr(language, 'school'),
-      subjectColumn,
+      ...(showSubjectColumn ? [subjectColumn] : []),
       tr(language, 'status'),
       tr(language, 'assignments'),
       tr(language, 'actions')
@@ -66,10 +69,10 @@ export function UsersTable({
       return user.guardianPhone?.trim() || '-';
     }
 
-    return user.role === 'teacher' ? teacherSubjectsLabel(language, user) : user.subject ? subjectNames[language][user.subject] : '-';
+    return user.role === 'teacher' ? teacherSubjectsLabel(language, user) : '-';
   };
 
-  const rowsForUsers = (tableUsers: PlatformUser[], tableColumns: string[]) =>
+  const rowsForUsers = (tableUsers: PlatformUser[], tableColumns: string[], showSubjectColumn: boolean) =>
     tableUsers.flatMap((user) => {
       const school = getSchool(data, user);
       const detailsOpen = Boolean(expandedUsers[user.id]);
@@ -82,7 +85,7 @@ export function UsersTable({
             <RoleLabel role={user.role} language={language} />
           </td>
           <td>{school?.name ?? '-'}</td>
-          <td>{subjectCellForUser(user)}</td>
+          {showSubjectColumn && <td>{subjectCellForUser(user)}</td>}
           <td>
             <span className={`status ${user.status}`}>{statusNames[language][user.status]}</span>
           </td>
@@ -147,10 +150,11 @@ export function UsersTable({
 
   const renderTable = (tableUsers: PlatformUser[]) => {
     const tableColumns = columnsForUsers(tableUsers);
+    const showSubjectColumn = subjectColumnIsVisible(tableUsers);
 
     return (
       <ResponsiveTable columns={tableColumns} emptyText={tr(language, 'noRecords')}>
-        {rowsForUsers(tableUsers, tableColumns)}
+        {rowsForUsers(tableUsers, tableColumns, showSubjectColumn)}
       </ResponsiveTable>
     );
   };
