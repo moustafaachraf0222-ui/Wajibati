@@ -23,6 +23,7 @@ const seedData = {
       status: 'active'
     }
   ],
+  studentActivations: [],
   exercises: [],
   announcements: [],
   notes: [],
@@ -67,6 +68,7 @@ function applyDeletedSchoolTombstones(data) {
     ...data,
     schools: data.schools.filter((school) => !deletedSchoolIds.has(school.id)),
     users: data.users.filter((user) => !user.schoolId || !deletedSchoolIds.has(user.schoolId)),
+    studentActivations: data.studentActivations.filter((activation) => !deletedSchoolIds.has(activation.schoolId)),
     exercises: data.exercises.filter((exercise) => !deletedSchoolIds.has(exercise.schoolId)),
     announcements: data.announcements.filter((announcement) => !deletedSchoolIds.has(announcement.schoolId)),
     notes: data.notes.filter((note) => !deletedSchoolIds.has(note.schoolId)),
@@ -167,6 +169,7 @@ function normalizeState(value) {
         )
       : [],
     users: Array.isArray(value.users) ? value.users : seedData.users,
+    studentActivations: Array.isArray(value.studentActivations) ? value.studentActivations : [],
     exercises: Array.isArray(value.exercises) ? value.exercises : [],
     announcements: Array.isArray(value.announcements) ? value.announcements : [],
     notes: Array.isArray(value.notes) ? value.notes : [],
@@ -289,6 +292,38 @@ function chooseCompletionDate(existingDate, incomingDate) {
   return String(incomingDate ?? '') > String(existingDate ?? '') ? incomingDate : existingDate;
 }
 
+function activationTimestamp(value) {
+  if (!value) {
+    return 0;
+  }
+
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function mergeStudentActivations(existingActivations = [], incomingActivations = []) {
+  const merged = new Map();
+
+  existingActivations.forEach((activation) => {
+    if (activation?.id) {
+      merged.set(activation.id, activation);
+    }
+  });
+
+  incomingActivations.forEach((activation) => {
+    if (!activation?.id) {
+      return;
+    }
+
+    const existingActivation = merged.get(activation.id);
+    if (!existingActivation || activationTimestamp(activation.activatedAt) >= activationTimestamp(existingActivation.activatedAt)) {
+      merged.set(activation.id, { ...existingActivation, ...activation });
+    }
+  });
+
+  return [...merged.values()];
+}
+
 function mergePushTokens(existingTokens = {}, incomingTokens = {}) {
   const userIds = uniqueStrings([...Object.keys(existingTokens), ...Object.keys(incomingTokens)]);
 
@@ -325,6 +360,7 @@ function mergeState(existingData, incomingData) {
     },
     schools: mergeRecordsById(existingData.schools, incomingData.schools),
     users: mergeRecordsById(existingData.users, incomingData.users),
+    studentActivations: mergeStudentActivations(existingData.studentActivations, incomingData.studentActivations),
     exercises: mergeRecordsById(existingData.exercises, incomingData.exercises, chooseLatestRecord),
     announcements: mergeRecordsById(existingData.announcements, incomingData.announcements),
     notes: mergeRecordsById(existingData.notes, incomingData.notes),
@@ -440,16 +476,15 @@ function targetUsersForAnnouncement(data, announcement) {
   );
 }
 
-function tokensForUsers(data, users) {
+function tokensForUser(data, user) {
   const tokenSet = new Set();
-  users.forEach((user) => {
-    const records = data.pushTokens[user.id] ?? [];
-    records.forEach((record) => {
-      if (record?.token) {
-        tokenSet.add(record.token);
-      }
-    });
+  const records = data.pushTokens[user.id] ?? [];
+  records.forEach((record) => {
+    if (record?.token) {
+      tokenSet.add(record.token);
+    }
   });
+
   return [...tokenSet];
 }
 
@@ -528,35 +563,89 @@ async function firebaseAccessToken(serviceAccount) {
   return payload.access_token;
 }
 
-async function sendFirebaseNotification(env, tokens, notification, data = {}) {
+async function createFirebaseNotificationSender(env) {
   const serviceAccount = firebaseServiceAccount(env);
-  if (!serviceAccount || tokens.length === 0) {
-    return;
+  if (!serviceAccount) {
+    return null;
   }
 
   const accessToken = await firebaseAccessToken(serviceAccount);
   const endpoint = `https://fcm.googleapis.com/v1/projects/${serviceAccount.project_id}/messages:send`;
-  await Promise.allSettled(
-    tokens.map((token) =>
-      fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          message: {
-            token,
-            notification,
-            data: Object.fromEntries(Object.entries(data).map(([key, value]) => [key, String(value)])),
-            android: {
-              priority: 'HIGH'
+
+  return async function sendNotification(tokens, notification, data = {}) {
+    if (tokens.length === 0) {
+      return;
+    }
+
+    await Promise.allSettled(
+      tokens.map((token) =>
+        fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            message: {
+              token,
+              notification,
+              data: Object.fromEntries(Object.entries(data).map(([key, value]) => [key, String(value)])),
+              android: {
+                priority: 'HIGH'
+              }
             }
-          }
+          })
         })
-      })
-    )
+      )
+    );
+  };
+}
+
+async function sendFirebaseNotification(env, tokens, notification, data = {}) {
+  const sendNotification = await createFirebaseNotificationSender(env);
+  if (!sendNotification) {
+    return;
+  }
+
+  await sendNotification(tokens, notification, data);
+}
+
+function cleanText(value, fallback = '') {
+  const text = String(value ?? '').trim();
+  return text || fallback;
+}
+
+function userDisplayName(user) {
+  return cleanText(user?.name, 'التلميذ');
+}
+
+function messageForStudent(user, message) {
+  return `${userDisplayName(user)}، ${message}`;
+}
+
+function personalizedNotification(user, notification) {
+  if (user.role !== 'student') {
+    return notification;
+  }
+
+  return {
+    ...notification,
+    body: messageForStudent(user, notification.body)
+  };
+}
+
+function targetUsersForAbsenceReport(data, report) {
+  const absentStudentIds = new Set(
+    data.absenceRecords
+      .filter((record) => record.reportId === report.id && record.sentAt && !record.deletedAt)
+      .map((record) => record.studentId)
   );
+
+  return data.users.filter((user) => user.role === 'student' && user.status === 'active' && absentStudentIds.has(user.id));
+}
+
+function absenceDetailsForStudent(data, report, user) {
+  return data.absenceRecords.find((record) => record.reportId === report.id && record.studentId === user.id && record.sentAt && !record.deletedAt);
 }
 
 async function sendNotificationsForChanges(env, previousData, nextData) {
@@ -566,10 +655,10 @@ async function sendNotificationsForChanges(env, previousData, nextData) {
     const subjectName = subjectNames[exercise.subject] ?? 'مادة';
     notifications.push({
       users: targetUsersForExercise(nextData, exercise),
-      notification: {
+      notification: (user) => ({
         title: `تمرين ${subjectName} جديد`,
-        body: exercise.title || 'تم نشر تمرين جديد لك.'
-      },
+        body: messageForStudent(user, `عندك تمرين ${subjectName}: ${cleanText(exercise.title, 'تم نشر تمرين جديد لك.')}`)
+      }),
       data: { type: 'exercise', id: exercise.id }
     });
   });
@@ -578,10 +667,10 @@ async function sendNotificationsForChanges(env, previousData, nextData) {
     const subjectName = note.subject ? subjectNames[note.subject] : '';
     notifications.push({
       users: targetUsersForNote(nextData, note),
-      notification: {
+      notification: (user) => ({
         title: subjectName ? `ملاحظة ${subjectName} جديدة` : 'ملاحظة جديدة',
-        body: note.title || 'تم نشر ملاحظة جديدة لك.'
-      },
+        body: messageForStudent(user, `عندك ملاحظة${subjectName ? ` ${subjectName}` : ''}: ${cleanText(note.title, 'تم نشر ملاحظة جديدة لك.')}`)
+      }),
       data: { type: 'note', id: note.id }
     });
   });
@@ -589,16 +678,46 @@ async function sendNotificationsForChanges(env, previousData, nextData) {
   createdRecords(previousData.announcements, nextData.announcements).forEach((announcement) => {
     notifications.push({
       users: targetUsersForAnnouncement(nextData, announcement),
-      notification: {
+      notification: (user) =>
+        personalizedNotification(user, {
         title: 'إعلان مدرسي',
-        body: announcement.title || 'تم نشر إعلان جديد.'
-      },
+          body: `عندك إعلان مدرسي: ${cleanText(announcement.title, 'تم نشر إعلان جديد.')}`
+        }),
       data: { type: 'announcement', id: announcement.id }
     });
   });
 
+  createdRecords(previousData.absenceReports, nextData.absenceReports).forEach((report) => {
+    notifications.push({
+      users: targetUsersForAbsenceReport(nextData, report),
+      notification: (user) => {
+        const absenceRecord = absenceDetailsForStudent(nextData, report, user);
+        const sessionName = cleanText(absenceRecord?.sessionName ?? report.sessionName, 'الحصة');
+        const date = cleanText(report.date, 'اليوم');
+
+        return {
+          title: 'إشعار غياب',
+          body: messageForStudent(user, `تم تسجيل غيابك في ${sessionName} بتاريخ ${date}.`)
+        };
+      },
+      data: { type: 'absence', id: report.id, date: report.date, sessionId: report.sessionId }
+    });
+  });
+
+  const sendNotification = await createFirebaseNotificationSender(env);
+  if (!sendNotification) {
+    return;
+  }
+
   await Promise.allSettled(
-    notifications.map((item) => sendFirebaseNotification(env, tokensForUsers(nextData, item.users), item.notification, item.data))
+    notifications.flatMap((item) =>
+      item.users.map((user) =>
+        sendNotification(tokensForUser(nextData, user), typeof item.notification === 'function' ? item.notification(user) : personalizedNotification(user, item.notification), {
+          ...item.data,
+          userId: user.id
+        })
+      )
+    )
   );
 }
 
