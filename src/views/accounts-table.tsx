@@ -10,8 +10,8 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import type { Language, PlatformData, PlatformUser, Role } from '../types';
-import { statusNames, subjectNames, tr } from '../i18n';
-import { assignmentSummaryLabel, hasAccountDetails, teacherSubjectsLabel } from '../education';
+import { schoolYearLabel, statusNames, subjectNames, tr } from '../i18n';
+import { assignmentSummaryLabel, hasAccountDetails, secondaryStreamLabel, teacherSubjectsLabel } from '../education';
 import { canDeleteUser, canEditUser, canToggleUser, getSchool } from '../data';
 import { AccountAssignmentDetails, ResponsiveTable, RoleLabel } from '../ui';
 
@@ -24,7 +24,8 @@ export function UsersTable({
   onToggle,
   onDelete,
   onEdit,
-  groupByRole = false
+  groupByRole = false,
+  groupStudentsByClass = false
 }: {
   title: string;
   data: PlatformData;
@@ -35,6 +36,7 @@ export function UsersTable({
   onDelete: (user: PlatformUser) => void;
   onEdit?: (user: PlatformUser) => void;
   groupByRole?: boolean;
+  groupStudentsByClass?: boolean;
 }) {
   const [expandedUsers, setExpandedUsers] = useState<Record<string, boolean>>({});
   const [pendingDeleteUser, setPendingDeleteUser] = useState<PlatformUser | null>(null);
@@ -130,6 +132,52 @@ export function UsersTable({
       {rowsForUsers(tableUsers)}
     </ResponsiveTable>
   );
+
+  const compareStudentsByClass = (left: PlatformUser, right: PlatformUser) =>
+    (left.schoolYear ?? 999) - (right.schoolYear ?? 999) ||
+    (left.stream ?? '').localeCompare(right.stream ?? '', undefined, { numeric: true, sensitivity: 'base' }) ||
+    (left.classGroup ?? '').localeCompare(right.classGroup ?? '', undefined, { numeric: true, sensitivity: 'base' }) ||
+    left.name.localeCompare(right.name, undefined, { numeric: true, sensitivity: 'base' });
+
+  const studentClassKey = (user: PlatformUser) => `${user.schoolYear ?? ''}|${user.stream ?? ''}|${(user.classGroup ?? '').trim().toLowerCase()}`;
+  const studentClassLabel = (user: PlatformUser) => {
+    const year = schoolYearLabel(language, user.stage, user.schoolYear);
+    const stream = user.stage === 'secondary' && user.stream ? ` - ${secondaryStreamLabel(language, user.stream, user.schoolYear)}` : '';
+    const classGroup = user.classGroup?.trim() || '-';
+    return `${year}${stream} - ${tr(language, 'classGroup')} ${classGroup}`;
+  };
+
+  const renderStudentClassGroups = (studentUsers: PlatformUser[]) => {
+    const groups = [...studentUsers].sort(compareStudentsByClass).reduce<Array<{ key: string; label: string; users: PlatformUser[] }>>((accumulator, user) => {
+      const key = studentClassKey(user);
+      const existing = accumulator.find((group) => group.key === key);
+      if (existing) {
+        existing.users.push(user);
+        return accumulator;
+      }
+
+      accumulator.push({ key, label: studentClassLabel(user), users: [user] });
+      return accumulator;
+    }, []);
+
+    return (
+      <div className="student-class-groups">
+        {groups.map((group) => (
+          <details className="user-group student-class-group" key={group.key} open>
+            <summary>
+              <span className="user-group-label">{group.label}</span>
+              <span className="user-group-meta">
+                <strong>{group.users.length}</strong>
+                <ChevronDown size={17} aria-hidden="true" />
+              </span>
+            </summary>
+            {renderTable(group.users)}
+          </details>
+        ))}
+      </div>
+    );
+  };
+
   const groupedUsers = (['admin', 'director', 'supervisor', 'teacher', 'student'] as Role[])
     .map((role) => ({ role, users: users.filter((user) => user.role === role) }))
     .filter((group) => group.users.length > 0);
@@ -158,7 +206,7 @@ export function UsersTable({
                     <ChevronDown size={17} aria-hidden="true" />
                   </span>
                 </summary>
-                {renderTable(group.users)}
+                {groupStudentsByClass && group.role === 'student' ? renderStudentClassGroups(group.users) : renderTable(group.users)}
               </details>
             ) : (
               <div className="user-group single" key={group.role}>
@@ -170,7 +218,7 @@ export function UsersTable({
                     <strong>{group.users.length}</strong>
                   </span>
                 </div>
-                {renderTable(group.users)}
+                {groupStudentsByClass && group.role === 'student' ? renderStudentClassGroups(group.users) : renderTable(group.users)}
               </div>
             )
           )}

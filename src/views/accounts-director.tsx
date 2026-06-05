@@ -103,6 +103,7 @@ export function DirectorUsersPanel({
           onDelete={deleteUser}
           onEdit={(target) => setEditingUser(target)}
           groupByRole
+          groupStudentsByClass
         />
       )}
     </section>
