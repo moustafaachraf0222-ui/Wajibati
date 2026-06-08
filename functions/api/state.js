@@ -36,6 +36,7 @@ const seedData = {
   laboratories: [],
   labDevices: [],
   labFaultReports: [],
+  labReservationRequests: [],
   pushTokens: {},
   deletedSchoolIds: [],
   deletedExerciseIds: [],
@@ -82,6 +83,7 @@ function applyDeletedSchoolTombstones(data) {
     laboratories: data.laboratories.filter((lab) => !deletedSchoolIds.has(lab.schoolId)),
     labDevices: data.labDevices.filter((device) => !deletedSchoolIds.has(device.schoolId)),
     labFaultReports: data.labFaultReports.filter((report) => !deletedSchoolIds.has(report.schoolId)),
+    labReservationRequests: data.labReservationRequests.filter((request) => !deletedSchoolIds.has(request.schoolId)),
     completions: Object.fromEntries(
       Object.entries(data.completions).filter(([userId]) => !removedUserIds.has(userId)).map(([userId, done]) => [
         userId,
@@ -201,6 +203,7 @@ function normalizeState(value) {
     laboratories: Array.isArray(value.laboratories) ? value.laboratories : [],
     labDevices: Array.isArray(value.labDevices) ? value.labDevices : [],
     labFaultReports: Array.isArray(value.labFaultReports) ? value.labFaultReports : [],
+    labReservationRequests: Array.isArray(value.labReservationRequests) ? value.labReservationRequests : [],
     pushTokens: value.pushTokens && typeof value.pushTokens === 'object' ? value.pushTokens : {},
     deletedSchoolIds: Array.isArray(value.deletedSchoolIds) ? uniqueStrings(value.deletedSchoolIds) : [],
     deletedExerciseIds: Array.isArray(value.deletedExerciseIds) ? uniqueStrings(value.deletedExerciseIds) : [],
@@ -393,6 +396,7 @@ function mergeState(existingData, incomingData) {
     laboratories: mergeRecordsById(existingData.laboratories, incomingData.laboratories, chooseLatestRecord),
     labDevices: mergeRecordsById(existingData.labDevices, incomingData.labDevices, chooseLatestRecord),
     labFaultReports: mergeRecordsById(existingData.labFaultReports, incomingData.labFaultReports, chooseLatestRecord),
+    labReservationRequests: mergeRecordsById(existingData.labReservationRequests, incomingData.labReservationRequests, chooseLatestRecord),
     completions: mergeCompletions(existingData.completions, incomingData.completions),
     completionDates: mergeNestedMaps(existingData.completionDates, incomingData.completionDates, chooseCompletionDate),
     feedback: mergeNestedMaps(existingData.feedback, incomingData.feedback, chooseLatestFeedback),
@@ -684,6 +688,22 @@ function targetUsersForLabFaultReport(data, report) {
   );
 }
 
+function labForReservation(data, request) {
+  return (data.laboratories ?? []).find((lab) => lab.id === request.labId);
+}
+
+function reservationSlotLabel(request) {
+  return `${cleanText(request.startsAt, '')}-${cleanText(request.endsAt, '')}`;
+}
+
+function updatedReservationResponses(previousRequests = [], nextRequests = []) {
+  const previousById = new Map(previousRequests.map((request) => [request.id, request]));
+  return nextRequests.filter((request) => {
+    const previousRequest = previousById.get(request.id);
+    return previousRequest && previousRequest.status !== request.status && (request.status === 'confirmed' || request.status === 'rejected');
+  });
+}
+
 async function sendNotificationsForChanges(env, previousData, nextData) {
   const notifications = [];
 
@@ -750,6 +770,44 @@ async function sendNotificationsForChanges(env, previousData, nextData) {
         body: `تم الإبلاغ عن عطل في ${cleanText(report.deviceName, 'جهاز')} داخل ${cleanText(lab?.name, 'المخبر')} بواسطة ${cleanText(reporter?.name, 'المخبري')}.`
       },
       data: { type: 'lab_fault', id: report.id, labId: report.labId, deviceId: report.deviceId }
+    });
+  });
+
+  createdRecords(previousData.labReservationRequests ?? [], nextData.labReservationRequests ?? []).forEach((request) => {
+    const lab = labForReservation(nextData, request);
+    const teacher = nextData.users.find((user) => user.id === request.teacherId);
+    const supervisor = nextData.users.find((user) => user.id === request.labSupervisorId);
+    if (!supervisor) {
+      return;
+    }
+
+    notifications.push({
+      users: [supervisor],
+      notification: {
+        title: 'طلب حجز مخبر',
+        body: `${cleanText(teacher?.name, 'الأستاذ')} طلب حجز ${cleanText(lab?.name, 'المخبر')} في ${reservationSlotLabel(request)}.`
+      },
+      data: { type: 'lab_reservation_request', id: request.id, labId: request.labId, slotId: request.slotId }
+    });
+  });
+
+  updatedReservationResponses(previousData.labReservationRequests ?? [], nextData.labReservationRequests ?? []).forEach((request) => {
+    const lab = labForReservation(nextData, request);
+    const teacher = nextData.users.find((user) => user.id === request.teacherId);
+    if (!teacher) {
+      return;
+    }
+
+    notifications.push({
+      users: [teacher],
+      notification: {
+        title: request.status === 'confirmed' ? 'تم تأكيد حجز المخبر' : 'تم رفض حجز المخبر',
+        body:
+          request.status === 'confirmed'
+            ? `تم تأكيد حجز ${cleanText(lab?.name, 'المخبر')} في ${reservationSlotLabel(request)}.`
+            : `تم رفض طلب حجز ${cleanText(lab?.name, 'المخبر')} في ${reservationSlotLabel(request)}.`
+      },
+      data: { type: 'lab_reservation_response', id: request.id, labId: request.labId, slotId: request.slotId, status: request.status }
     });
   });
 

@@ -25,6 +25,7 @@ const seedData: PlatformData = {
   laboratories: [],
   labDevices: [],
   labFaultReports: [],
+  labReservationRequests: [],
   pushTokens: {},
   deletedSchoolIds: [],
   deletedExerciseIds: [],
@@ -61,6 +62,7 @@ export function isSeedOnlyData(data: PlatformData) {
     data.absenceReports.length === 0 &&
     data.laboratories.length === 0 &&
     data.labDevices.length === 0 &&
-    data.labFaultReports.length === 0
+    data.labFaultReports.length === 0 &&
+    data.labReservationRequests.length === 0
   );
 }

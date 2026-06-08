@@ -98,6 +98,7 @@ export function normalizePlatformData(value: Partial<PlatformData> | null | unde
     laboratories: Array.isArray(source.laboratories) ? source.laboratories : fallback.laboratories,
     labDevices: Array.isArray(source.labDevices) ? source.labDevices : fallback.labDevices,
     labFaultReports: Array.isArray(source.labFaultReports) ? source.labFaultReports : fallback.labFaultReports,
+    labReservationRequests: Array.isArray(source.labReservationRequests) ? source.labReservationRequests : fallback.labReservationRequests,
     pushTokens: source.pushTokens && typeof source.pushTokens === 'object' ? source.pushTokens : fallback.pushTokens,
     deletedSchoolIds: Array.isArray(source.deletedSchoolIds)
       ? uniqueStrings(source.deletedSchoolIds.filter((id): id is string => typeof id === 'string'))

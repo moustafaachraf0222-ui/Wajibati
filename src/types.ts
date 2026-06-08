@@ -230,6 +230,7 @@ export type LabPeriod = 'morning' | 'afternoon';
 export type LabAvailability = 'available' | 'reserved';
 export type LabDeviceStatus = 'working' | 'broken';
 export type LabFaultStatus = 'open' | 'repaired';
+export type LabReservationStatus = 'pending' | 'confirmed' | 'rejected';
 
 export type LabTimeSlot = {
   id: string;
@@ -279,6 +280,23 @@ export type LabFaultReport = {
   updatedAt?: string;
 };
 
+export type LabReservationRequest = {
+  id: string;
+  schoolId: string;
+  labId: string;
+  slotId: string;
+  period: LabPeriod;
+  startsAt: string;
+  endsAt: string;
+  teacherId: string;
+  labSupervisorId: string;
+  status: LabReservationStatus;
+  requestedAt: string;
+  respondedAt?: string;
+  respondedBy?: string;
+  updatedAt?: string;
+};
+
 export type PushTokenRecord = {
   token: string;
   platform: string;
@@ -301,6 +319,7 @@ export type PlatformData = {
   laboratories: Laboratory[];
   labDevices: LabDevice[];
   labFaultReports: LabFaultReport[];
+  labReservationRequests: LabReservationRequest[];
   pushTokens: Record<string, PushTokenRecord[]>;
   deletedSchoolIds: string[];
   deletedExerciseIds: string[];

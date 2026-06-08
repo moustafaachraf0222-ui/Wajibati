@@ -63,6 +63,9 @@ export function deleteUserRecords(previous: PlatformData, target: PlatformUser):
     laboratories: previous.laboratories.filter((lab) => lab.supervisorId !== target.id),
     labDevices: previous.labDevices.filter((device) => !removedLabIds.includes(device.labId)),
     labFaultReports: previous.labFaultReports.filter((report) => !removedLabIds.includes(report.labId) && !removedDeviceIds.includes(report.deviceId)),
+    labReservationRequests: previous.labReservationRequests.filter(
+      (request) => request.teacherId !== target.id && request.labSupervisorId !== target.id && !removedLabIds.includes(request.labId)
+    ),
     completions: Object.fromEntries(
       Object.entries(previous.completions)
         .filter(([userId]) => userId !== target.id)
@@ -114,6 +117,7 @@ export function applyDeletedSchoolTombstones(data: PlatformData): PlatformData {
     laboratories: data.laboratories.filter((lab) => !deletedSchoolIds.has(lab.schoolId)),
     labDevices: data.labDevices.filter((device) => !deletedSchoolIds.has(device.schoolId)),
     labFaultReports: data.labFaultReports.filter((report) => !deletedSchoolIds.has(report.schoolId)),
+    labReservationRequests: data.labReservationRequests.filter((request) => !deletedSchoolIds.has(request.schoolId)),
     completions: Object.fromEntries(
       Object.entries(data.completions)
         .filter(([userId]) => !removedUserIds.has(userId))

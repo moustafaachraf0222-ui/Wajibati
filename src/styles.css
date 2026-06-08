@@ -1998,6 +1998,11 @@ tbody tr.account-details-row:hover td {
   background: var(--rose-soft);
 }
 
+.lab-request-button {
+  justify-self: stretch;
+  margin-top: 4px;
+}
+
 .lab-device-form {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
@@ -2068,7 +2073,8 @@ tbody tr.account-details-row:hover td {
   background: var(--rose-soft);
 }
 
-.button.small {
+.button.small,
+.icon-text-button.small {
   min-height: 34px;
   padding: 7px 10px;
 }
