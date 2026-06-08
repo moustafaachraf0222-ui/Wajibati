@@ -2404,6 +2404,23 @@ summary.subject-group-heading:hover .subject-icon svg {
   text-align: start;
 }
 
+.modal.school-edit-modal {
+  width: min(680px, 100%);
+  max-height: min(760px, calc(100vh - 40px));
+  overflow-y: auto;
+  justify-items: stretch;
+  text-align: start;
+}
+
+.modal.school-edit-modal > svg {
+  justify-self: center;
+}
+
+.modal.school-edit-modal h2,
+.modal.school-edit-modal .modal-copy {
+  text-align: center;
+}
+
 .modal.app-info-modal > svg {
   width: 46px;
   height: 46px;
