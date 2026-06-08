@@ -2908,6 +2908,68 @@ summary.subject-group-heading:hover .subject-icon svg {
   color: var(--ink);
 }
 
+.absence-justification-list {
+  display: grid;
+  gap: 12px;
+}
+
+.absence-justification-card {
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper-soft);
+  padding: 14px;
+}
+
+.absence-justification-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.absence-justification-head > div {
+  display: grid;
+  gap: 4px;
+}
+
+.absence-justification-head strong {
+  color: var(--ink);
+}
+
+.absence-justification-head span,
+.absence-justification-head small {
+  color: var(--muted);
+}
+
+.justification-current-box {
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  padding: 10px;
+}
+
+.justification-current-box > span {
+  color: var(--teal);
+  font-weight: 800;
+}
+
+.justification-current-box p {
+  margin: 0;
+  color: var(--ink);
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.justification-current-box small {
+  color: var(--muted);
+}
+
 .absence-report-class {
   display: grid;
   gap: 8px;

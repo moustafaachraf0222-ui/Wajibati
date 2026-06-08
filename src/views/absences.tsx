@@ -1,5 +1,5 @@
-import { CalendarDays, Check, ClipboardCheck, Edit3, FileText, Plus, Printer, Save, Send, Trash2, X } from 'lucide-react';
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { CalendarDays, Check, ClipboardCheck, Edit3, FileText, Plus, Printer, Save, Send, Trash2, Upload, X } from 'lucide-react';
+import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from 'react';
 import type {
   AbsenceRecord,
   AbsenceReport,
@@ -14,7 +14,8 @@ import type {
 import { localeNames, schoolYearLabel, tr } from '../i18n';
 import { assignedYearClassGroups, assignedYearStreamClassGroups, sameClassGroup, secondaryStreamLabel, uniqueStrings } from '../education';
 import { getSchool, makeId } from '../data';
-import { ResponsiveTable } from '../ui';
+import { readAttachmentFromInput } from '../files';
+import { AttachmentPreview, ResponsiveTable } from '../ui';
 
 type AbsenceClassGroup = {
   key: string;
@@ -28,6 +29,12 @@ type AbsenceReportEntry = {
   marker: PlatformUser;
   record: AbsenceRecord;
   report: AbsenceReport;
+  student: PlatformUser;
+};
+
+type AbsenceJustificationEntry = {
+  marker: PlatformUser | undefined;
+  record: AbsenceRecord;
   student: PlatformUser;
 };
 
@@ -61,6 +68,13 @@ type MonthlyAbsenceClassSummary = {
   stream?: SecondaryStream;
   studentCount: number;
   students: MonthlyAbsenceStudentSummary[];
+};
+
+type StudentJustificationForm = {
+  attachment: AbsenceRecord['justificationAttachment'] | null;
+  error: string;
+  saved: boolean;
+  text: string;
 };
 
 type AbsenceSessionChoice = {
@@ -370,6 +384,16 @@ function reportSessionLabel(report: AbsenceReport) {
   return `${report.sessionName} ${report.startsAt}-${report.endsAt}`;
 }
 
+function absenceRecordSessionLabel(record: AbsenceRecord) {
+  const sessionName = record.sessionName ?? record.sessionId;
+  const time = record.startsAt && record.endsAt ? ` ${record.startsAt}-${record.endsAt}` : '';
+  return `${sessionName}${time}`;
+}
+
+function absenceRecordHasJustification(record: AbsenceRecord) {
+  return Boolean(record.justificationText?.trim() || record.justificationAttachment);
+}
+
 function reportIsCurrent(report: AbsenceReport, now = Date.now()) {
   const createdAt = Date.parse(report.createdAt);
   return !Number.isFinite(createdAt) || now - createdAt < ABSENCE_REPORT_CURRENT_MS;
@@ -417,6 +441,77 @@ function buildAbsenceReportGroups(entries: AbsenceReportEntry[]) {
         (left.stream ?? '').localeCompare(right.stream ?? '', undefined, { numeric: true, sensitivity: 'base' }) ||
         left.classGroup.localeCompare(right.classGroup, undefined, { numeric: true, sensitivity: 'base' })
     );
+}
+
+function absenceJustificationsForRecorder(data: PlatformData, currentUser: PlatformUser): AbsenceJustificationEntry[] {
+  return data.absenceRecords
+    .filter((record) => record.schoolId === currentUser.schoolId && record.sentAt && !record.deletedAt && absenceRecordHasJustification(record))
+    .map((record) => {
+      const student = data.users.find((user) => user.id === record.studentId);
+      if (!student || student.stage !== currentUser.stage) {
+        return null;
+      }
+
+      if (currentUser.role === 'teacher' && record.markedBy !== currentUser.id) {
+        return null;
+      }
+
+      return {
+        record,
+        student,
+        marker: data.users.find((user) => user.id === record.markedBy)
+      };
+    })
+    .filter((entry): entry is AbsenceJustificationEntry => Boolean(entry))
+    .sort(
+      (left, right) =>
+        right.record.date.localeCompare(left.record.date) ||
+        left.record.schoolYear - right.record.schoolYear ||
+        (left.record.stream ?? '').localeCompare(right.record.stream ?? '', undefined, { numeric: true, sensitivity: 'base' }) ||
+        left.record.classGroup.localeCompare(right.record.classGroup, undefined, { numeric: true, sensitivity: 'base' }) ||
+        sortByName(left.student, right.student)
+    );
+}
+
+function groupAbsenceJustifications(entries: AbsenceJustificationEntry[]) {
+  const groups = new Map<
+    string,
+    {
+      classGroup: string;
+      date: string;
+      entries: AbsenceJustificationEntry[];
+      key: string;
+      schoolYear: number;
+      stream?: SecondaryStream;
+    }
+  >();
+
+  entries.forEach((entry) => {
+    const key = `${entry.record.date}|${reportGroupKey(entry.record)}`;
+    const existing = groups.get(key);
+
+    if (existing) {
+      existing.entries.push(entry);
+      return;
+    }
+
+    groups.set(key, {
+      key,
+      date: entry.record.date,
+      schoolYear: entry.record.schoolYear,
+      stream: entry.record.stream,
+      classGroup: entry.record.classGroup,
+      entries: [entry]
+    });
+  });
+
+  return [...groups.values()].sort(
+    (left, right) =>
+      right.date.localeCompare(left.date) ||
+      left.schoolYear - right.schoolYear ||
+      (left.stream ?? '').localeCompare(right.stream ?? '', undefined, { numeric: true, sensitivity: 'base' }) ||
+      left.classGroup.localeCompare(right.classGroup, undefined, { numeric: true, sensitivity: 'base' })
+  );
 }
 
 function reportSectionsForDirector(data: PlatformData, currentUser: PlatformUser, selectedDate: string): AbsenceReportSection[] {
@@ -837,9 +932,195 @@ function MonthlyAbsenceReportPanel({
   );
 }
 
+function StudentAbsenceJustifications({ data, setData, currentUser, language }: CommonViewProps & { setData: DataSetter }) {
+  const school = getSchool(data, currentUser);
+  const [forms, setForms] = useState<Record<string, StudentJustificationForm>>({});
+  const absenceRecords = useMemo(
+    () =>
+      data.absenceRecords
+        .filter((record) => record.studentId === currentUser.id && record.sentAt && !record.deletedAt)
+        .sort(
+          (left, right) =>
+            right.date.localeCompare(left.date) ||
+            (right.startsAt ?? '').localeCompare(left.startsAt ?? '') ||
+            right.createdAt.localeCompare(left.createdAt)
+        ),
+    [currentUser.id, data.absenceRecords]
+  );
+
+  const formForRecord = (record: AbsenceRecord): StudentJustificationForm =>
+    forms[record.id] ?? {
+      text: record.justificationText ?? '',
+      attachment: record.justificationAttachment ?? null,
+      error: '',
+      saved: false
+    };
+
+  const updateForm = (record: AbsenceRecord, patch: Partial<StudentJustificationForm>) => {
+    setForms((previous) => ({
+      ...previous,
+      [record.id]: {
+        ...formForRecord(record),
+        ...patch
+      }
+    }));
+  };
+
+  const readJustificationFile = (record: AbsenceRecord, event: ChangeEvent<HTMLInputElement>) => {
+    readAttachmentFromInput(
+      event,
+      (attachment) => updateForm(record, { attachment, error: '', saved: false }),
+      () => updateForm(record, { error: tr(language, 'fileTooLarge'), saved: false })
+    );
+  };
+
+  const saveJustification = (record: AbsenceRecord) => {
+    const form = formForRecord(record);
+    const text = form.text.trim();
+    const attachment = form.attachment ?? undefined;
+
+    if (!text && !attachment) {
+      updateForm(record, { error: tr(language, 'justificationRequired'), saved: false });
+      return;
+    }
+
+    const submittedAt = new Date().toISOString();
+    setData((previous) => ({
+      ...previous,
+      absenceRecords: previous.absenceRecords.map((candidate) =>
+        candidate.id === record.id && candidate.studentId === currentUser.id
+          ? {
+              ...candidate,
+              justificationText: text || undefined,
+              justificationAttachment: attachment,
+              justificationSubmittedAt: submittedAt,
+              updatedAt: submittedAt
+            }
+          : candidate
+      )
+    }));
+    updateForm(record, { error: '', saved: true, text, attachment: attachment ?? null });
+  };
+
+  return (
+    <section className="content-grid absences-view">
+      <div className="panel full">
+        <div className="panel-heading">
+          <div>
+            <p>{school?.name ?? tr(language, 'school')}</p>
+            <h2>{tr(language, 'studentAbsenceJustifications')}</h2>
+          </div>
+          <ClipboardCheck size={24} aria-hidden="true" />
+        </div>
+        <p className="hint">{tr(language, 'studentAbsenceJustificationsHint')}</p>
+        <div className="absence-justification-list">
+          {absenceRecords.length === 0 && <p className="empty-state">{tr(language, 'noSentAbsences')}</p>}
+          {absenceRecords.map((record) => {
+            const form = formForRecord(record);
+            const hasSubmittedJustification = absenceRecordHasJustification(record);
+
+            return (
+              <article className="absence-justification-card" key={record.id}>
+                <div className="absence-justification-head">
+                  <div>
+                    <strong>{formatAbsenceDate(language, record.date)}</strong>
+                    <span>{absenceRecordSessionLabel(record)}</span>
+                  </div>
+                  <small>{classLabel(language, record, currentUser.stage)}</small>
+                </div>
+                {hasSubmittedJustification && (
+                  <div className="justification-current-box">
+                    <span>{tr(language, 'currentJustification')}</span>
+                    {record.justificationText && <p>{record.justificationText}</p>}
+                    {record.justificationAttachment && <AttachmentPreview attachment={record.justificationAttachment} language={language} />}
+                    {record.justificationSubmittedAt && (
+                      <small>
+                        {tr(language, 'justifiedAt')}: {formatAbsenceDateTime(language, record.justificationSubmittedAt)}
+                      </small>
+                    )}
+                  </div>
+                )}
+                <label>
+                  <span>{tr(language, 'absenceJustificationText')}</span>
+                  <textarea value={form.text} rows={4} onChange={(event) => updateForm(record, { text: event.target.value, error: '', saved: false })} />
+                </label>
+                <label className="file-field">
+                  <span>{tr(language, 'absenceJustificationFile')}</span>
+                  <input type="file" onChange={(event) => readJustificationFile(record, event)} />
+                  <Upload size={18} aria-hidden="true" />
+                </label>
+                {form.attachment && <AttachmentPreview attachment={form.attachment} language={language} />}
+                {form.error && <p className="form-error">{form.error}</p>}
+                {form.saved && <p className="success-message">{tr(language, 'justificationSubmitted')}</p>}
+                <button className="button primary" type="button" onClick={() => saveJustification(record)}>
+                  <Save size={17} aria-hidden="true" />
+                  <span>{tr(language, 'submitJustification')}</span>
+                </button>
+              </article>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function RecorderAbsenceJustifications({ data, currentUser, language }: CommonViewProps) {
+  const entries = useMemo(() => absenceJustificationsForRecorder(data, currentUser), [currentUser, data]);
+  const groups = useMemo(() => groupAbsenceJustifications(entries), [entries]);
+
+  return (
+    <div className="panel full">
+      <div className="panel-heading">
+        <div>
+          <p>{tr(language, 'absenceJustificationsHint')}</p>
+          <h2>{tr(language, 'absenceJustifications')}</h2>
+        </div>
+        <FileText size={24} aria-hidden="true" />
+      </div>
+      <div className="absence-report-list">
+        {groups.length === 0 && <p className="empty-state">{tr(language, 'noAbsenceJustifications')}</p>}
+        {groups.map((group) => (
+          <details className="absence-report-group" key={group.key} open>
+            <summary>
+              <span className="absence-report-group-title">
+                <strong>{formatAbsenceDate(language, group.date)} - {classLabel(language, group, currentUser.stage)}</strong>
+                <small>
+                  {tr(language, 'absenceJustifications')}: {group.entries.length}
+                </small>
+              </span>
+              <span className="absence-report-count">{group.entries.length}</span>
+            </summary>
+            <div className="absence-report-inner">
+              <ResponsiveTable
+                columns={[tr(language, 'fullName'), tr(language, 'session'), tr(language, 'absenceJustification'), tr(language, 'attachment'), tr(language, 'justifiedAt')]}
+                emptyText={tr(language, 'noAbsenceJustifications')}
+              >
+                {group.entries.map((entry) => (
+                  <tr key={entry.record.id}>
+                    <td>{entry.student.name}</td>
+                    <td>{absenceRecordSessionLabel(entry.record)}</td>
+                    <td>{entry.record.justificationText?.trim() || '-'}</td>
+                    <td>{entry.record.justificationAttachment ? <AttachmentPreview attachment={entry.record.justificationAttachment} language={language} /> : '-'}</td>
+                    <td>{entry.record.justificationSubmittedAt ? formatAbsenceDateTime(language, entry.record.justificationSubmittedAt) : '-'}</td>
+                  </tr>
+                ))}
+              </ResponsiveTable>
+            </div>
+          </details>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function AbsencesView({ data, setData, currentUser, language }: CommonViewProps & { setData: DataSetter }) {
   if (currentUser.role === 'director') {
     return <DirectorAbsenceReports data={data} setData={setData} currentUser={currentUser} language={language} />;
+  }
+
+  if (currentUser.role === 'student') {
+    return <StudentAbsenceJustifications data={data} setData={setData} currentUser={currentUser} language={language} />;
   }
 
   if (currentUser.role === 'supervisor' || (currentUser.role === 'teacher' && currentUser.stage === 'primary')) {
@@ -1886,6 +2167,8 @@ function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: Co
           <p className="empty-state">{tr(language, 'noClassesForAbsence')}</p>
         )}
       </div>
+
+      <RecorderAbsenceJustifications data={data} currentUser={currentUser} language={language} />
     </section>
   );
 }

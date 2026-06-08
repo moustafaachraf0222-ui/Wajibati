@@ -51,6 +51,7 @@ export const navItems: Record<Role, NavItem[]> = {
     { id: 'announcements', labelKey: 'announcements', icon: MessageSquare },
     { id: 'exercises', labelKey: 'exercises', icon: BookOpen },
     { id: 'notes', labelKey: 'notes', icon: MessageSquare },
+    { id: 'absences', labelKey: 'absences', icon: ClipboardCheck },
     { id: 'settings', labelKey: 'settings', icon: Settings }
   ]
 };
