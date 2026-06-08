@@ -2884,6 +2884,30 @@ summary.subject-group-heading:hover .subject-icon svg {
   justify-content: flex-end;
 }
 
+.monthly-report-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.monthly-report-chip {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper-soft);
+  color: var(--muted);
+  padding: 6px 10px;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.monthly-report-chip strong {
+  color: var(--ink);
+}
+
 .absence-report-class {
   display: grid;
   gap: 8px;

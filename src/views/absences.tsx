@@ -45,6 +45,24 @@ type AbsenceReportSection = {
   report: AbsenceReport;
 };
 
+type MonthlyAbsenceStudentSummary = {
+  absenceCount: number;
+  student: PlatformUser;
+};
+
+type MonthlyAbsenceClassSummary = {
+  absenceCount: number;
+  absenceRate: number;
+  classGroup: string;
+  key: string;
+  possibleMarks: number;
+  schoolYear: number;
+  sessionCount: number;
+  stream?: SecondaryStream;
+  studentCount: number;
+  students: MonthlyAbsenceStudentSummary[];
+};
+
 type AbsenceSessionChoice = {
   key: string;
   schedule: AbsenceSchedule;
@@ -74,6 +92,10 @@ function localDateIso(date: Date) {
 
 function todayIso() {
   return localDateIso(new Date());
+}
+
+function currentMonthValue() {
+  return todayIso().slice(0, 7);
 }
 
 function addDaysIso(date: string, days: number) {
@@ -305,6 +327,19 @@ function formatAbsenceDateTime(language: Language, value: string) {
   return new Intl.DateTimeFormat(localeNames[language], { dateStyle: 'medium', timeStyle: 'short' }).format(date);
 }
 
+function formatAbsenceMonth(language: Language, month: string) {
+  const date = new Date(`${month}-01T00:00:00`);
+  if (Number.isNaN(date.getTime())) {
+    return month;
+  }
+
+  return new Intl.DateTimeFormat(localeNames[language], { month: 'long', year: 'numeric' }).format(date);
+}
+
+function formatAbsencePercent(language: Language, value: number) {
+  return new Intl.NumberFormat(localeNames[language], { maximumFractionDigits: 1 }).format(value);
+}
+
 function sessionIdFor(date: string, scheduleId: string, sessionId: string) {
   return `template:${date}:${scheduleId}:${sessionId}`;
 }
@@ -509,6 +544,144 @@ function printAbsenceReports(language: Language, schoolName: string, sections: A
   }, 120);
 }
 
+function buildMonthlyAbsenceReport(data: PlatformData, currentUser: PlatformUser, month: string): MonthlyAbsenceClassSummary[] {
+  const classGroups = classesForAbsences(data, currentUser);
+  const sentRecords = data.absenceRecords.filter(
+    (record) => record.schoolId === currentUser.schoolId && record.sentAt && !record.deletedAt && record.date.startsWith(`${month}-`)
+  );
+
+  return classGroups.map((group) => {
+    const studentIds = new Set(group.students.map((student) => student.id));
+    const groupRecords = sentRecords.filter(
+      (record) =>
+        record.schoolYear === group.schoolYear &&
+        record.stream === group.stream &&
+        sameClassGroup(record.classGroup, group.classGroup) &&
+        studentIds.has(record.studentId)
+    );
+    const sessionCount = new Set(groupRecords.map((record) => record.sessionId)).size;
+    const absenceCounts = new Map<string, number>();
+
+    groupRecords.forEach((record) => {
+      absenceCounts.set(record.studentId, (absenceCounts.get(record.studentId) ?? 0) + 1);
+    });
+
+    const possibleMarks = group.students.length * sessionCount;
+    const absenceCount = groupRecords.length;
+
+    return {
+      key: group.key,
+      schoolYear: group.schoolYear,
+      stream: group.stream,
+      classGroup: group.classGroup,
+      studentCount: group.students.length,
+      sessionCount,
+      absenceCount,
+      possibleMarks,
+      absenceRate: possibleMarks > 0 ? (absenceCount / possibleMarks) * 100 : 0,
+      students: group.students
+        .map((student) => ({ student, absenceCount: absenceCounts.get(student.id) ?? 0 }))
+        .sort((left, right) => right.absenceCount - left.absenceCount || sortByName(left.student, right.student))
+    };
+  });
+}
+
+function printMonthlyAbsenceReport(language: Language, schoolName: string, month: string, classes: MonthlyAbsenceClassSummary[]) {
+  if (typeof document === 'undefined') {
+    return;
+  }
+
+  const direction = language === 'ar' ? 'rtl' : 'ltr';
+  const printedAt = new Intl.DateTimeFormat(localeNames[language], { dateStyle: 'medium', timeStyle: 'short' }).format(new Date());
+  const reportHtml = classes
+    .map((group) => {
+      const rows =
+        group.students.length === 0
+          ? `<tr><td colspan="2">${escapeHtml(tr(language, 'noStudentsInSelectedClass'))}</td></tr>`
+          : group.students
+              .map(
+                (entry) => `
+                  <tr>
+                    <td>${escapeHtml(entry.student.name)}</td>
+                    <td>${entry.absenceCount}</td>
+                  </tr>`
+              )
+              .join('');
+
+      return `
+        <section>
+          <h2>${escapeHtml(classLabel(language, group, group.students[0]?.student.stage))}</h2>
+          <p>
+            ${escapeHtml(tr(language, 'studentCount'))}: ${group.studentCount}
+            | ${escapeHtml(tr(language, 'recordedSessions'))}: ${group.sessionCount}
+            | ${escapeHtml(tr(language, 'absenceMarkCount'))}: ${group.absenceCount}
+            | ${escapeHtml(tr(language, 'absenceRate'))}: ${formatAbsencePercent(language, group.absenceRate)}%
+          </p>
+          <table>
+            <thead>
+              <tr>
+                <th>${escapeHtml(tr(language, 'fullName'))}</th>
+                <th>${escapeHtml(tr(language, 'absentCount'))}</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </section>`;
+    })
+    .join('');
+
+  const frame = document.createElement('iframe');
+  frame.setAttribute('aria-hidden', 'true');
+  frame.style.position = 'fixed';
+  frame.style.inset = 'auto 0 0 auto';
+  frame.style.width = '0';
+  frame.style.height = '0';
+  frame.style.border = '0';
+  document.body.appendChild(frame);
+
+  const frameDocument = frame.contentDocument ?? frame.contentWindow?.document;
+  if (!frameDocument || !frame.contentWindow) {
+    frame.remove();
+    return;
+  }
+
+  frameDocument.open();
+  frameDocument.write(`<!doctype html>
+    <html lang="${language}" dir="${direction}">
+      <head>
+        <meta charset="utf-8" />
+        <title>${escapeHtml(tr(language, 'monthlyAbsenceReport'))}</title>
+        <style>
+          @page { size: A4; margin: 16mm; }
+          * { box-sizing: border-box; }
+          body { margin: 0; color: #111827; font-family: Arial, Tahoma, sans-serif; direction: ${direction}; }
+          header { border-bottom: 3px solid #006233; padding-bottom: 12px; margin-bottom: 18px; }
+          h1 { margin: 0 0 6px; color: #006233; font-size: 22px; }
+          h2 { margin: 22px 0 6px; color: #111827; font-size: 17px; }
+          p { margin: 0 0 10px; color: #4b5563; font-size: 13px; }
+          table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 12px; }
+          th, td { border: 1px solid #d1d5db; padding: 9px 8px; text-align: start; vertical-align: middle; }
+          th { background: #f3f4f6; color: #111827; font-weight: 700; }
+          tbody tr:nth-child(even) td { background: #fafafa; }
+        </style>
+      </head>
+      <body>
+        <header>
+          <h1>${escapeHtml(tr(language, 'monthlyAbsenceReport'))}</h1>
+          <p>${escapeHtml(schoolName)} - ${escapeHtml(formatAbsenceMonth(language, month))} - ${escapeHtml(printedAt)}</p>
+        </header>
+        ${reportHtml || `<p>${escapeHtml(tr(language, 'noMonthlyAbsenceReport'))}</p>`}
+      </body>
+    </html>`);
+  frameDocument.close();
+
+  setTimeout(() => {
+    frame.contentWindow?.focus();
+    frame.contentWindow?.print();
+    setTimeout(() => frame.remove(), 500);
+  }, 120);
+}
+
 function AbsenceReportList({
   emptyText,
   language,
@@ -558,6 +731,108 @@ function AbsenceReportList({
           </div>
         </details>
       ))}
+    </div>
+  );
+}
+
+function MonthlyAbsenceReportPanel({
+  data,
+  currentUser,
+  language,
+  schoolName
+}: {
+  data: PlatformData;
+  currentUser: PlatformUser;
+  language: Language;
+  schoolName: string;
+}) {
+  const [selectedMonth, setSelectedMonth] = useState(currentMonthValue);
+  const monthlyClasses = useMemo(() => buildMonthlyAbsenceReport(data, currentUser, selectedMonth), [currentUser, data, selectedMonth]);
+  const totalAbsences = monthlyClasses.reduce((sum, group) => sum + group.absenceCount, 0);
+  const totalStudents = monthlyClasses.reduce((sum, group) => sum + group.studentCount, 0);
+  const totalPossibleMarks = monthlyClasses.reduce((sum, group) => sum + group.possibleMarks, 0);
+  const overallRate = totalPossibleMarks > 0 ? (totalAbsences / totalPossibleMarks) * 100 : 0;
+
+  return (
+    <div className="panel full">
+      <div className="panel-heading">
+        <div>
+          <p>{tr(language, 'monthlyAbsenceReportHint')}</p>
+          <h2>{tr(language, 'monthlyAbsenceReport')}</h2>
+        </div>
+        <CalendarDays size={24} aria-hidden="true" />
+      </div>
+      <div className="absence-report-toolbar">
+        <label>
+          <span>{tr(language, 'reportMonth')}</span>
+          <input type="month" value={selectedMonth} onChange={(event) => setSelectedMonth(event.target.value || currentMonthValue())} />
+        </label>
+        <button
+          className="button ghost"
+          type="button"
+          disabled={monthlyClasses.length === 0}
+          onClick={() => printMonthlyAbsenceReport(language, schoolName, selectedMonth, monthlyClasses)}
+        >
+          <Printer size={17} aria-hidden="true" />
+          <span>{tr(language, 'printMonthlyAbsenceReport')}</span>
+        </button>
+      </div>
+      <div className="absence-report-stats">
+        <div className="absence-report-stat">
+          <span>{tr(language, 'reportedClassCount')}</span>
+          <strong>{monthlyClasses.length}</strong>
+        </div>
+        <div className="absence-report-stat">
+          <span>{tr(language, 'studentCount')}</span>
+          <strong>{totalStudents}</strong>
+        </div>
+        <div className="absence-report-stat">
+          <span>{tr(language, 'absenceMarkCount')}</span>
+          <strong>{totalAbsences}</strong>
+        </div>
+        <div className="absence-report-stat">
+          <span>{tr(language, 'absenceRate')}</span>
+          <strong>{formatAbsencePercent(language, overallRate)}%</strong>
+        </div>
+      </div>
+      <div className="absence-report-list monthly-absence-list">
+        {monthlyClasses.length === 0 && <p className="empty-state">{tr(language, 'noMonthlyAbsenceReport')}</p>}
+        {monthlyClasses.map((group) => (
+          <details className="absence-report-group" key={`${selectedMonth}-${group.key}`} open={group.absenceCount > 0}>
+            <summary>
+              <span className="absence-report-group-title">
+                <strong>{classLabel(language, group, currentUser.stage)}</strong>
+                <small>
+                  {tr(language, 'studentCount')}: {group.studentCount} | {tr(language, 'recordedSessions')}: {group.sessionCount} |{' '}
+                  {tr(language, 'absenceMarkCount')}: {group.absenceCount}
+                </small>
+              </span>
+              <span className="absence-report-count">{formatAbsencePercent(language, group.absenceRate)}%</span>
+            </summary>
+            <div className="absence-report-inner">
+              <div className="monthly-report-metrics">
+                <span className="monthly-report-chip">
+                  {tr(language, 'absenceRate')}: <strong>{formatAbsencePercent(language, group.absenceRate)}%</strong>
+                </span>
+                <span className="monthly-report-chip">
+                  {tr(language, 'recordedSessions')}: <strong>{group.sessionCount}</strong>
+                </span>
+                <span className="monthly-report-chip">
+                  {tr(language, 'absenceMarkCount')}: <strong>{group.absenceCount}</strong>
+                </span>
+              </div>
+              <ResponsiveTable columns={[tr(language, 'fullName'), tr(language, 'absentCount')]} emptyText={tr(language, 'noStudentsInSelectedClass')}>
+                {group.students.map((entry) => (
+                  <tr key={`${selectedMonth}-${group.key}-${entry.student.id}`}>
+                    <td>{entry.student.name}</td>
+                    <td>{entry.absenceCount}</td>
+                  </tr>
+                ))}
+              </ResponsiveTable>
+            </div>
+          </details>
+        ))}
+      </div>
     </div>
   );
 }
@@ -1035,6 +1310,8 @@ function DirectorAbsenceReports({ data, setData, currentUser, language }: Common
           </div>
         </div>
       </div>
+
+      <MonthlyAbsenceReportPanel data={data} currentUser={currentUser} language={language} schoolName={school?.name ?? '-'} />
 
       <div className="panel full">
         <div className="panel-heading">
