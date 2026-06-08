@@ -1,6 +1,6 @@
 import type { Dispatch, SetStateAction } from 'react';
 
-export type Role = 'admin' | 'director' | 'supervisor' | 'lab' | 'teacher' | 'student';
+export type Role = 'admin' | 'director' | 'supervisor' | 'lab' | 'canteen' | 'teacher' | 'student';
 export type Stage = 'primary' | 'middle' | 'secondary';
 export type Language = 'ar' | 'fr' | 'en';
 export type Theme = 'light' | 'dark';
@@ -47,7 +47,18 @@ export type Subject =
   | 'german'
   | 'italian';
 
-export type View = 'overview' | 'schools' | 'users' | 'school' | 'exercises' | 'announcements' | 'notes' | 'absences' | 'labs' | 'settings';
+export type View =
+  | 'overview'
+  | 'schools'
+  | 'users'
+  | 'school'
+  | 'exercises'
+  | 'announcements'
+  | 'notes'
+  | 'absences'
+  | 'labs'
+  | 'canteen'
+  | 'settings';
 
 export type SecondaryStream =
   | 'experimental_science'
@@ -297,6 +308,31 @@ export type LabReservationRequest = {
   updatedAt?: string;
 };
 
+export type CanteenCard = {
+  id: string;
+  schoolId: string;
+  studentId: string;
+  code: string;
+  status: AccountStatus;
+  createdBy: string;
+  createdAt: string;
+  updatedAt?: string;
+};
+
+export type CanteenScanResult = 'allowed' | 'duplicate' | 'absent' | 'invalid';
+
+export type CanteenMealScan = {
+  id: string;
+  schoolId: string;
+  cardId?: string;
+  studentId?: string;
+  code: string;
+  scannedBy: string;
+  scannedAt: string;
+  date: string;
+  result: CanteenScanResult;
+};
+
 export type PushTokenRecord = {
   token: string;
   platform: string;
@@ -320,6 +356,8 @@ export type PlatformData = {
   labDevices: LabDevice[];
   labFaultReports: LabFaultReport[];
   labReservationRequests: LabReservationRequest[];
+  canteenCards: CanteenCard[];
+  canteenMealScans: CanteenMealScan[];
   pushTokens: Record<string, PushTokenRecord[]>;
   deletedSchoolIds: string[];
   deletedExerciseIds: string[];

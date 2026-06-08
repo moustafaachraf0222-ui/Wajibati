@@ -5,6 +5,7 @@ import { ExercisesView } from './views/exercises';
 import { AnnouncementsView, NotesView } from './views/messages';
 import { OverviewView } from './views/overview';
 import { LaboratoriesView } from './views/labs';
+import { CanteenView } from './views/canteen';
 import { SchoolProfileView, SchoolsView } from './views/schools';
 import { SettingsView } from './views/settings';
 
@@ -48,6 +49,8 @@ export function AppRouter({
       return <AbsencesView data={data} setData={setData} currentUser={currentUser} language={language} />;
     case 'labs':
       return <LaboratoriesView data={data} setData={setData} currentUser={currentUser} language={language} />;
+    case 'canteen':
+      return <CanteenView data={data} setData={setData} currentUser={currentUser} language={language} />;
     case 'settings':
       return (
         <SettingsView

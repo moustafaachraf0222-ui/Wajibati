@@ -66,6 +66,8 @@ export function deleteUserRecords(previous: PlatformData, target: PlatformUser):
     labReservationRequests: previous.labReservationRequests.filter(
       (request) => request.teacherId !== target.id && request.labSupervisorId !== target.id && !removedLabIds.includes(request.labId)
     ),
+    canteenCards: previous.canteenCards.filter((card) => card.studentId !== target.id && card.createdBy !== target.id),
+    canteenMealScans: previous.canteenMealScans.filter((scan) => scan.studentId !== target.id && scan.scannedBy !== target.id),
     completions: Object.fromEntries(
       Object.entries(previous.completions)
         .filter(([userId]) => userId !== target.id)
@@ -118,6 +120,8 @@ export function applyDeletedSchoolTombstones(data: PlatformData): PlatformData {
     labDevices: data.labDevices.filter((device) => !deletedSchoolIds.has(device.schoolId)),
     labFaultReports: data.labFaultReports.filter((report) => !deletedSchoolIds.has(report.schoolId)),
     labReservationRequests: data.labReservationRequests.filter((request) => !deletedSchoolIds.has(request.schoolId)),
+    canteenCards: data.canteenCards.filter((card) => !deletedSchoolIds.has(card.schoolId)),
+    canteenMealScans: data.canteenMealScans.filter((scan) => !deletedSchoolIds.has(scan.schoolId)),
     completions: Object.fromEntries(
       Object.entries(data.completions)
         .filter(([userId]) => !removedUserIds.has(userId))

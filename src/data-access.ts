@@ -121,6 +121,10 @@ export function defaultView(role: Role): View {
     return 'labs';
   }
 
+  if (role === 'canteen') {
+    return 'canteen';
+  }
+
   if (role === 'student') {
     return 'exercises';
   }
@@ -140,7 +144,7 @@ export function canToggleUser(currentUser: PlatformUser, target: PlatformUser) {
   return (
     currentUser.role === 'director' &&
     target.schoolId === currentUser.schoolId &&
-    (target.role === 'supervisor' || target.role === 'lab' || target.role === 'teacher' || target.role === 'student')
+    (target.role === 'supervisor' || target.role === 'lab' || target.role === 'canteen' || target.role === 'teacher' || target.role === 'student')
   );
 }
 
@@ -156,7 +160,7 @@ export function canEditUser(currentUser: PlatformUser, target: PlatformUser) {
   return (
     currentUser.role === 'director' &&
     target.schoolId === currentUser.schoolId &&
-    (target.role === 'supervisor' || target.role === 'lab' || target.role === 'teacher' || target.role === 'student')
+    (target.role === 'supervisor' || target.role === 'lab' || target.role === 'canteen' || target.role === 'teacher' || target.role === 'student')
   );
 }
 
@@ -172,6 +176,6 @@ export function canDeleteUser(currentUser: PlatformUser, target: PlatformUser) {
   return (
     currentUser.role === 'director' &&
     target.schoolId === currentUser.schoolId &&
-    (target.role === 'supervisor' || target.role === 'lab' || target.role === 'teacher' || target.role === 'student')
+    (target.role === 'supervisor' || target.role === 'lab' || target.role === 'canteen' || target.role === 'teacher' || target.role === 'student')
   );
 }

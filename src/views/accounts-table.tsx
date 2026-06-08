@@ -204,7 +204,7 @@ export function UsersTable({
     );
   };
 
-  const groupedUsers = (['admin', 'director', 'supervisor', 'lab', 'teacher', 'student'] as Role[])
+  const groupedUsers = (['admin', 'director', 'supervisor', 'lab', 'canteen', 'teacher', 'student'] as Role[])
     .map((role) => ({ role, users: users.filter((user) => user.role === role) }))
     .filter((group) => group.users.length > 0);
 

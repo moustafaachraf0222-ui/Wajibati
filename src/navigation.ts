@@ -8,6 +8,7 @@ import {
   School,
   Settings,
   ShieldCheck,
+  Utensils,
   UserPlus,
   Users
 } from 'lucide-react';
@@ -34,6 +35,7 @@ export const navItems: Record<Role, NavItem[]> = {
     { id: 'users', labelKey: 'users', icon: UserPlus },
     { id: 'absences', labelKey: 'absences', icon: ClipboardCheck },
     { id: 'labs', labelKey: 'laboratories', icon: FlaskConical },
+    { id: 'canteen', labelKey: 'schoolCanteen', icon: Utensils },
     { id: 'announcements', labelKey: 'announcements', icon: MessageSquare },
     { id: 'settings', labelKey: 'settings', icon: Settings }
   ],
@@ -44,6 +46,11 @@ export const navItems: Record<Role, NavItem[]> = {
   ],
   lab: [
     { id: 'labs', labelKey: 'laboratories', icon: FlaskConical },
+    { id: 'announcements', labelKey: 'announcements', icon: MessageSquare },
+    { id: 'settings', labelKey: 'settings', icon: Settings }
+  ],
+  canteen: [
+    { id: 'canteen', labelKey: 'schoolCanteen', icon: Utensils },
     { id: 'announcements', labelKey: 'announcements', icon: MessageSquare },
     { id: 'settings', labelKey: 'settings', icon: Settings }
   ],

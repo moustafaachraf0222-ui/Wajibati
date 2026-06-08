@@ -78,7 +78,7 @@ export function DirectorCreateAccountPanel({
   school: SchoolRecord | undefined;
 }) {
   const [form, setForm] = useState({
-    role: 'teacher' as 'supervisor' | 'lab' | 'teacher' | 'student',
+    role: 'teacher' as 'supervisor' | 'lab' | 'canteen' | 'teacher' | 'student',
     name: '',
     subject: 'math' as Subject,
     subjectsByYear: {} as Record<string, Subject | ''>,
@@ -98,7 +98,10 @@ export function DirectorCreateAccountPanel({
   const [bulkForm, setBulkForm] = useState(initialBulkStudentForm);
   const [bulkError, setBulkError] = useState('');
   const [bulkCreatedCount, setBulkCreatedCount] = useState(0);
-  const accountRoles = currentUser.stage === 'primary' ? (['teacher', 'student'] as const) : (['supervisor', 'lab', 'teacher', 'student'] as const);
+  const accountRoles =
+    currentUser.stage === 'primary'
+      ? (['canteen', 'teacher', 'student'] as const)
+      : (['supervisor', 'lab', 'canteen', 'teacher', 'student'] as const);
 
   const createAccount = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -271,7 +274,7 @@ export function DirectorCreateAccountPanel({
   const availableYearLabels = currentUser.stage ? schoolYearNames[language][currentUser.stage] : [];
   const generatedEmailPreview = school && form.name.trim() ? generateSchoolEmail(form.name, form.role, school.domain, data.users) : '';
 
-  const chooseAccountRole = (role: 'supervisor' | 'lab' | 'teacher' | 'student') => {
+  const chooseAccountRole = (role: 'supervisor' | 'lab' | 'canteen' | 'teacher' | 'student') => {
     if ((role === 'supervisor' || role === 'lab') && currentUser.stage === 'primary') {
       return;
     }
@@ -687,7 +690,7 @@ export function DirectorCreateAccountPanel({
         {form.role === 'teacher' && form.schoolYears.length === 0 && <p className="hint full">{tr(language, 'subjectAfterYear')}</p>}
         {form.role !== 'student' ? (
           <>
-            <p className="hint full">{tr(language, currentUser.stage === 'primary' ? 'primaryNoSupervisors' : 'createOnlyTeacherStudent')}</p>
+            <p className="hint full">{tr(language, currentUser.stage === 'primary' ? 'createPrimaryAccountsHint' : 'createOnlyTeacherStudent')}</p>
             {error && <p className="form-error full">{error}</p>}
             <button className="button primary form-submit" type="submit">
               <Plus size={17} aria-hidden="true" />

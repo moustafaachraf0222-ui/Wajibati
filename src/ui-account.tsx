@@ -1,4 +1,4 @@
-import { BookOpen, Building2, ClipboardCheck, FlaskConical, GraduationCap, ShieldCheck } from 'lucide-react';
+import { BookOpen, Building2, ClipboardCheck, FlaskConical, GraduationCap, ShieldCheck, Utensils } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { Language, PlatformUser, Role, SecondaryStream } from './types';
 import { roleNames, schoolYearLabel, stageNames, tr } from './i18n';
@@ -15,6 +15,7 @@ const roleIcons: Record<Role, LucideIcon> = {
   director: Building2,
   supervisor: ClipboardCheck,
   lab: FlaskConical,
+  canteen: Utensils,
   teacher: GraduationCap,
   student: BookOpen
 };
