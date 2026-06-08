@@ -11,7 +11,7 @@ import {
   Users
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import type { Role, View } from './types';
+import type { PlatformUser, Role, View } from './types';
 
 export type NavItem = {
   id: View;
@@ -54,3 +54,14 @@ export const navItems: Record<Role, NavItem[]> = {
     { id: 'settings', labelKey: 'settings', icon: Settings }
   ]
 };
+
+const primaryTeacherAbsenceItem: NavItem = { id: 'absences', labelKey: 'absences', icon: ClipboardCheck };
+
+export function navItemsForUser(user: PlatformUser) {
+  const items = navItems[user.role];
+  if (user.role !== 'teacher' || user.stage !== 'primary' || items.some((item) => item.id === 'absences')) {
+    return items;
+  }
+
+  return [items[0], primaryTeacherAbsenceItem, ...items.slice(1)];
+}

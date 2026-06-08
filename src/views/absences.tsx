@@ -12,7 +12,7 @@ import type {
   Stage
 } from '../types';
 import { localeNames, schoolYearLabel, tr } from '../i18n';
-import { sameClassGroup, secondaryStreamLabel, uniqueStrings } from '../education';
+import { assignedYearClassGroups, assignedYearStreamClassGroups, sameClassGroup, secondaryStreamLabel, uniqueStrings } from '../education';
 import { getSchool, makeId } from '../data';
 import { ResponsiveTable } from '../ui';
 
@@ -97,6 +97,13 @@ const fallbackSessions = [
   { id: 'session-8', name: '8', startsAt: '16:00', endsAt: '17:00' }
 ];
 
+function primaryPeriodSessions(language: Language): AbsenceSchedule['sessions'] {
+  return [
+    { id: 'primary-morning', name: tr(language, 'morningPeriod'), startsAt: '08:00', endsAt: '12:00' },
+    { id: 'primary-afternoon', name: tr(language, 'afternoonPeriod'), startsAt: '13:00', endsAt: '17:00' }
+  ];
+}
+
 function classKey(schoolYear: number, stream: SecondaryStream | undefined, classGroup: string) {
   return `${schoolYear}:${stream ?? ''}:${classGroup.trim().toLowerCase()}`;
 }
@@ -109,6 +116,22 @@ function sortByName(left: PlatformUser, right: PlatformUser) {
   return left.name.localeCompare(right.name, undefined, { numeric: true, sensitivity: 'base' });
 }
 
+function teacherCanMarkStudentAbsence(teacher: PlatformUser, student: PlatformUser) {
+  const streamGroups = assignedYearStreamClassGroups(teacher);
+  const streamEntries = Object.entries(streamGroups);
+  if (streamEntries.length > 0) {
+    const yearGroups = streamGroups[String(student.schoolYear)] ?? {};
+    if (student.stream) {
+      return Boolean(yearGroups[student.stream]?.some((group) => sameClassGroup(group, student.classGroup)));
+    }
+
+    return Object.values(yearGroups).some((groups) => groups?.some((group) => sameClassGroup(group, student.classGroup)));
+  }
+
+  const classGroups = assignedYearClassGroups(teacher);
+  return Boolean(classGroups[String(student.schoolYear)]?.some((group) => sameClassGroup(group, student.classGroup)));
+}
+
 function classesForAbsences(data: PlatformData, currentUser: PlatformUser): AbsenceClassGroup[] {
   const groups = new Map<string, AbsenceClassGroup>();
 
@@ -119,7 +142,8 @@ function classesForAbsences(data: PlatformData, currentUser: PlatformUser): Abse
         user.schoolId === currentUser.schoolId &&
         user.stage === currentUser.stage &&
         user.schoolYear &&
-        user.classGroup?.trim()
+        user.classGroup?.trim() &&
+        (currentUser.role !== 'teacher' || teacherCanMarkStudentAbsence(currentUser, user))
     )
     .forEach((student) => {
       const schoolYear = student.schoolYear!;
@@ -307,7 +331,8 @@ function reportSectionsForDirector(data: PlatformData, currentUser: PlatformUser
     .filter((report) => selectedDate === 'all' || report.date === selectedDate)
     .map((report) => {
       const marker = data.users.find((user) => user.id === report.markedBy);
-      if (marker?.role !== 'supervisor') {
+      const validMarker = marker?.role === 'supervisor' || (marker?.role === 'teacher' && report.stage === 'primary');
+      if (!validMarker) {
         return null;
       }
 
@@ -483,7 +508,11 @@ export function AbsencesView({ data, setData, currentUser, language }: CommonVie
     return <DirectorAbsenceReports data={data} setData={setData} currentUser={currentUser} language={language} />;
   }
 
-  return <SupervisorAbsenceWorkspace data={data} setData={setData} currentUser={currentUser} language={language} />;
+  if (currentUser.role === 'supervisor' || (currentUser.role === 'teacher' && currentUser.stage === 'primary')) {
+    return <SupervisorAbsenceWorkspace data={data} setData={setData} currentUser={currentUser} language={language} />;
+  }
+
+  return <p className="empty-state">{tr(language, 'scopedData')}</p>;
 }
 
 function defaultScheduleSessions(): AbsenceSchedule['sessions'] {
@@ -891,7 +920,7 @@ function DirectorAbsenceReports({ data, setData, currentUser, language }: Common
 
   return (
     <section className="content-grid absences-view">
-      <DirectorScheduleManager data={data} setData={setData} currentUser={currentUser} language={language} />
+      {currentUser.stage !== 'primary' && <DirectorScheduleManager data={data} setData={setData} currentUser={currentUser} language={language} />}
 
       <div className="panel full">
         <div className="panel-heading">
@@ -942,7 +971,7 @@ function DirectorAbsenceReports({ data, setData, currentUser, language }: Common
             <strong>{uniqueStudents.size}</strong>
           </div>
           <div className="absence-report-stat">
-            <span>{tr(language, 'reportingSupervisors')}</span>
+            <span>{tr(language, currentUser.stage === 'primary' ? 'reportingTeachers' : 'reportingSupervisors')}</span>
             <strong>{uniqueMarkers.size}</strong>
           </div>
         </div>
@@ -996,10 +1025,14 @@ function DirectorAbsenceReports({ data, setData, currentUser, language }: Common
 
 function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: CommonViewProps & { setData: DataSetter }) {
   const school = getSchool(data, currentUser);
+  const primaryTeacherMode = currentUser.role === 'teacher' && currentUser.stage === 'primary';
   const classGroups = useMemo(() => classesForAbsences(data, currentUser), [data, currentUser]);
   const schedules = useMemo(
-    () => data.absenceSchedules.filter((schedule) => schedule.schoolId === currentUser.schoolId && (!schedule.stage || schedule.stage === currentUser.stage)),
-    [currentUser.schoolId, currentUser.stage, data.absenceSchedules]
+    () =>
+      primaryTeacherMode
+        ? []
+        : data.absenceSchedules.filter((schedule) => schedule.schoolId === currentUser.schoolId && (!schedule.stage || schedule.stage === currentUser.stage)),
+    [currentUser.schoolId, currentUser.stage, data.absenceSchedules, primaryTeacherMode]
   );
   const [selectedDate, setSelectedDate] = useState(todayIso);
   const [selectedYear, setSelectedYear] = useState<number | ''>('');
@@ -1055,11 +1088,11 @@ function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: Co
   const selectedClass = classOptions.find((group) => group.key === selectedClassKey);
   const fallbackSchedule = useMemo<AbsenceSchedule>(
     () => ({
-      id: `fixed:${currentUser.schoolId ?? 'school'}:${currentUser.stage ?? 'stage'}`,
+      id: primaryTeacherMode ? `primary-fixed:${currentUser.schoolId ?? 'school'}:${selectedClass?.key ?? 'class'}` : `fixed:${currentUser.schoolId ?? 'school'}:${currentUser.stage ?? 'stage'}`,
       schoolId: currentUser.schoolId ?? '',
       stage: currentUser.stage,
       name: tr(language, 'dailySchedule'),
-      sessions: fallbackSessions,
+      sessions: primaryTeacherMode ? primaryPeriodSessions(language) : fallbackSessions,
       targets: selectedClass
         ? [
             {
@@ -1073,7 +1106,7 @@ function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: Co
       createdBy: 'system',
       createdAt: ''
     }),
-    [currentUser.schoolId, currentUser.stage, language, selectedClass]
+    [currentUser.schoolId, currentUser.stage, language, primaryTeacherMode, selectedClass]
   );
   const classSchedules = useMemo(
     () => (selectedClass ? [...schedules].filter((schedule) => scheduleAppliesToClass(schedule, selectedClass)).sort(compareSchedulesForClass(selectedClass)) : []),
@@ -1096,8 +1129,8 @@ function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: Co
     [classSchedules, selectedDate]
   );
   const sessionSchedules = useMemo(
-    () => (effectiveSchedule ? [effectiveSchedule] : schedules.length === 0 && selectedClass ? [fallbackSchedule] : []),
-    [effectiveSchedule, fallbackSchedule, schedules.length, selectedClass]
+    () => (primaryTeacherMode && selectedClass ? [fallbackSchedule] : effectiveSchedule ? [effectiveSchedule] : schedules.length === 0 && selectedClass ? [fallbackSchedule] : []),
+    [effectiveSchedule, fallbackSchedule, primaryTeacherMode, schedules.length, selectedClass]
   );
   const sessionChoices = useMemo<AbsenceSessionChoice[]>(
     () =>
@@ -1365,7 +1398,7 @@ function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: Co
           </div>
           <ClipboardCheck size={24} aria-hidden="true" />
         </div>
-        <p className="hint">{tr(language, 'supervisorAbsenceFlowHint')}</p>
+        <p className="hint">{tr(language, primaryTeacherMode ? 'primaryTeacherAbsenceFlowHint' : 'supervisorAbsenceFlowHint')}</p>
         <div className="absence-target-grid with-date">
           <label>
             <span>{tr(language, 'absenceDate')}</span>

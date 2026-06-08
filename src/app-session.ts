@@ -2,14 +2,14 @@ import { useCallback, useEffect, useState } from 'react';
 import type { PlatformData, View } from './types';
 import { SESSION_KEY, canAuthenticateUser, defaultView, getSchool } from './data';
 import { useSessionPersistence } from './app-effects';
-import { navItems } from './navigation';
+import { navItemsForUser } from './navigation';
 
 export function useAppSession(data: PlatformData) {
   const [sessionUserId, setSessionUserId] = useState<string | null>(() => localStorage.getItem(SESSION_KEY));
   const [activeView, setActiveView] = useState<View>('overview');
   const [logoutOpen, setLogoutOpen] = useState(false);
   const currentUser = data.users.find((user) => user.id === sessionUserId && canAuthenticateUser(data, user)) ?? null;
-  const tabs = currentUser ? navItems[currentUser.role] : [];
+  const tabs = currentUser ? navItemsForUser(currentUser) : [];
   const safeView = tabs.some((tab) => tab.id === activeView) ? activeView : tabs[0]?.id ?? 'overview';
   const currentSchool = currentUser ? getSchool(data, currentUser) : undefined;
 

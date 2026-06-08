@@ -98,6 +98,7 @@ export function DirectorCreateAccountPanel({
   const [bulkForm, setBulkForm] = useState(initialBulkStudentForm);
   const [bulkError, setBulkError] = useState('');
   const [bulkCreatedCount, setBulkCreatedCount] = useState(0);
+  const accountRoles = currentUser.stage === 'primary' ? (['teacher', 'student'] as const) : (['supervisor', 'teacher', 'student'] as const);
 
   const createAccount = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -106,6 +107,11 @@ export function DirectorCreateAccountPanel({
     }
 
     if (form.role === 'student') {
+      return;
+    }
+
+    if (form.role === 'supervisor' && currentUser.stage === 'primary') {
+      setError(tr(language, 'primaryNoSupervisors'));
       return;
     }
 
@@ -261,11 +267,21 @@ export function DirectorCreateAccountPanel({
   const generatedEmailPreview = school && form.name.trim() ? generateSchoolEmail(form.name, form.role, school.domain, data.users) : '';
 
   const chooseAccountRole = (role: 'supervisor' | 'teacher' | 'student') => {
+    if (role === 'supervisor' && currentUser.stage === 'primary') {
+      return;
+    }
+
     setForm({
       ...form,
       role
     });
   };
+
+  useEffect(() => {
+    if (currentUser.stage === 'primary' && form.role === 'supervisor') {
+      setForm((previous) => ({ ...previous, role: 'teacher' }));
+    }
+  }, [currentUser.stage, form.role]);
 
   useEffect(() => {
     if (form.role !== 'teacher') {
@@ -441,7 +457,7 @@ export function DirectorCreateAccountPanel({
       <div className="panel-heading">
         <div>
           <p>{tr(language, 'lockedScope')}</p>
-          <h2>{tr(language, 'createSchoolAccounts')}</h2>
+          <h2>{tr(language, currentUser.stage === 'primary' ? 'createPrimarySchoolAccounts' : 'createSchoolAccounts')}</h2>
         </div>
         <UserPlus size={24} aria-hidden="true" />
       </div>
@@ -459,7 +475,7 @@ export function DirectorCreateAccountPanel({
         <div className="form-field full">
           <span>{tr(language, 'accountType')}</span>
           <div className="account-type-grid" role="group" aria-label={tr(language, 'accountType')}>
-            {(['supervisor', 'teacher', 'student'] as const).map((role) => (
+            {accountRoles.map((role) => (
               <button
                 className={form.role === role ? 'account-type-option active' : 'account-type-option'}
                 key={role}
@@ -666,7 +682,7 @@ export function DirectorCreateAccountPanel({
         {form.role === 'teacher' && form.schoolYears.length === 0 && <p className="hint full">{tr(language, 'subjectAfterYear')}</p>}
         {form.role !== 'student' ? (
           <>
-            <p className="hint full">{tr(language, 'createOnlyTeacherStudent')}</p>
+            <p className="hint full">{tr(language, currentUser.stage === 'primary' ? 'primaryNoSupervisors' : 'createOnlyTeacherStudent')}</p>
             {error && <p className="form-error full">{error}</p>}
             <button className="button primary form-submit" type="submit">
               <Plus size={17} aria-hidden="true" />
