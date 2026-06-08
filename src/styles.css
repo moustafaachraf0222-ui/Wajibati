@@ -1973,6 +1973,56 @@ tbody tr.account-details-row:hover td {
   padding: 14px;
 }
 
+.lab-teacher-devices {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.lab-teacher-devices h4 {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.94rem;
+}
+
+.lab-device-name-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.lab-device-name-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper);
+  padding: 7px 10px;
+  min-height: 34px;
+}
+
+.lab-device-name-chip strong {
+  font-size: 0.9rem;
+}
+
+.lab-device-name-chip small {
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.lab-device-name-chip.working {
+  border-color: color-mix(in srgb, var(--green) 35%, var(--line));
+  background: var(--green-soft);
+}
+
+.lab-device-name-chip.broken {
+  border-color: color-mix(in srgb, var(--rose) 38%, var(--line));
+  background: var(--rose-soft);
+}
+
 .lab-period-badge {
   display: grid;
   gap: 4px;

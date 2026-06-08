@@ -186,7 +186,7 @@ export function LaboratoriesView({
         <LabReservationRequestsPanel data={data} setData={setData} currentUser={currentUser} language={language} labs={labs} />
       )}
 
-      <LabStatusPanel data={data} setData={setData} currentUser={currentUser} labs={labs} language={language} />
+      <LabStatusPanel data={data} setData={setData} currentUser={currentUser} labs={labs} devicesByLab={devicesByLab} language={language} />
 
       {(currentUser.role === 'director' || currentUser.role === 'lab') && (
         <LabFaultReportsPanel
@@ -610,6 +610,7 @@ function LabStatusPanel({
   setData,
   currentUser,
   labs,
+  devicesByLab,
   language
 }: {
   data: PlatformData;
@@ -617,6 +618,7 @@ function LabStatusPanel({
   language: Language;
   setData: DataSetter;
   labs: Laboratory[];
+  devicesByLab: Record<string, LabDevice[]>;
 }) {
   const requestReservation = (lab: Laboratory, slot: LabTimeSlot) => {
     if (currentUser.role !== 'teacher' || !currentUser.schoolId || slot.availability !== 'available') {
@@ -673,43 +675,64 @@ function LabStatusPanel({
       </div>
       <div className="lab-status-grid">
         {labs.length === 0 && <p className="empty-state">{tr(language, 'noLaboratories')}</p>}
-        {labs.map((lab) => (
-          <article className="lab-status-card" key={lab.id}>
-            <h3>{lab.name}</h3>
-            <div className="lab-period-badges">
-              {labPeriods.map((period) => {
-                return (
-                  <section className="lab-status-period" key={period}>
-                    <h4>{periodLabel(language, period)}</h4>
-                    <div className="lab-slot-badges">
-                      {labTimeSlots(lab)
-                        .filter((slot) => slot.period === period)
-                        .map((slot) => {
-                          const activeRequest =
-                            currentUser.role === 'teacher' ? activeTeacherReservationForSlot(data, currentUser.id, lab.id, slot.id) : undefined;
-                          const canRequest = currentUser.role === 'teacher' && slot.availability === 'available' && !activeRequest;
+        {labs.map((lab) => {
+          const labDevices = devicesByLab[lab.id] ?? [];
 
-                          return (
-                            <span className={`lab-period-badge ${slot.availability}`} key={slot.id}>
-                              <strong>{slot.startsAt}-{slot.endsAt}</strong>
-                              <small>{availabilityLabel(language, slot.availability)}</small>
-                              {activeRequest && <small>{reservationStatusLabel(language, activeRequest.status)}</small>}
-                              {canRequest && (
-                                <button className="button ghost small lab-request-button" type="button" onClick={() => requestReservation(lab, slot)}>
-                                  <Send size={15} aria-hidden="true" />
-                                  <span>{tr(language, 'requestLabReservation')}</span>
-                                </button>
-                              )}
-                            </span>
-                          );
-                        })}
+          return (
+            <article className="lab-status-card" key={lab.id}>
+              <h3>{lab.name}</h3>
+              {currentUser.role === 'teacher' && (
+                <section className="lab-teacher-devices">
+                  <h4>{tr(language, 'labDeviceNames')}</h4>
+                  {labDevices.length === 0 ? (
+                    <p className="empty-state">{tr(language, 'noDevices')}</p>
+                  ) : (
+                    <div className="lab-device-name-list">
+                      {labDevices.map((device) => (
+                        <span className={`lab-device-name-chip ${device.status}`} key={device.id}>
+                          <strong>{device.name}</strong>
+                          <small>{deviceStatusLabel(language, device.status)}</small>
+                        </span>
+                      ))}
                     </div>
-                  </section>
-                );
-              })}
-            </div>
-          </article>
-        ))}
+                  )}
+                </section>
+              )}
+              <div className="lab-period-badges">
+                {labPeriods.map((period) => {
+                  return (
+                    <section className="lab-status-period" key={period}>
+                      <h4>{periodLabel(language, period)}</h4>
+                      <div className="lab-slot-badges">
+                        {labTimeSlots(lab)
+                          .filter((slot) => slot.period === period)
+                          .map((slot) => {
+                            const activeRequest =
+                              currentUser.role === 'teacher' ? activeTeacherReservationForSlot(data, currentUser.id, lab.id, slot.id) : undefined;
+                            const canRequest = currentUser.role === 'teacher' && slot.availability === 'available' && !activeRequest;
+
+                            return (
+                              <span className={`lab-period-badge ${slot.availability}`} key={slot.id}>
+                                <strong>{slot.startsAt}-{slot.endsAt}</strong>
+                                <small>{availabilityLabel(language, slot.availability)}</small>
+                                {activeRequest && <small>{reservationStatusLabel(language, activeRequest.status)}</small>}
+                                {canRequest && (
+                                  <button className="button ghost small lab-request-button" type="button" onClick={() => requestReservation(lab, slot)}>
+                                    <Send size={15} aria-hidden="true" />
+                                    <span>{tr(language, 'requestLabReservation')}</span>
+                                  </button>
+                                )}
+                              </span>
+                            );
+                          })}
+                      </div>
+                    </section>
+                  );
+                })}
+              </div>
+            </article>
+          );
+        })}
       </div>
     </div>
   );
