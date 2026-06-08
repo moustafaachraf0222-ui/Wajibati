@@ -19,6 +19,16 @@ type ScanOutcome = {
   scan: CanteenMealScan;
 };
 
+let cachedJsQrReader: typeof import('jsqr').default | null = null;
+
+async function loadJsQrReader() {
+  if (!cachedJsQrReader) {
+    cachedJsQrReader = (await import('jsqr')).default;
+  }
+
+  return cachedJsQrReader;
+}
+
 function escapeHtml(value: string) {
   return value
     .replace(/&/g, '&amp;')
@@ -34,6 +44,38 @@ function barcodeDetectorConstructor() {
   }
 
   return (window as unknown as { BarcodeDetector?: BarcodeDetectorConstructor }).BarcodeDetector;
+}
+
+async function readQrCodeFromVideo(video: HTMLVideoElement, canvas: HTMLCanvasElement, detector?: BarcodeDetectorInstance | null) {
+  if (detector) {
+    try {
+      const results = await detector.detect(video);
+      const code = results[0]?.rawValue?.trim();
+      if (code) {
+        return code;
+      }
+    } catch {
+      // Fall back to jsQR below. Some WebViews expose BarcodeDetector but fail on video frames.
+    }
+  }
+
+  const width = video.videoWidth;
+  const height = video.videoHeight;
+  if (width <= 0 || height <= 0) {
+    return '';
+  }
+
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext('2d', { willReadFrequently: true });
+  if (!context) {
+    return '';
+  }
+
+  context.drawImage(video, 0, 0, width, height);
+  const imageData = context.getImageData(0, 0, width, height);
+  const jsQrReader = await loadJsQrReader();
+  return jsQrReader(imageData.data, width, height, { inversionAttempts: 'attemptBoth' })?.data?.trim() ?? '';
 }
 
 function localDateKey(date = new Date()) {
@@ -609,21 +651,28 @@ function CanteenWorkerView({
   );
 
   const startScanner = async () => {
-    const Detector = barcodeDetectorConstructor();
-    if (!Detector || !navigator.mediaDevices?.getUserMedia) {
+    if (!navigator.mediaDevices?.getUserMedia) {
       setCameraError(tr(language, 'cameraNotAvailable'));
       return;
     }
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }
+      });
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
       }
 
-      const detector = new Detector({ formats: ['qr_code'] });
+      const Detector = barcodeDetectorConstructor();
+      const detector = Detector ? new Detector({ formats: ['qr_code'] }) : null;
+      const scanCanvas = document.createElement('canvas');
       setCameraError('');
       setScannerActive(true);
 
@@ -633,21 +682,20 @@ function CanteenWorkerView({
         }
 
         try {
-          const results = await detector.detect(videoRef.current);
-          const code = results[0]?.rawValue?.trim();
+          const code = await readQrCodeFromVideo(videoRef.current, scanCanvas, detector);
           const now = Date.now();
           if (code && (!lastScanRef.current || lastScanRef.current.code !== code || now - lastScanRef.current.at > 3500)) {
             lastScanRef.current = { code, at: now };
             processCode(code);
           }
         } catch {
-          setCameraError(tr(language, 'cameraNotAvailable'));
+          setCameraError('');
         }
 
-        scanTimeoutRef.current = window.setTimeout(runScan, 700);
+        scanTimeoutRef.current = window.setTimeout(runScan, 450);
       };
 
-      scanTimeoutRef.current = window.setTimeout(runScan, 500);
+      scanTimeoutRef.current = window.setTimeout(runScan, 350);
     } catch {
       setCameraError(tr(language, 'cameraNotAvailable'));
       stopScanner();
