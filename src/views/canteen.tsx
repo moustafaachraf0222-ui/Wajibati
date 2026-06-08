@@ -603,6 +603,7 @@ function CanteenWorkerView({
 }) {
   const [manualCode, setManualCode] = useState('');
   const [scanOutcome, setScanOutcome] = useState<ScanOutcome | null>(null);
+  const [scanNotice, setScanNotice] = useState<'idle' | 'success'>('idle');
   const [cameraError, setCameraError] = useState('');
   const [scannerActive, setScannerActive] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -631,6 +632,15 @@ function CanteenWorkerView({
 
   useEffect(() => () => stopScanner(), [stopScanner]);
 
+  useEffect(() => {
+    if (scanNotice !== 'success') {
+      return undefined;
+    }
+
+    const noticeTimer = window.setTimeout(() => setScanNotice('idle'), 2400);
+    return () => window.clearTimeout(noticeTimer);
+  }, [scanNotice]);
+
   const processCode = useCallback(
     (rawCode: string) => {
       const code = rawCode.trim();
@@ -644,6 +654,7 @@ function CanteenWorkerView({
         nextOutcome = evaluation.outcome;
         return evaluation.data;
       });
+      setScanNotice('success');
       setScanOutcome(nextOutcome);
       setManualCode('');
     },
@@ -674,6 +685,7 @@ function CanteenWorkerView({
       const detector = Detector ? new Detector({ formats: ['qr_code'] }) : null;
       const scanCanvas = document.createElement('canvas');
       setCameraError('');
+      setScanNotice('idle');
       setScannerActive(true);
 
       const runScan = async () => {
@@ -684,7 +696,7 @@ function CanteenWorkerView({
         try {
           const code = await readQrCodeFromVideo(videoRef.current, scanCanvas, detector);
           const now = Date.now();
-          if (code && (!lastScanRef.current || lastScanRef.current.code !== code || now - lastScanRef.current.at > 3500)) {
+          if (code && (!lastScanRef.current || lastScanRef.current.code !== code || now - lastScanRef.current.at > 6000)) {
             lastScanRef.current = { code, at: now };
             processCode(code);
           }
@@ -720,10 +732,20 @@ function CanteenWorkerView({
         <div className="canteen-scanner-layout">
           <div className="canteen-camera-box">
             <video ref={videoRef} playsInline muted />
+            {scannerActive && (
+              <div className={scanNotice === 'success' ? 'canteen-scan-overlay success' : 'canteen-scan-overlay'}>
+                <div className="canteen-scan-frame" aria-hidden="true">
+                  <span className="canteen-scan-line" />
+                  <span className="canteen-scan-label">
+                    {tr(language, scanNotice === 'success' ? 'scanSuccess' : 'scannerFrameHint')}
+                  </span>
+                </div>
+              </div>
+            )}
             {!scannerActive && (
               <div className="canteen-camera-placeholder">
                 <QrCode size={44} aria-hidden="true" />
-                <span>{tr(language, 'mealScanner')}</span>
+                <span>{tr(language, 'scannerFrameHint')}</span>
               </div>
             )}
           </div>
@@ -752,6 +774,11 @@ function CanteenWorkerView({
               </button>
             </form>
             {cameraError && <p className="form-error">{cameraError}</p>}
+            {scanNotice === 'success' && (
+              <p className="success-message" aria-live="polite">
+                {tr(language, 'scanSuccess')}
+              </p>
+            )}
             {scanOutcome && (
               <div className={`canteen-result ${resultClass(scanOutcome.result)}`}>
                 {scanOutcome.result === 'allowed' ? <CheckCircle2 size={22} aria-hidden="true" /> : scanOutcome.result === 'duplicate' ? <AlertTriangle size={22} aria-hidden="true" /> : <XCircle size={22} aria-hidden="true" />}

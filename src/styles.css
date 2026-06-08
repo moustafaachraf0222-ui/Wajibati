@@ -2173,6 +2173,94 @@ tbody tr.account-details-row:hover td {
   filter: drop-shadow(0 8px 16px color-mix(in srgb, var(--green) 20%, transparent));
 }
 
+.canteen-scan-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  background: radial-gradient(circle at center, transparent 0 35%, color-mix(in srgb, #000 38%, transparent) 66%);
+  padding: 22px;
+}
+
+.canteen-scan-frame {
+  position: relative;
+  width: min(72%, 260px);
+  aspect-ratio: 1;
+  border: 2px solid color-mix(in srgb, var(--green) 76%, white);
+  border-radius: 18px;
+  box-shadow:
+    0 0 0 999px color-mix(in srgb, #000 22%, transparent),
+    0 0 22px color-mix(in srgb, var(--green) 28%, transparent);
+}
+
+.canteen-scan-frame::before,
+.canteen-scan-frame::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: 20px;
+  background:
+    linear-gradient(var(--green), var(--green)) top left / 42px 4px no-repeat,
+    linear-gradient(var(--green), var(--green)) top left / 4px 42px no-repeat,
+    linear-gradient(var(--green), var(--green)) top right / 42px 4px no-repeat,
+    linear-gradient(var(--green), var(--green)) top right / 4px 42px no-repeat,
+    linear-gradient(var(--green), var(--green)) bottom left / 42px 4px no-repeat,
+    linear-gradient(var(--green), var(--green)) bottom left / 4px 42px no-repeat,
+    linear-gradient(var(--green), var(--green)) bottom right / 42px 4px no-repeat,
+    linear-gradient(var(--green), var(--green)) bottom right / 4px 42px no-repeat;
+}
+
+.canteen-scan-line {
+  position: absolute;
+  inset-inline: 18px;
+  top: 20px;
+  height: 3px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--green) 88%, white);
+  box-shadow: 0 0 16px color-mix(in srgb, var(--green) 65%, transparent);
+  animation: canteen-scan-line 1.7s ease-in-out infinite alternate;
+}
+
+.canteen-scan-label {
+  position: absolute;
+  left: 50%;
+  bottom: -48px;
+  width: max-content;
+  max-width: min(82vw, 320px);
+  transform: translateX(-50%);
+  border: 1px solid color-mix(in srgb, var(--green) 45%, var(--line));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--paper) 92%, var(--green-soft));
+  color: var(--text);
+  padding: 8px 13px;
+  font-weight: 900;
+  text-align: center;
+}
+
+.canteen-scan-overlay.success .canteen-scan-frame {
+  border-color: color-mix(in srgb, var(--green) 88%, white);
+  box-shadow:
+    0 0 0 999px color-mix(in srgb, #000 18%, transparent),
+    0 0 26px color-mix(in srgb, var(--green) 48%, transparent);
+}
+
+.canteen-scan-overlay.success .canteen-scan-line {
+  animation: none;
+  top: 50%;
+  background: color-mix(in srgb, var(--green) 92%, white);
+}
+
+@keyframes canteen-scan-line {
+  from {
+    transform: translateY(0);
+  }
+
+  to {
+    transform: translateY(190px);
+  }
+}
+
 .canteen-scan-controls {
   display: grid;
   gap: 14px;
