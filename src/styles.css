@@ -1874,6 +1874,12 @@ tbody tr.account-details-row:hover td {
   gap: 12px;
 }
 
+.lab-card-list,
+.lab-status-grid {
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  align-items: start;
+}
+
 .lab-card {
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -1900,11 +1906,59 @@ tbody tr.account-details-row:hover td {
 }
 
 .lab-period-grid,
-.lab-period-badges {
+.lab-period-badges,
+.lab-slots-board {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
   margin-top: 12px;
+}
+
+.lab-slot-period,
+.lab-status-period {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.lab-slot-period h4,
+.lab-status-period h4 {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.94rem;
+}
+
+.lab-slot-list,
+.lab-slot-badges {
+  display: grid;
+  gap: 8px;
+}
+
+.lab-slot-control {
+  display: grid;
+  grid-template-columns: minmax(92px, 1fr) minmax(112px, 0.95fr);
+  gap: 8px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  padding: 8px;
+}
+
+.lab-slot-control span {
+  font-weight: 800;
+  direction: ltr;
+  text-align: start;
+}
+
+.lab-slot-control.available {
+  border-color: color-mix(in srgb, var(--green) 32%, var(--line));
+  background: var(--green-soft);
+}
+
+.lab-slot-control.reserved {
+  border-color: color-mix(in srgb, var(--rose) 38%, var(--line));
+  background: var(--rose-soft);
 }
 
 .lab-period-badge,
@@ -1923,6 +1977,11 @@ tbody tr.account-details-row:hover td {
   display: grid;
   gap: 4px;
   padding: 10px 12px;
+}
+
+.lab-period-badge strong {
+  direction: ltr;
+  text-align: start;
 }
 
 .lab-period-badge small {
@@ -3300,6 +3359,8 @@ summary.subject-group-heading:hover .subject-icon svg {
   .schedule-template-card,
   .account-type-grid,
   .lab-period-grid,
+  .lab-period-badges,
+  .lab-slots-board,
   .lab-device-form,
   .form-grid,
   .exercise-grid,

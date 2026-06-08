@@ -231,12 +231,22 @@ export type LabAvailability = 'available' | 'reserved';
 export type LabDeviceStatus = 'working' | 'broken';
 export type LabFaultStatus = 'open' | 'repaired';
 
+export type LabTimeSlot = {
+  id: string;
+  period: LabPeriod;
+  name: string;
+  startsAt: string;
+  endsAt: string;
+  availability: LabAvailability;
+};
+
 export type Laboratory = {
   id: string;
   schoolId: string;
   name: string;
   supervisorId: string;
   periods: Record<LabPeriod, LabAvailability>;
+  timeSlots?: LabTimeSlot[];
   createdBy: string;
   createdAt: string;
   updatedAt?: string;

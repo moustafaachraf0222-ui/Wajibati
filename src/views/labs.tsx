@@ -7,6 +7,7 @@ import type {
   LabFaultReport,
   Laboratory,
   LabPeriod,
+  LabTimeSlot,
   Language,
   PlatformData,
   PlatformUser,
@@ -18,6 +19,18 @@ import { readAttachmentFromInput } from '../files';
 import { AttachmentPreview, Field, ResponsiveTable } from '../ui';
 
 const labPeriods: LabPeriod[] = ['morning', 'afternoon'];
+const quickLabChoices = ['lab1', 'lab2', 'custom'] as const;
+
+const defaultLabSlotTemplates: Array<Omit<LabTimeSlot, 'availability'>> = [
+  { id: 'morning-0800-0900', period: 'morning', name: '1', startsAt: '08:00', endsAt: '09:00' },
+  { id: 'morning-0900-1000', period: 'morning', name: '2', startsAt: '09:00', endsAt: '10:00' },
+  { id: 'morning-1000-1100', period: 'morning', name: '3', startsAt: '10:00', endsAt: '11:00' },
+  { id: 'morning-1100-1200', period: 'morning', name: '4', startsAt: '11:00', endsAt: '12:00' },
+  { id: 'afternoon-1300-1400', period: 'afternoon', name: '5', startsAt: '13:00', endsAt: '14:00' },
+  { id: 'afternoon-1400-1500', period: 'afternoon', name: '6', startsAt: '14:00', endsAt: '15:00' },
+  { id: 'afternoon-1500-1600', period: 'afternoon', name: '7', startsAt: '15:00', endsAt: '16:00' },
+  { id: 'afternoon-1600-1700', period: 'afternoon', name: '8', startsAt: '16:00', endsAt: '17:00' }
+];
 
 function periodLabel(language: Language, period: LabPeriod) {
   return tr(language, period === 'morning' ? 'labMorningPeriod' : 'labAfternoonPeriod');
@@ -25,6 +38,29 @@ function periodLabel(language: Language, period: LabPeriod) {
 
 function availabilityLabel(language: Language, availability: LabAvailability) {
   return tr(language, availability === 'available' ? 'labAvailable' : 'labReserved');
+}
+
+function defaultLabTimeSlots(availability: LabAvailability = 'available'): LabTimeSlot[] {
+  return defaultLabSlotTemplates.map((slot) => ({ ...slot, availability }));
+}
+
+function labTimeSlots(lab: Laboratory) {
+  if (Array.isArray(lab.timeSlots) && lab.timeSlots.length > 0) {
+    return [...lab.timeSlots].sort((left, right) => left.startsAt.localeCompare(right.startsAt));
+  }
+
+  return defaultLabSlotTemplates.map((slot) => ({
+    ...slot,
+    availability: (lab.periods ?? defaultLabPeriods())[slot.period] ?? 'available'
+  }));
+}
+
+function quickLabName(language: Language, choice: (typeof quickLabChoices)[number], customName: string) {
+  if (choice === 'custom') {
+    return customName.trim();
+  }
+
+  return tr(language, choice === 'lab1' ? 'labOne' : 'labTwo');
 }
 
 function deviceStatusLabel(language: Language, status: LabDevice['status']) {
@@ -145,15 +181,21 @@ function LabManagementPanel({
   labs: Laboratory[];
   devicesByLab: Record<string, LabDevice[]>;
 }) {
-  const [labName, setLabName] = useState('');
+  const [labChoice, setLabChoice] = useState<(typeof quickLabChoices)[number]>('lab1');
+  const [customLabName, setCustomLabName] = useState('');
   const [labError, setLabError] = useState('');
   const [deviceDrafts, setDeviceDrafts] = useState<Record<string, { name: string; image: UploadedAttachment | null; error: string }>>({});
 
   const addLab = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const name = labName.trim();
+    const name = quickLabName(language, labChoice, customLabName);
     if (!name || !currentUser.schoolId) {
       setLabError(tr(language, 'labNameRequired'));
+      return;
+    }
+
+    if (labs.some((lab) => lab.name.trim().toLowerCase() === name.toLowerCase())) {
+      setLabError(tr(language, 'duplicateLaboratory'));
       return;
     }
 
@@ -168,16 +210,17 @@ function LabManagementPanel({
           name,
           supervisorId: currentUser.id,
           periods: defaultLabPeriods(),
+          timeSlots: defaultLabTimeSlots(),
           createdBy: currentUser.id,
           createdAt: now
         }
       ]
     }));
-    setLabName('');
+    setCustomLabName('');
     setLabError('');
   };
 
-  const updateLabAvailability = (lab: Laboratory, period: LabPeriod, availability: LabAvailability) => {
+  const updateLabSlotAvailability = (lab: Laboratory, slotId: string, availability: LabAvailability) => {
     const now = new Date().toISOString();
     setData((previous) => ({
       ...previous,
@@ -185,11 +228,7 @@ function LabManagementPanel({
         item.id === lab.id
           ? {
               ...item,
-              periods: {
-                ...defaultLabPeriods(),
-                ...(item.periods ?? {}),
-                [period]: availability
-              },
+              timeSlots: labTimeSlots(item).map((slot) => (slot.id === slotId ? { ...slot, availability } : slot)),
               updatedAt: now
             }
           : item
@@ -290,7 +329,17 @@ function LabManagementPanel({
         <FlaskConical size={24} aria-hidden="true" />
       </div>
       <form className="form-grid" onSubmit={addLab}>
-        <Field label={tr(language, 'labName')} value={labName} onChange={setLabName} required />
+        <label>
+          <span>{tr(language, 'labQuickChoice')}</span>
+          <select value={labChoice} onChange={(event) => setLabChoice(event.target.value as (typeof quickLabChoices)[number])}>
+            <option value="lab1">{tr(language, 'labOne')}</option>
+            <option value="lab2">{tr(language, 'labTwo')}</option>
+            <option value="custom">{tr(language, 'customLabName')}</option>
+          </select>
+        </label>
+        {labChoice === 'custom' && (
+          <Field label={tr(language, 'labName')} value={customLabName} onChange={setCustomLabName} required />
+        )}
         {labError && <p className="form-error full">{labError}</p>}
         <button className="button primary form-submit" type="submit">
           <Plus size={17} aria-hidden="true" />
@@ -309,18 +358,26 @@ function LabManagementPanel({
               </div>
               <FlaskConical size={21} aria-hidden="true" />
             </div>
-            <div className="lab-period-grid">
+            <div className="lab-slots-board">
               {labPeriods.map((period) => (
-                <label key={period}>
-                  <span>{periodLabel(language, period)}</span>
-                  <select
-                    value={(lab.periods ?? defaultLabPeriods())[period] ?? 'available'}
-                    onChange={(event) => updateLabAvailability(lab, period, event.target.value as LabAvailability)}
-                  >
-                    <option value="available">{tr(language, 'labAvailable')}</option>
-                    <option value="reserved">{tr(language, 'labReserved')}</option>
-                  </select>
-                </label>
+                <section className="lab-slot-period" key={period}>
+                  <h4>{periodLabel(language, period)}</h4>
+                  <div className="lab-slot-list">
+                    {labTimeSlots(lab)
+                      .filter((slot) => slot.period === period)
+                      .map((slot) => (
+                        <label className={`lab-slot-control ${slot.availability}`} key={slot.id}>
+                          <span>
+                            {slot.startsAt}-{slot.endsAt}
+                          </span>
+                          <select value={slot.availability} onChange={(event) => updateLabSlotAvailability(lab, slot.id, event.target.value as LabAvailability)}>
+                            <option value="available">{tr(language, 'labAvailable')}</option>
+                            <option value="reserved">{tr(language, 'labReserved')}</option>
+                          </select>
+                        </label>
+                      ))}
+                  </div>
+                </section>
               ))}
             </div>
 
@@ -393,12 +450,20 @@ function LabStatusPanel({ labs, language }: { labs: Laboratory[]; language: Lang
             <h3>{lab.name}</h3>
             <div className="lab-period-badges">
               {labPeriods.map((period) => {
-                const availability = (lab.periods ?? defaultLabPeriods())[period] ?? 'available';
                 return (
-                  <span className={`lab-period-badge ${availability}`} key={period}>
-                    <strong>{periodLabel(language, period)}</strong>
-                    <small>{availabilityLabel(language, availability)}</small>
-                  </span>
+                  <section className="lab-status-period" key={period}>
+                    <h4>{periodLabel(language, period)}</h4>
+                    <div className="lab-slot-badges">
+                      {labTimeSlots(lab)
+                        .filter((slot) => slot.period === period)
+                        .map((slot) => (
+                          <span className={`lab-period-badge ${slot.availability}`} key={slot.id}>
+                            <strong>{slot.startsAt}-{slot.endsAt}</strong>
+                            <small>{availabilityLabel(language, slot.availability)}</small>
+                          </span>
+                        ))}
+                    </div>
+                  </section>
                 );
               })}
             </div>
