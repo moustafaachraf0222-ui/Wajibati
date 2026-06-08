@@ -1,6 +1,6 @@
-import type { PlatformData, PlatformUser, SchoolRecord } from './types';
+import type { AbsenceRecord, PlatformData, PlatformUser, SchoolRecord } from './types';
 import { uniqueStrings } from './education';
-import { SCHOOL_TRASH_RETENTION_MS } from './data-constants';
+import { ABSENCE_JUSTIFICATION_RETENTION_MS, SCHOOL_TRASH_RETENTION_MS } from './data-constants';
 
 export function schoolIsTrashed(school?: SchoolRecord) {
   return Boolean(school?.deletedAt);
@@ -21,6 +21,24 @@ export function schoolTrashExpiresAt(school: SchoolRecord) {
 
 export function schoolTrashIsExpired(school: SchoolRecord, now = Date.now()) {
   const expiresAt = schoolTrashExpiresAt(school);
+  return Boolean(expiresAt && expiresAt.getTime() <= now);
+}
+
+export function absenceJustificationExpiresAt(record: Pick<AbsenceRecord, 'justificationSubmittedAt'>) {
+  if (!record.justificationSubmittedAt) {
+    return null;
+  }
+
+  const submittedAt = Date.parse(record.justificationSubmittedAt);
+  if (Number.isNaN(submittedAt)) {
+    return null;
+  }
+
+  return new Date(submittedAt + ABSENCE_JUSTIFICATION_RETENTION_MS);
+}
+
+export function absenceJustificationIsExpired(record: Pick<AbsenceRecord, 'justificationSubmittedAt'>, now = Date.now()) {
+  const expiresAt = absenceJustificationExpiresAt(record);
   return Boolean(expiresAt && expiresAt.getTime() <= now);
 }
 
@@ -205,4 +223,38 @@ export function purgeExpiredTrashedSchools(data: PlatformData, now = Date.now())
   }
 
   return expiredSchools.reduce((nextData, school) => deleteSchoolRecords(nextData, school), data);
+}
+
+export function purgeExpiredAbsenceJustifications(data: PlatformData, now = Date.now()): PlatformData {
+  const hasExpiredJustifications = data.absenceRecords.some(
+    (record) =>
+      (record.justificationText?.trim() || record.justificationAttachment) &&
+      absenceJustificationIsExpired(record, now)
+  );
+
+  if (!hasExpiredJustifications) {
+    return data;
+  }
+
+  const updatedAt = new Date(now).toISOString();
+  return {
+    ...data,
+    absenceRecords: data.absenceRecords.map((record) => {
+      if (!absenceJustificationIsExpired(record, now)) {
+        return record;
+      }
+
+      const {
+        justificationText: _justificationText,
+        justificationAttachment: _justificationAttachment,
+        justificationSubmittedAt: _justificationSubmittedAt,
+        ...recordWithoutJustification
+      } = record;
+
+      return {
+        ...recordWithoutJustification,
+        updatedAt
+      };
+    })
+  };
 }

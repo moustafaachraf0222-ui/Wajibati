@@ -2,7 +2,7 @@ import type { AbsenceSchedule, PlatformData } from './types';
 import { secondaryStreams, uniqueStrings } from './education';
 import { DATA_KEY } from './data-constants';
 import { cloneSeedData } from './data-seed';
-import { applyDeletionTombstones, purgeExpiredTrashedSchools } from './data-tombstones';
+import { applyDeletionTombstones, purgeExpiredAbsenceJustifications, purgeExpiredTrashedSchools } from './data-tombstones';
 
 function normalizedScheduleClassGroup(value: string) {
   return value.trim().toLowerCase();
@@ -112,7 +112,7 @@ export function normalizePlatformData(value: Partial<PlatformData> | null | unde
     }
   };
 
-  return applyDeletionTombstones(purgeExpiredTrashedSchools(normalized));
+  return applyDeletionTombstones(purgeExpiredAbsenceJustifications(purgeExpiredTrashedSchools(normalized)));
 }
 
 export function loadData(): PlatformData {

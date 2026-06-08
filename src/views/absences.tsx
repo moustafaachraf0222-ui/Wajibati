@@ -13,7 +13,7 @@ import type {
 } from '../types';
 import { localeNames, schoolYearLabel, tr } from '../i18n';
 import { assignedYearClassGroups, assignedYearStreamClassGroups, sameClassGroup, secondaryStreamLabel, uniqueStrings } from '../education';
-import { getSchool, makeId } from '../data';
+import { absenceJustificationExpiresAt, absenceJustificationIsExpired, getSchool, makeId } from '../data';
 import { readAttachmentFromInput } from '../files';
 import { AttachmentPreview, ResponsiveTable } from '../ui';
 
@@ -391,7 +391,7 @@ function absenceRecordSessionLabel(record: AbsenceRecord) {
 }
 
 function absenceRecordHasJustification(record: AbsenceRecord) {
-  return Boolean(record.justificationText?.trim() || record.justificationAttachment);
+  return Boolean((record.justificationText?.trim() || record.justificationAttachment) && !absenceJustificationIsExpired(record));
 }
 
 function reportIsCurrent(report: AbsenceReport, now = Date.now()) {
@@ -1036,6 +1036,11 @@ function StudentAbsenceJustifications({ data, setData, currentUser, language }: 
                     {record.justificationSubmittedAt && (
                       <small>
                         {tr(language, 'justifiedAt')}: {formatAbsenceDateTime(language, record.justificationSubmittedAt)}
+                      </small>
+                    )}
+                    {absenceJustificationExpiresAt(record) && (
+                      <small>
+                        {tr(language, 'justificationExpiresAt')}: {formatAbsenceDateTime(language, absenceJustificationExpiresAt(record)!.toISOString())}
                       </small>
                     )}
                   </div>

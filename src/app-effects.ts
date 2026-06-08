@@ -2,7 +2,7 @@ import { Capacitor } from '@capacitor/core';
 import { PushNotifications, type Token } from '@capacitor/push-notifications';
 import { useEffect } from 'react';
 import type { DataSetter, Language, PlatformUser, SyncStatus, Theme } from './types';
-import { LANGUAGE_KEY, SESSION_KEY, THEME_KEY, purgeExpiredTrashedSchools, upsertPushToken } from './data';
+import { LANGUAGE_KEY, SESSION_KEY, THEME_KEY, purgeExpiredAbsenceJustifications, purgeExpiredTrashedSchools, upsertPushToken } from './data';
 
 export function useLanguagePreference(language: Language) {
   useEffect(() => {
@@ -31,12 +31,12 @@ export function useSessionPersistence(sessionUserId: string | null) {
 
 export function useExpiredSchoolTrashPurge(setData: DataSetter) {
   useEffect(() => {
-    const purgeExpiredSchools = () => {
-      setData((previous) => purgeExpiredTrashedSchools(previous));
+    const purgeExpiredData = () => {
+      setData((previous) => purgeExpiredAbsenceJustifications(purgeExpiredTrashedSchools(previous)));
     };
 
-    purgeExpiredSchools();
-    const purgeTimer = window.setInterval(purgeExpiredSchools, 60_000);
+    purgeExpiredData();
+    const purgeTimer = window.setInterval(purgeExpiredData, 60_000);
     return () => window.clearInterval(purgeTimer);
   }, [setData]);
 }
