@@ -132,8 +132,67 @@ function teacherCanMarkStudentAbsence(teacher: PlatformUser, student: PlatformUs
   return Boolean(classGroups[String(student.schoolYear)]?.some((group) => sameClassGroup(group, student.classGroup)));
 }
 
-function classesForAbsences(data: PlatformData, currentUser: PlatformUser): AbsenceClassGroup[] {
+function assignedAbsenceGroupsForTeacher(teacher: PlatformUser) {
   const groups = new Map<string, AbsenceClassGroup>();
+  const streamGroups = assignedYearStreamClassGroups(teacher);
+  const streamEntries = Object.entries(streamGroups);
+
+  if (streamEntries.length > 0) {
+    streamEntries.forEach(([year, streams]) => {
+      const schoolYear = Number(year);
+      if (!Number.isInteger(schoolYear) || schoolYear <= 0) {
+        return;
+      }
+
+      Object.entries(streams).forEach(([stream, classGroups]) => {
+        (classGroups ?? []).forEach((classGroup) => {
+          const normalizedClassGroup = classGroup.trim();
+          if (!normalizedClassGroup) {
+            return;
+          }
+
+          const key = classKey(schoolYear, stream as SecondaryStream, normalizedClassGroup);
+          groups.set(key, {
+            key,
+            schoolYear,
+            stream: stream as SecondaryStream,
+            classGroup: normalizedClassGroup,
+            students: []
+          });
+        });
+      });
+    });
+
+    return groups;
+  }
+
+  Object.entries(assignedYearClassGroups(teacher)).forEach(([year, classGroups]) => {
+    const schoolYear = Number(year);
+    if (!Number.isInteger(schoolYear) || schoolYear <= 0) {
+      return;
+    }
+
+    classGroups.forEach((classGroup) => {
+      const normalizedClassGroup = classGroup.trim();
+      if (!normalizedClassGroup) {
+        return;
+      }
+
+      const key = classKey(schoolYear, undefined, normalizedClassGroup);
+      groups.set(key, {
+        key,
+        schoolYear,
+        classGroup: normalizedClassGroup,
+        students: []
+      });
+    });
+  });
+
+  return groups;
+}
+
+function classesForAbsences(data: PlatformData, currentUser: PlatformUser): AbsenceClassGroup[] {
+  const groups = currentUser.role === 'teacher' ? assignedAbsenceGroupsForTeacher(currentUser) : new Map<string, AbsenceClassGroup>();
 
   data.users
     .filter(
@@ -1190,6 +1249,7 @@ function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: Co
   const draftAbsenceCount = recordsForSession.filter((record) => !record.sentAt).length;
   const draftClassCount = new Set(recordsForSession.map(reportGroupKey)).size;
   const absentCount = recordsForSelection.length;
+  const selectedClassHasStudents = Boolean(selectedClass?.students.length);
   const selectedSessionAppliesToClass = Boolean(
     selectedClass &&
       selectedSessionChoices.length > 0 &&
@@ -1199,7 +1259,7 @@ function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: Co
     selectedClass && selectedSessionAppliesToClass
       ? selectedSessionChoices.filter((choice) => !sentSessionIds.has(sessionIdFor(selectedDate, choice.schedule.id, choice.session.id)))
       : [];
-  const canEditSelectedClass = Boolean(selectedClass && sessionReady && selectedSessionAppliesToClass && editableSessionChoices.length > 0);
+  const canEditSelectedClass = Boolean(selectedClass && selectedClassHasStudents && sessionReady && selectedSessionAppliesToClass && editableSessionChoices.length > 0);
 
   const saveClassAbsences = () => {
     setNotice('');
@@ -1207,6 +1267,11 @@ function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: Co
 
     if (!selectedClass || !sessionReady) {
       setError(tr(language, 'scheduleRequired'));
+      return;
+    }
+
+    if (!selectedClassHasStudents) {
+      setError(tr(language, 'noStudentsInSelectedClass'));
       return;
     }
 
@@ -1474,7 +1539,7 @@ function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: Co
           <span>{tr(language, 'draftAbsenceCount')}: {draftAbsenceCount}</span>
           <span>{tr(language, 'reportedClassCount')}: {draftClassCount}</span>
           <strong>{allSelectedSessionsSent ? tr(language, 'absenceReportAlreadySent') : tr(language, 'draftReport')}</strong>
-          <button className="button primary" type="button" disabled={!sessionReady || allSelectedSessionsSent} onClick={sendAbsenceReport}>
+          <button className="button primary" type="button" disabled={!sessionReady || allSelectedSessionsSent || draftAbsenceCount === 0} onClick={sendAbsenceReport}>
             <Send size={17} aria-hidden="true" />
             <span>{tr(language, 'sendAbsenceReport')}</span>
           </button>
@@ -1504,6 +1569,8 @@ function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: Co
         <p className="hint">
           {allSelectedSessionsSent
             ? tr(language, 'absenceReportAlreadySent')
+            : selectedClass && !selectedClassHasStudents
+              ? tr(language, 'noStudentsInSelectedClass')
             : selectedClass && selectedSessionChoices.length > 0 && !selectedSessionAppliesToClass
               ? tr(language, 'sessionNotAssignedToClass')
               : tr(language, 'absenceGridHint')}
@@ -1513,7 +1580,7 @@ function SupervisorAbsenceWorkspace({ data, setData, currentUser, language }: Co
         {selectedClass ? (
           <ResponsiveTable
             columns={[tr(language, 'fullName'), ...selectedSessionChoices.map(sessionTimeLabel)]}
-            emptyText={tr(language, 'noRecords')}
+            emptyText={tr(language, 'noStudentsInSelectedClass')}
           >
             {selectedClass.students.map((student) => {
               return (
