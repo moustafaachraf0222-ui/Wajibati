@@ -15,6 +15,8 @@ export const primarySubjects: Subject[] = [
   'physical_education'
 ];
 
+export const primarySpecialistSubjects: Subject[] = ['french', 'tamazight', 'physical_education'];
+export const primaryTeacherSubjects: Subject[] = ['arabic', ...primarySpecialistSubjects];
 export const primaryLowerYearExcludedSubjects: Subject[] = ['french', 'english'];
 
 export const middleSubjects: Subject[] = [

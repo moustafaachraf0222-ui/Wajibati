@@ -1,12 +1,13 @@
 import { BookOpen, Building2, ClipboardCheck, GraduationCap, ShieldCheck } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { Language, PlatformUser, Role, SecondaryStream } from './types';
-import { roleNames, schoolYearLabel, stageNames, subjectNames, tr } from './i18n';
+import { roleNames, schoolYearLabel, stageNames, tr } from './i18n';
 import {
   assignedYearClassGroups,
   assignedYearStreamClassGroups,
   secondaryStreamLabel,
-  teacherSubjectForYear
+  teacherSubjectForYear,
+  teacherSubjectName
 } from './education';
 
 const roleIcons: Record<Role, LucideIcon> = {
@@ -72,7 +73,7 @@ export function AccountAssignmentDetails({ user, language }: { user: PlatformUse
                 <div className="assignment-year-heading">
                   <strong>{schoolYearLabel(language, user.stage, Number(year))}</strong>
                   {teacherSubjectForYear(user, Number(year)) && (
-                    <span className="assignment-chip subject">{subjectNames[language][teacherSubjectForYear(user, Number(year))!]}</span>
+                    <span className="assignment-chip subject">{teacherSubjectName(language, user, teacherSubjectForYear(user, Number(year))!, Number(year))}</span>
                   )}
                 </div>
                 <div className="assignment-stream-list">
@@ -107,7 +108,7 @@ export function AccountAssignmentDetails({ user, language }: { user: PlatformUse
                 <div className="assignment-year-heading">
                   <strong>{schoolYearLabel(language, user.stage, Number(year))}</strong>
                   {teacherSubjectForYear(user, Number(year)) && (
-                    <span className="assignment-chip subject">{subjectNames[language][teacherSubjectForYear(user, Number(year))!]}</span>
+                    <span className="assignment-chip subject">{teacherSubjectName(language, user, teacherSubjectForYear(user, Number(year))!, Number(year))}</span>
                   )}
                 </div>
                 <div className="assignment-chip-row">

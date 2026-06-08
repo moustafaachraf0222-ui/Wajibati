@@ -4,7 +4,9 @@ import {
   firstYearSecondaryStreams,
   middleSubjects,
   primaryLowerYearExcludedSubjects,
+  primarySpecialistSubjects,
   primarySubjects,
+  primaryTeacherSubjects,
   secondarySubjectStreams,
   secondarySubjects
 } from './education-constants';
@@ -39,6 +41,67 @@ export function teacherSubjectForYear(user: PlatformUser, schoolYear: number | u
   return assignedYearSubjects(user)[String(schoolYear)] ?? user.subject;
 }
 
+function subjectIsAvailableForPrimaryYear(subject: Subject, schoolYear: number | undefined) {
+  return !(schoolYear && (schoolYear === 1 || schoolYear === 2) && primaryLowerYearExcludedSubjects.includes(subject));
+}
+
+export function primaryGeneralSubjectsForYear(schoolYear: number | undefined) {
+  return primarySubjects.filter((subject) => !primarySpecialistSubjects.includes(subject) && subjectIsAvailableForPrimaryYear(subject, schoolYear));
+}
+
+function isPrimaryGeneralTeacherSubject(subject: Subject | undefined, schoolYear: number | undefined) {
+  return Boolean(subject && primaryGeneralSubjectsForYear(schoolYear).includes(subject));
+}
+
+export function primaryTeacherSubjectName(language: Language, subject: Subject) {
+  if (subject === 'arabic') {
+    return tr(language, 'primaryLiteratureTeacher');
+  }
+
+  if (subject === 'french') {
+    return tr(language, 'primaryFrenchTeacher');
+  }
+
+  if (subject === 'tamazight') {
+    return tr(language, 'primaryTamazightTeacher');
+  }
+
+  if (subject === 'physical_education') {
+    return tr(language, 'primarySportTeacher');
+  }
+
+  return subjectNames[language][subject];
+}
+
+export function teacherSubjectName(language: Language, user: PlatformUser, subject: Subject, schoolYear?: number) {
+  if (user.stage === 'primary' && isPrimaryGeneralTeacherSubject(subject, schoolYear)) {
+    return tr(language, 'primaryLiteratureTeacher');
+  }
+
+  if (user.stage === 'primary' && primaryTeacherSubjects.includes(subject)) {
+    return primaryTeacherSubjectName(language, subject);
+  }
+
+  return subjectNames[language][subject];
+}
+
+export function teacherAllowedSubjectsForYear(user: PlatformUser, schoolYear: number | undefined) {
+  const subject = teacherSubjectForYear(user, schoolYear);
+  if (!subject) {
+    return [];
+  }
+
+  if (user.stage !== 'primary') {
+    return [subject];
+  }
+
+  if (isPrimaryGeneralTeacherSubject(subject, schoolYear)) {
+    return primaryGeneralSubjectsForYear(schoolYear);
+  }
+
+  return subjectIsAvailableForPrimaryYear(subject, schoolYear) ? [subject] : [];
+}
+
 export function teacherSubjectsLabel(language: Language, user: PlatformUser) {
   if (user.role !== 'teacher') {
     return user.subject ? subjectNames[language][user.subject] : '-';
@@ -51,10 +114,12 @@ export function teacherSubjectsLabel(language: Language, user: PlatformUser) {
 
   const uniqueSubjects = [...new Set(subjectEntries.map(([, subject]) => subject))];
   if (uniqueSubjects.length === 1) {
-    return subjectNames[language][uniqueSubjects[0]];
+    return teacherSubjectName(language, user, uniqueSubjects[0]);
   }
 
-  return subjectEntries.map(([year, subject]) => `${schoolYearLabel(language, user.stage, Number(year))}: ${subjectNames[language][subject]}`).join(' | ');
+  return subjectEntries
+    .map(([year, subject]) => `${schoolYearLabel(language, user.stage, Number(year))}: ${teacherSubjectName(language, user, subject, Number(year))}`)
+    .join(' | ');
 }
 
 export function selectedStreamsForTeacherYear(yearStreamClassGroups: YearStreamClassGroups, school: SchoolRecord | undefined, schoolYear: number) {
@@ -174,12 +239,13 @@ export function subjectsForTeacherYears(school: SchoolRecord | undefined, select
     return [];
   }
 
-  const availableSubjects = subjectsForTeacherStreams(school, selectedStreams);
-
-  if (school?.stage === 'primary' && schoolYears.some((year) => year === 1 || year === 2)) {
-    return availableSubjects.filter((subject) => !primaryLowerYearExcludedSubjects.includes(subject));
+  if (school?.stage === 'primary') {
+    return schoolYears.some((year) => year === 1 || year === 2)
+      ? primaryTeacherSubjects.filter((subject) => !primaryLowerYearExcludedSubjects.includes(subject))
+      : primaryTeacherSubjects;
   }
 
+  const availableSubjects = subjectsForTeacherStreams(school, selectedStreams);
   return availableSubjects;
 }
 
@@ -202,6 +268,10 @@ export function subjectScopeLabel(language: Language, subject: Subject, school?:
 }
 
 export function subjectOptionLabel(language: Language, subject: Subject, school?: SchoolRecord) {
+  if (school?.stage === 'primary' && primaryTeacherSubjects.includes(subject)) {
+    return primaryTeacherSubjectName(language, subject);
+  }
+
   const subjectName = subjectNames[language][subject];
   const scope = subjectScopeLabel(language, subject, school);
 

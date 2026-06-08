@@ -3,7 +3,7 @@ import {
   exerciseMatchesStudent,
   exerciseMatchesTeacherAssignment,
   sameClassGroup,
-  teacherSubjectForYear
+  teacherAllowedSubjectsForYear
 } from './education';
 import { schoolIsTrashed } from './data-tombstones';
 
@@ -64,7 +64,7 @@ export function scopedExercises(data: PlatformData, user: PlatformUser) {
     return data.exercises.filter(
       (exercise) =>
         exercise.schoolId === user.schoolId &&
-        exercise.subject === teacherSubjectForYear(user, exercise.schoolYear) &&
+        teacherAllowedSubjectsForYear(user, exercise.schoolYear).includes(exercise.subject) &&
         exerciseMatchesTeacherAssignment(exercise, user)
     );
   }

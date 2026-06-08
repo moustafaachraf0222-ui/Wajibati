@@ -1,6 +1,6 @@
 import { Archive, MessageSquare, Plus, Trash2, Upload } from 'lucide-react';
 import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
-import type { Announcement, DataSetter, Language, PlatformData, PlatformUser, SecondaryStream, TeacherNote, UploadedAttachment } from '../types';
+import type { Announcement, DataSetter, Language, PlatformData, PlatformUser, SecondaryStream, Subject, TeacherNote, UploadedAttachment } from '../types';
 import { schoolYearLabel, subjectNames, tr } from '../i18n';
 import {
   assignedSchoolYears,
@@ -9,6 +9,7 @@ import {
   sameClassGroup,
   secondaryStreamLabel,
   secondaryStreamsForYear,
+  teacherAllowedSubjectsForYear,
   teacherSubjectForYear,
   uniqueStrings
 } from '../education';
@@ -205,10 +206,12 @@ function TeacherNotes({ data, setData, currentUser, language }: CommonViewProps 
   const teacherClassesForYearAndStream = (year: number, stream: SecondaryStream | '') =>
     stream && hasStreamAssignments ? teacherYearStreamClassGroups[String(year)]?.[stream] ?? [] : teacherClassesForYear(year);
   const firstStream = teacherStreamsForYear(firstYear)[0] ?? '';
+  const firstSubject = teacherAllowedSubjectsForYear(currentUser, firstYear)[0] ?? '';
   const [form, setForm] = useState({
     title: '',
     body: '',
     targetSchoolYear: firstYear,
+    targetSubject: firstSubject as Subject | '',
     targetStream: firstStream as SecondaryStream | '',
     targetClassGroup: teacherClassesForYearAndStream(firstYear, firstStream)[0] ?? teacherClassesForYear(firstYear)[0] ?? '',
     attachment: null as UploadedAttachment | null
@@ -218,6 +221,7 @@ function TeacherNotes({ data, setData, currentUser, language }: CommonViewProps 
   const activeNotes = notes.filter((note) => !isNoteArchived(note, now));
   const archivedNotes = notes.filter((note) => isNoteArchived(note, now));
   const streamOptionsForSelectedYear = teacherStreamsForYear(form.targetSchoolYear);
+  const subjectOptionsForSelectedYear = teacherAllowedSubjectsForYear(currentUser, form.targetSchoolYear);
   const streamRequired = currentUser.stage === 'secondary';
 
   const readFile = (event: ChangeEvent<HTMLInputElement>) => {
@@ -234,7 +238,9 @@ function TeacherNotes({ data, setData, currentUser, language }: CommonViewProps 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const classGroup = form.targetClassGroup.trim();
-    const targetSubject = teacherSubjectForYear(currentUser, form.targetSchoolYear);
+    const targetSubject = subjectOptionsForSelectedYear.includes(form.targetSubject as Subject)
+      ? (form.targetSubject as Subject)
+      : subjectOptionsForSelectedYear[0] ?? teacherSubjectForYear(currentUser, form.targetSchoolYear);
     const targetStream =
       form.targetStream && streamOptionsForSelectedYear.includes(form.targetStream as SecondaryStream) ? (form.targetStream as SecondaryStream) : undefined;
     const targetClasses =
@@ -276,6 +282,7 @@ function TeacherNotes({ data, setData, currentUser, language }: CommonViewProps 
       title: '',
       body: '',
       targetSchoolYear: firstYear,
+      targetSubject: firstSubject as Subject | '',
       targetStream: firstStream as SecondaryStream | '',
       targetClassGroup: teacherClassesForYearAndStream(firstYear, firstStream)[0] ?? teacherClassesForYear(firstYear)[0] ?? '',
       attachment: null
@@ -319,10 +326,17 @@ function TeacherNotes({ data, setData, currentUser, language }: CommonViewProps 
               onChange={(event) => {
                 const year = Number(event.target.value);
                 const streams = teacherStreamsForYear(year);
+                const subjects = teacherAllowedSubjectsForYear(currentUser, year);
                 const nextStream = streams.includes(form.targetStream as SecondaryStream) ? (form.targetStream as SecondaryStream) : streams[0] ?? '';
                 const classes =
                   currentUser.stage === 'secondary' && nextStream ? teacherClassesForYearAndStream(year, nextStream) : teacherClassesForYear(year);
-                setForm({ ...form, targetSchoolYear: year, targetStream: nextStream, targetClassGroup: classes[0] ?? '' });
+                setForm({
+                  ...form,
+                  targetSchoolYear: year,
+                  targetSubject: subjects.includes(form.targetSubject as Subject) ? form.targetSubject : subjects[0] ?? '',
+                  targetStream: nextStream,
+                  targetClassGroup: classes[0] ?? ''
+                });
               }}
             >
               {teacherYears.map((year) => (
@@ -332,6 +346,18 @@ function TeacherNotes({ data, setData, currentUser, language }: CommonViewProps 
               ))}
             </select>
           </label>
+          {subjectOptionsForSelectedYear.length > 1 && (
+            <label>
+              <span>{tr(language, 'subject')}</span>
+              <select value={form.targetSubject} onChange={(event) => setForm({ ...form, targetSubject: event.target.value as Subject })}>
+                {subjectOptionsForSelectedYear.map((subject) => (
+                  <option value={subject} key={subject}>
+                    {subjectNames[language][subject]}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           {streamRequired && (
             <label>
               <span>{tr(language, 'stream')}</span>

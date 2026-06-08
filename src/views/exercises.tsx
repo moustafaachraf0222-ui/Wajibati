@@ -50,6 +50,7 @@ import {
   secondaryStreamsForYear,
   secondarySubjectStreams,
   streamsForSubject,
+  teacherAllowedSubjectsForYear,
   teacherSubjectForYear,
   teacherSubjectsLabel,
   uniqueStrings,
@@ -158,17 +159,20 @@ function TeacherExercises({ data, setData, currentUser, language }: CommonViewPr
     return teacherYearStreamClassGroups[String(year)]?.[stream] ?? [];
   };
   const firstStream = teacherStreamsForYear(firstYear)[0] ?? '';
+  const firstSubject = teacherAllowedSubjectsForYear(currentUser, firstYear)[0] ?? '';
   const [form, setForm] = useState({
     title: '',
     body: '',
     dueDate: '',
     image: '',
     targetSchoolYear: firstYear,
+    targetSubject: firstSubject as Subject | '',
     targetClassGroup: teacherClassesForYearAndStream(firstYear, firstStream)[0] ?? teacherClassesForYear(firstYear)[0] ?? '',
     targetStream: firstStream as SecondaryStream | '',
     isVacation: false
   });
   const streamOptionsForSelectedYear = teacherStreamsForYear(form.targetSchoolYear);
+  const subjectOptionsForSelectedYear = teacherAllowedSubjectsForYear(currentUser, form.targetSchoolYear);
   const streamRequired = currentUser.stage === 'secondary';
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState('');
@@ -204,7 +208,9 @@ function TeacherExercises({ data, setData, currentUser, language }: CommonViewPr
     event.preventDefault();
     const savedAt = new Date().toISOString();
     const classGroup = form.targetClassGroup.trim();
-    const targetSubject = teacherSubjectForYear(currentUser, form.targetSchoolYear);
+    const targetSubject = subjectOptionsForSelectedYear.includes(form.targetSubject as Subject)
+      ? (form.targetSubject as Subject)
+      : subjectOptionsForSelectedYear[0];
     const targetStream =
       form.targetStream && streamOptionsForSelectedYear.includes(form.targetStream as SecondaryStream) ? (form.targetStream as SecondaryStream) : undefined;
     const targetClasses =
@@ -282,6 +288,7 @@ function TeacherExercises({ data, setData, currentUser, language }: CommonViewPr
       dueDate: '',
       image: '',
       targetSchoolYear: firstYear,
+      targetSubject: firstSubject as Subject | '',
       targetClassGroup: teacherClassesForYearAndStream(firstYear, firstStream)[0] ?? teacherClassesForYear(firstYear)[0] ?? '',
       targetStream: firstStream as SecondaryStream | '',
       isVacation: false
@@ -295,12 +302,14 @@ function TeacherExercises({ data, setData, currentUser, language }: CommonViewPr
 
     setEditingId(exercise.id);
     setError('');
+    const editSubjects = teacherAllowedSubjectsForYear(currentUser, exercise.schoolYear ?? firstYear);
     setForm({
       title: exercise.title,
       body: exercise.body,
       dueDate: exercise.dueDate < todayIso() ? todayIso() : exercise.dueDate,
       image: exercise.image ?? '',
       targetSchoolYear: exercise.schoolYear ?? firstYear,
+      targetSubject: editSubjects.includes(exercise.subject) ? exercise.subject : editSubjects[0] ?? '',
       targetClassGroup:
         exercise.classGroup ??
         teacherClassesForYearAndStream(exercise.schoolYear ?? firstYear, exercise.stream ?? firstStream)[0] ??
@@ -377,12 +386,14 @@ function TeacherExercises({ data, setData, currentUser, language }: CommonViewPr
               onChange={(event) => {
                 const year = Number(event.target.value);
                 const streams = teacherStreamsForYear(year);
+                const subjects = teacherAllowedSubjectsForYear(currentUser, year);
                 const nextStream = streams.includes(form.targetStream as SecondaryStream) ? (form.targetStream as SecondaryStream) : streams[0] ?? '';
                 const classes =
                   currentUser.stage === 'secondary' && nextStream ? teacherClassesForYearAndStream(year, nextStream) : teacherClassesForYear(year);
                 setForm({
                   ...form,
                   targetSchoolYear: year,
+                  targetSubject: subjects.includes(form.targetSubject as Subject) ? form.targetSubject : subjects[0] ?? '',
                   targetStream: nextStream,
                   targetClassGroup: classes.some((classGroup) => sameClassGroup(classGroup, form.targetClassGroup))
                     ? form.targetClassGroup
@@ -397,6 +408,18 @@ function TeacherExercises({ data, setData, currentUser, language }: CommonViewPr
               ))}
             </select>
           </label>
+          {subjectOptionsForSelectedYear.length > 1 && (
+            <label>
+              <span>{tr(language, 'subject')}</span>
+              <select value={form.targetSubject} onChange={(event) => setForm({ ...form, targetSubject: event.target.value as Subject })}>
+                {subjectOptionsForSelectedYear.map((subject) => (
+                  <option value={subject} key={subject}>
+                    {subjectNames[language][subject]}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           {streamRequired && (
             <label>
               <span>{tr(language, 'stream')}</span>

@@ -15,7 +15,6 @@ import {
   schoolYearLabel,
   schoolYearNames,
   stageNames,
-  subjectNames,
   tr
 } from '../i18n';
 import {
@@ -27,6 +26,7 @@ import {
   sameClassGroup,
   secondaryStreamLabel,
   secondaryStreamsForYear,
+  subjectOptionLabel,
   subjectOptionsForTeacherYear,
   uniqueNumbers
 } from '../education';
@@ -651,7 +651,7 @@ export function DirectorCreateAccountPanel({
                         )}
                         {subjectOptionsForYear.map((subject) => (
                           <option value={subject} key={subject}>
-                            {subjectNames[language][subject]}
+                            {subjectOptionLabel(language, subject, school)}
                           </option>
                         ))}
                       </select>

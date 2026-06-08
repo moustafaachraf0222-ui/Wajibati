@@ -16,7 +16,6 @@ import {
   schoolYearNames,
   stageNames,
   statusNames,
-  subjectNames,
   tr
 } from '../i18n';
 import {
@@ -30,6 +29,7 @@ import {
   secondaryStreamLabel,
   secondaryStreamsForYear,
   stages,
+  subjectOptionLabel,
   subjectOptionsForTeacherYear,
   uniqueNumbers
 } from '../education';
@@ -603,7 +603,7 @@ export function AccountEditPanel({
                         )}
                         {subjectOptionsForYear.map((subject) => (
                           <option value={subject} key={subject}>
-                            {subjectNames[language][subject]}
+                            {subjectOptionLabel(language, subject, targetSchool)}
                           </option>
                         ))}
                       </select>
