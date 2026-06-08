@@ -47,6 +47,8 @@ export function deleteUserRecords(previous: PlatformData, target: PlatformUser):
     target.role === 'teacher' ? previous.exercises.filter((exercise) => exercise.teacherId === target.id).map((exercise) => exercise.id) : [];
   const removedNoteIds = target.role === 'teacher' ? previous.notes.filter((note) => note.teacherId === target.id).map((note) => note.id) : [];
   const removedScheduleIds = previous.absenceSchedules.filter((schedule) => schedule.createdBy === target.id).map((schedule) => schedule.id);
+  const removedLabIds = target.role === 'lab' ? previous.laboratories.filter((lab) => lab.supervisorId === target.id).map((lab) => lab.id) : [];
+  const removedDeviceIds = previous.labDevices.filter((device) => removedLabIds.includes(device.labId)).map((device) => device.id);
 
   return {
     ...previous,
@@ -58,6 +60,9 @@ export function deleteUserRecords(previous: PlatformData, target: PlatformUser):
     absenceSchedules: previous.absenceSchedules.filter((schedule) => schedule.createdBy !== target.id),
     absenceRecords: previous.absenceRecords.filter((record) => record.studentId !== target.id && record.markedBy !== target.id),
     absenceReports: previous.absenceReports.filter((report) => report.markedBy !== target.id),
+    laboratories: previous.laboratories.filter((lab) => lab.supervisorId !== target.id),
+    labDevices: previous.labDevices.filter((device) => !removedLabIds.includes(device.labId)),
+    labFaultReports: previous.labFaultReports.filter((report) => !removedLabIds.includes(report.labId) && !removedDeviceIds.includes(report.deviceId)),
     completions: Object.fromEntries(
       Object.entries(previous.completions)
         .filter(([userId]) => userId !== target.id)
@@ -106,6 +111,9 @@ export function applyDeletedSchoolTombstones(data: PlatformData): PlatformData {
     absenceSchedules: data.absenceSchedules.filter((schedule) => !deletedSchoolIds.has(schedule.schoolId)),
     absenceRecords: data.absenceRecords.filter((record) => !deletedSchoolIds.has(record.schoolId)),
     absenceReports: data.absenceReports.filter((report) => !deletedSchoolIds.has(report.schoolId)),
+    laboratories: data.laboratories.filter((lab) => !deletedSchoolIds.has(lab.schoolId)),
+    labDevices: data.labDevices.filter((device) => !deletedSchoolIds.has(device.schoolId)),
+    labFaultReports: data.labFaultReports.filter((report) => !deletedSchoolIds.has(report.schoolId)),
     completions: Object.fromEntries(
       Object.entries(data.completions)
         .filter(([userId]) => !removedUserIds.has(userId))

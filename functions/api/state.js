@@ -33,6 +33,9 @@ const seedData = {
   absenceSchedules: [],
   absenceRecords: [],
   absenceReports: [],
+  laboratories: [],
+  labDevices: [],
+  labFaultReports: [],
   pushTokens: {},
   deletedSchoolIds: [],
   deletedExerciseIds: [],
@@ -76,6 +79,9 @@ function applyDeletedSchoolTombstones(data) {
     absenceSchedules: data.absenceSchedules.filter((schedule) => !deletedSchoolIds.has(schedule.schoolId)),
     absenceRecords: data.absenceRecords.filter((record) => !deletedSchoolIds.has(record.schoolId)),
     absenceReports: data.absenceReports.filter((report) => !deletedSchoolIds.has(report.schoolId)),
+    laboratories: data.laboratories.filter((lab) => !deletedSchoolIds.has(lab.schoolId)),
+    labDevices: data.labDevices.filter((device) => !deletedSchoolIds.has(device.schoolId)),
+    labFaultReports: data.labFaultReports.filter((report) => !deletedSchoolIds.has(report.schoolId)),
     completions: Object.fromEntries(
       Object.entries(data.completions).filter(([userId]) => !removedUserIds.has(userId)).map(([userId, done]) => [
         userId,
@@ -192,6 +198,9 @@ function normalizeState(value) {
     absenceSchedules: Array.isArray(value.absenceSchedules) ? value.absenceSchedules : [],
     absenceRecords: Array.isArray(value.absenceRecords) ? value.absenceRecords : [],
     absenceReports: Array.isArray(value.absenceReports) ? value.absenceReports : [],
+    laboratories: Array.isArray(value.laboratories) ? value.laboratories : [],
+    labDevices: Array.isArray(value.labDevices) ? value.labDevices : [],
+    labFaultReports: Array.isArray(value.labFaultReports) ? value.labFaultReports : [],
     pushTokens: value.pushTokens && typeof value.pushTokens === 'object' ? value.pushTokens : {},
     deletedSchoolIds: Array.isArray(value.deletedSchoolIds) ? uniqueStrings(value.deletedSchoolIds) : [],
     deletedExerciseIds: Array.isArray(value.deletedExerciseIds) ? uniqueStrings(value.deletedExerciseIds) : [],
@@ -381,6 +390,9 @@ function mergeState(existingData, incomingData) {
     absenceSchedules: mergeRecordsById(existingData.absenceSchedules, incomingData.absenceSchedules),
     absenceRecords: mergeRecordsById(existingData.absenceRecords, incomingData.absenceRecords, chooseLatestWholeRecord),
     absenceReports: mergeRecordsById(existingData.absenceReports, incomingData.absenceReports, chooseLatestRecord),
+    laboratories: mergeRecordsById(existingData.laboratories, incomingData.laboratories, chooseLatestRecord),
+    labDevices: mergeRecordsById(existingData.labDevices, incomingData.labDevices, chooseLatestRecord),
+    labFaultReports: mergeRecordsById(existingData.labFaultReports, incomingData.labFaultReports, chooseLatestRecord),
     completions: mergeCompletions(existingData.completions, incomingData.completions),
     completionDates: mergeNestedMaps(existingData.completionDates, incomingData.completionDates, chooseCompletionDate),
     feedback: mergeNestedMaps(existingData.feedback, incomingData.feedback, chooseLatestFeedback),
@@ -663,6 +675,15 @@ function absenceDetailsForStudent(data, report, user) {
   return data.absenceRecords.find((record) => record.reportId === report.id && record.studentId === user.id && record.sentAt && !record.deletedAt);
 }
 
+function targetUsersForLabFaultReport(data, report) {
+  return data.users.filter(
+    (user) =>
+      user.role === 'director' &&
+      user.status === 'active' &&
+      user.schoolId === report.schoolId
+  );
+}
+
 async function sendNotificationsForChanges(env, previousData, nextData) {
   const notifications = [];
 
@@ -716,6 +737,19 @@ async function sendNotificationsForChanges(env, previousData, nextData) {
         };
       },
       data: { type: 'absence', id: report.id, date: report.date, sessionId: report.sessionId }
+    });
+  });
+
+  createdRecords(previousData.labFaultReports ?? [], nextData.labFaultReports ?? []).forEach((report) => {
+    const lab = (nextData.laboratories ?? []).find((item) => item.id === report.labId);
+    const reporter = nextData.users.find((user) => user.id === report.reportedBy);
+    notifications.push({
+      users: targetUsersForLabFaultReport(nextData, report),
+      notification: {
+        title: 'عطل في المخبر',
+        body: `تم الإبلاغ عن عطل في ${cleanText(report.deviceName, 'جهاز')} داخل ${cleanText(lab?.name, 'المخبر')} بواسطة ${cleanText(reporter?.name, 'المخبري')}.`
+      },
+      data: { type: 'lab_fault', id: report.id, labId: report.labId, deviceId: report.deviceId }
     });
   });
 

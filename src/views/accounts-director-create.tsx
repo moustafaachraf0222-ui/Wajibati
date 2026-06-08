@@ -78,7 +78,7 @@ export function DirectorCreateAccountPanel({
   school: SchoolRecord | undefined;
 }) {
   const [form, setForm] = useState({
-    role: 'teacher' as 'supervisor' | 'teacher' | 'student',
+    role: 'teacher' as 'supervisor' | 'lab' | 'teacher' | 'student',
     name: '',
     subject: 'math' as Subject,
     subjectsByYear: {} as Record<string, Subject | ''>,
@@ -98,7 +98,7 @@ export function DirectorCreateAccountPanel({
   const [bulkForm, setBulkForm] = useState(initialBulkStudentForm);
   const [bulkError, setBulkError] = useState('');
   const [bulkCreatedCount, setBulkCreatedCount] = useState(0);
-  const accountRoles = currentUser.stage === 'primary' ? (['teacher', 'student'] as const) : (['supervisor', 'teacher', 'student'] as const);
+  const accountRoles = currentUser.stage === 'primary' ? (['teacher', 'student'] as const) : (['supervisor', 'lab', 'teacher', 'student'] as const);
 
   const createAccount = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -112,6 +112,11 @@ export function DirectorCreateAccountPanel({
 
     if (form.role === 'supervisor' && currentUser.stage === 'primary') {
       setError(tr(language, 'primaryNoSupervisors'));
+      return;
+    }
+
+    if (form.role === 'lab' && currentUser.stage === 'primary') {
+      setError(tr(language, 'primaryNoLabs'));
       return;
     }
 
@@ -266,8 +271,8 @@ export function DirectorCreateAccountPanel({
   const availableYearLabels = currentUser.stage ? schoolYearNames[language][currentUser.stage] : [];
   const generatedEmailPreview = school && form.name.trim() ? generateSchoolEmail(form.name, form.role, school.domain, data.users) : '';
 
-  const chooseAccountRole = (role: 'supervisor' | 'teacher' | 'student') => {
-    if (role === 'supervisor' && currentUser.stage === 'primary') {
+  const chooseAccountRole = (role: 'supervisor' | 'lab' | 'teacher' | 'student') => {
+    if ((role === 'supervisor' || role === 'lab') && currentUser.stage === 'primary') {
       return;
     }
 
@@ -278,7 +283,7 @@ export function DirectorCreateAccountPanel({
   };
 
   useEffect(() => {
-    if (currentUser.stage === 'primary' && form.role === 'supervisor') {
+    if (currentUser.stage === 'primary' && (form.role === 'supervisor' || form.role === 'lab')) {
       setForm((previous) => ({ ...previous, role: 'teacher' }));
     }
   }, [currentUser.stage, form.role]);

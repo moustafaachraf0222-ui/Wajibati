@@ -1863,6 +1863,157 @@ tbody tr.account-details-row:hover td {
   background: var(--paper);
 }
 
+.labs-view .panel {
+  grid-column: 1 / -1;
+}
+
+.lab-card-list,
+.lab-status-grid,
+.lab-device-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.lab-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  background: color-mix(in srgb, var(--paper) 88%, var(--green-soft));
+}
+
+.lab-card-head,
+.lab-status-card h3 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.lab-card-head h3,
+.lab-status-card h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.lab-card-head small {
+  color: var(--muted);
+}
+
+.lab-period-grid,
+.lab-period-badges {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.lab-period-badge,
+.lab-status-card,
+.lab-device-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+}
+
+.lab-status-card {
+  padding: 14px;
+}
+
+.lab-period-badge {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+}
+
+.lab-period-badge small {
+  color: var(--muted);
+}
+
+.lab-period-badge.available {
+  border-color: color-mix(in srgb, var(--green) 38%, var(--line));
+  background: var(--green-soft);
+}
+
+.lab-period-badge.reserved {
+  border-color: color-mix(in srgb, var(--rose) 38%, var(--line));
+  background: var(--rose-soft);
+}
+
+.lab-device-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.lab-device-form .attachment-preview,
+.lab-device-form .form-error {
+  grid-column: 1 / -1;
+}
+
+.lab-device-grid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  margin-top: 12px;
+}
+
+.lab-device-card {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+}
+
+.lab-device-card > img,
+.lab-device-thumb {
+  width: 54px;
+  height: 54px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.lab-device-card > svg {
+  color: var(--muted);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  width: 54px;
+  height: 54px;
+  padding: 12px;
+}
+
+.lab-device-card strong,
+.lab-device-card small {
+  display: block;
+}
+
+.lab-device-card small {
+  color: var(--muted);
+}
+
+.lab-device-card select {
+  grid-column: 1 / -1;
+}
+
+.lab-device-card.working {
+  border-color: color-mix(in srgb, var(--green) 35%, var(--line));
+}
+
+.lab-device-card.broken {
+  border-color: color-mix(in srgb, var(--rose) 40%, var(--line));
+  background: var(--rose-soft);
+}
+
+.button.small {
+  min-height: 34px;
+  padding: 7px 10px;
+}
+
 .exercise-card {
   padding: 14px;
   display: grid;
@@ -3148,6 +3299,8 @@ summary.subject-group-heading:hover .subject-icon svg {
   .schedule-session-row,
   .schedule-template-card,
   .account-type-grid,
+  .lab-period-grid,
+  .lab-device-form,
   .form-grid,
   .exercise-grid,
   .detail-list {

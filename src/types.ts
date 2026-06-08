@@ -1,6 +1,6 @@
 import type { Dispatch, SetStateAction } from 'react';
 
-export type Role = 'admin' | 'director' | 'supervisor' | 'teacher' | 'student';
+export type Role = 'admin' | 'director' | 'supervisor' | 'lab' | 'teacher' | 'student';
 export type Stage = 'primary' | 'middle' | 'secondary';
 export type Language = 'ar' | 'fr' | 'en';
 export type Theme = 'light' | 'dark';
@@ -47,7 +47,7 @@ export type Subject =
   | 'german'
   | 'italian';
 
-export type View = 'overview' | 'schools' | 'users' | 'school' | 'exercises' | 'announcements' | 'notes' | 'absences' | 'settings';
+export type View = 'overview' | 'schools' | 'users' | 'school' | 'exercises' | 'announcements' | 'notes' | 'absences' | 'labs' | 'settings';
 
 export type SecondaryStream =
   | 'experimental_science'
@@ -226,6 +226,49 @@ export type AbsenceReport = {
   createdAt: string;
 };
 
+export type LabPeriod = 'morning' | 'afternoon';
+export type LabAvailability = 'available' | 'reserved';
+export type LabDeviceStatus = 'working' | 'broken';
+export type LabFaultStatus = 'open' | 'repaired';
+
+export type Laboratory = {
+  id: string;
+  schoolId: string;
+  name: string;
+  supervisorId: string;
+  periods: Record<LabPeriod, LabAvailability>;
+  createdBy: string;
+  createdAt: string;
+  updatedAt?: string;
+};
+
+export type LabDevice = {
+  id: string;
+  schoolId: string;
+  labId: string;
+  name: string;
+  image?: UploadedAttachment;
+  status: LabDeviceStatus;
+  createdBy: string;
+  createdAt: string;
+  updatedAt?: string;
+};
+
+export type LabFaultReport = {
+  id: string;
+  schoolId: string;
+  labId: string;
+  deviceId: string;
+  deviceName: string;
+  deviceImage?: UploadedAttachment;
+  reportedBy: string;
+  reportedAt: string;
+  faultNumber: number;
+  repairDate?: string;
+  status: LabFaultStatus;
+  updatedAt?: string;
+};
+
 export type PushTokenRecord = {
   token: string;
   platform: string;
@@ -245,6 +288,9 @@ export type PlatformData = {
   absenceSchedules: AbsenceSchedule[];
   absenceRecords: AbsenceRecord[];
   absenceReports: AbsenceReport[];
+  laboratories: Laboratory[];
+  labDevices: LabDevice[];
+  labFaultReports: LabFaultReport[];
   pushTokens: Record<string, PushTokenRecord[]>;
   deletedSchoolIds: string[];
   deletedExerciseIds: string[];

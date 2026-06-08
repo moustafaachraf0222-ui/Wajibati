@@ -3,6 +3,7 @@ import {
   Building2,
   GraduationCap,
   ClipboardCheck,
+  FlaskConical,
   MessageSquare,
   School,
   Settings,
@@ -32,6 +33,7 @@ export const navItems: Record<Role, NavItem[]> = {
     { id: 'school', labelKey: 'school', icon: School },
     { id: 'users', labelKey: 'users', icon: UserPlus },
     { id: 'absences', labelKey: 'absences', icon: ClipboardCheck },
+    { id: 'labs', labelKey: 'laboratories', icon: FlaskConical },
     { id: 'announcements', labelKey: 'announcements', icon: MessageSquare },
     { id: 'settings', labelKey: 'settings', icon: Settings }
   ],
@@ -40,8 +42,14 @@ export const navItems: Record<Role, NavItem[]> = {
     { id: 'announcements', labelKey: 'announcements', icon: MessageSquare },
     { id: 'settings', labelKey: 'settings', icon: Settings }
   ],
+  lab: [
+    { id: 'labs', labelKey: 'laboratories', icon: FlaskConical },
+    { id: 'announcements', labelKey: 'announcements', icon: MessageSquare },
+    { id: 'settings', labelKey: 'settings', icon: Settings }
+  ],
   teacher: [
     { id: 'overview', labelKey: 'overview', icon: GraduationCap },
+    { id: 'labs', labelKey: 'laboratories', icon: FlaskConical },
     { id: 'announcements', labelKey: 'announcements', icon: MessageSquare },
     { id: 'exercises', labelKey: 'exercises', icon: BookOpen },
     { id: 'notes', labelKey: 'notes', icon: MessageSquare },

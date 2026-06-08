@@ -1,4 +1,4 @@
-import type { PlatformUser } from './types';
+import type { PlatformUser, Role } from './types';
 
 export function makeId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
@@ -65,7 +65,7 @@ export function compactEmailLocalPart(value: string) {
     .replace(/[^a-z0-9]+/g, '');
 }
 
-export function generateSchoolEmail(name: string, role: 'supervisor' | 'teacher' | 'student', domain: string, users: PlatformUser[]) {
+export function generateSchoolEmail(name: string, role: Exclude<Role, 'admin' | 'director'>, domain: string, users: PlatformUser[]) {
   const emailDomain = normalizeEmailDomain(domain);
   const localBase = compactEmailLocalPart(name) || role;
   const usedEmails = new Set(users.map((user) => user.email.toLowerCase()));

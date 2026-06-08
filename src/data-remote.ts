@@ -119,6 +119,9 @@ export function hasUserData(data: PlatformData) {
     data.absenceSchedules.length > 0 ||
     data.absenceRecords.length > 0 ||
     data.absenceReports.length > 0 ||
+    data.laboratories.length > 0 ||
+    data.labDevices.length > 0 ||
+    data.labFaultReports.length > 0 ||
     data.deletedSchoolIds.length > 0 ||
     data.deletedExerciseIds.length > 0 ||
     data.deletedNoteIds.length > 0 ||
