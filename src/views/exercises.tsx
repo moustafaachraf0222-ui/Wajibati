@@ -1,16 +1,20 @@
 import {
+  AlertCircle,
   Archive,
   Atom,
   BarChart3,
   BookOpen,
   CalendarDays,
   Calculator,
+  Check,
   CheckCircle2,
   ChevronDown,
   CircleOff,
   Code2,
   Dumbbell,
   Edit3,
+  Eye,
+  Filter,
   FlaskConical,
   Globe2,
   GraduationCap,
@@ -19,15 +23,20 @@ import {
   Leaf,
   LockKeyhole,
   MessageSquare,
+  MinusCircle,
+  Play,
   Plus,
+  RotateCcw,
   Save,
+  Search,
   Star,
   Trash2,
   Upload,
+  User,
   Wrench,
   X
 } from 'lucide-react';
-import { useEffect, useState, type ChangeEvent, type FormEvent, type ReactElement } from 'react';
+import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import type {
   DataSetter,
@@ -942,60 +951,261 @@ function ExerciseList({
           )}
         </div>
       ) : (
-        <StudentExercisesView
+        <CompactStudentExercisesView
           exercises={exercises}
+          data={data}
           language={language}
-          renderExerciseCard={renderExerciseCard}
+          currentUser={currentUser}
         />
       )}
     </div>
   );
 }
 
-function StudentExercisesView({
+function CompactStudentExercisesView({
   exercises,
+  data,
   language,
-  renderExerciseCard
+  currentUser
 }: {
   exercises: Exercise[];
+  data: PlatformData;
   language: Language;
-  renderExerciseCard: (exercise: Exercise) => ReactElement;
+  currentUser: PlatformUser;
 }) {
-  const activeStudentExercises = exercises.filter((exercise) => !isPastExercise(exercise));
-  const archivedStudentExercises = exercises.filter(isPastExercise);
-  const archiveGroups = groupExercisesByMonth(archivedStudentExercises, language);
-  const sortedActive = [...activeStudentExercises].sort(sortExercises);
+  const [filter, setFilter] = useState<'all' | 'active' | 'completed' | 'late'>('all');
+  const [search, setSearch] = useState('');
+
+  const today = todayIso();
+  const active = exercises.filter((exercise) => !isPastExercise(exercise));
+  const completed = exercises.filter(isPastExercise);
+  const late = active.filter((exercise) => exercise.dueDate < today);
+  const completionRate = exercises.length > 0 ? Math.round((completed.length / exercises.length) * 100) : 0;
+
+  const filtered = (() => {
+    let list = [...exercises].sort(sortExercises);
+    if (filter === 'active') {
+      list = list.filter((exercise) => !isPastExercise(exercise));
+    } else if (filter === 'completed') {
+      list = list.filter(isPastExercise);
+    } else if (filter === 'late') {
+      list = list.filter((exercise) => isPastExercise(exercise) && exercise.dueDate < today);
+    }
+    const query = search.trim().toLowerCase();
+    if (query) {
+      list = list.filter((exercise) =>
+        exercise.title.toLowerCase().includes(query) ||
+        subjectNames[language][exercise.subject].toLowerCase().includes(query)
+      );
+    }
+    return list;
+  })();
+
+  const renderRow = (exercise: Exercise) => {
+    const teacher = data.users.find((user) => user.id === exercise.teacherId);
+    const teacherName = teacher?.name ?? '-';
+    const teacherInitial = teacherName.charAt(0).toUpperCase() || '?';
+    const isLate = !isPastExercise(exercise) && exercise.dueDate < today;
+    const isCompleted = isPastExercise(exercise);
+    const feedback = feedbackForStudent(data, currentUser.id, exercise.id);
+    const hasFeedback = Boolean(feedback && (feedback.difficulty || feedback.note?.trim()));
+
+    const rowClass = isCompleted ? 'done' : isLate ? 'late' : '';
+
+    return (
+      <div className={`ce-t-row ${rowClass}`} key={exercise.id}>
+        <div className="bar"></div>
+        <div className="ce-t-main">
+          <div className="row1">
+            {isLate && (
+              <span className="ce-badge danger">
+                <AlertCircle aria-hidden="true" />
+                {tr(language, 'late')}
+              </span>
+            )}
+            <h4>{exercise.title}</h4>
+          </div>
+          <div className="row2">
+            <span className="tag">{subjectNames[language][exercise.subject]}</span>
+            {exercise.schoolYear && <span className="tag">{schoolYearLabel(language, exercise.stage, exercise.schoolYear)}</span>}
+            {exercise.classGroup && <span className="tag">{tr(language, 'classGroup')} {exercise.classGroup}</span>}
+            {exercise.stream && <span className="tag">{secondaryStreamLabel(language, exercise.stream, exercise.schoolYear)}</span>}
+          </div>
+        </div>
+        <div className="ce-teacher">
+          <div className="avatar" aria-hidden="true">{teacherInitial}</div>
+          <span className="name">{teacherName}</span>
+        </div>
+        <div className="ce-t-cell">
+          <CalendarDays size={13} className="ic" aria-hidden="true" />
+          <strong>{exercise.dueDate}</strong>
+        </div>
+        <div>
+          {isCompleted ? (
+            hasFeedback && feedback?.difficulty ? (
+              <span className="ce-badge ok">
+                <Check size={11} strokeWidth={3} aria-hidden="true" />
+                {tr(language, homeworkDifficultyLabelKey(feedback.difficulty))}
+              </span>
+            ) : (
+              <span className="ce-badge ok">
+                <Check size={11} strokeWidth={3} aria-hidden="true" />
+                {tr(language, 'completedExercises')}
+              </span>
+            )
+          ) : isLate ? (
+            <span className="ce-badge danger">
+              <AlertCircle size={11} aria-hidden="true" />
+              {tr(language, 'late')}
+            </span>
+          ) : (
+            <span className="ce-badge">{tr(language, 'active')}</span>
+          )}
+        </div>
+        <div className="ce-t-action">
+          {isCompleted ? (
+            <button className="button ghost" type="button">
+              <Eye aria-hidden="true" />
+              <span>{tr(language, 'review')}</span>
+            </button>
+          ) : isLate ? (
+            <button className="button primary" type="button">
+              <Play aria-hidden="true" />
+              <span>{tr(language, 'start')}</span>
+            </button>
+          ) : (
+            <button className="button primary" type="button">
+              <Play aria-hidden="true" />
+              <span>{tr(language, 'start')}</span>
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   return (
-    <div className="student-exercise-groups">
-      {exercises.length === 0 && <p className="empty-state">{tr(language, 'noRecords')}</p>}
-      {activeStudentExercises.length === 0 && exercises.length > 0 && <p className="empty-state">{tr(language, 'homeworkArchive')}</p>}
-      <div className="exercise-grid compact-list">{sortedActive.map(renderExerciseCard)}</div>
-      {archiveGroups.length > 0 && (
-        <section className="homework-archive">
-          <div className="subject-group-heading">
-            <div className="subject-title">
-              <span className="subject-icon">
-                <Archive size={19} aria-hidden="true" />
-              </span>
-              <div>
-                <strong>{tr(language, 'homeworkArchive')}</strong>
-                <small>{tr(language, 'archiveByMonth')}</small>
-              </div>
-            </div>
-            <span className="subject-count">{archivedStudentExercises.length}</span>
+    <div className="compact-exercises">
+      <div className="ce-page-head">
+        <div>
+          <h1>{tr(language, 'exercises')}</h1>
+          <div className="ce-sub">{tr(language, 'scopedData')}</div>
+        </div>
+        <div className="ce-search">
+          <Search size={14} aria-hidden="true" />
+          <input
+            type="search"
+            placeholder={tr(language, 'searchExercises')}
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
+        </div>
+      </div>
+
+      <div className="ce-stats">
+        <div className="ce-stat pri">
+          <div className="ico">
+            <BookOpen aria-hidden="true" />
           </div>
-          {archiveGroups.map((group) => (
-            <details className="archive-month" key={group.key}>
-              <summary>
-                <span>{group.label}</span>
-                <strong>{group.exercises.length}</strong>
-              </summary>
-              <div className="exercise-grid compact-list">{group.exercises.map(renderExerciseCard)}</div>
-            </details>
-          ))}
-        </section>
-      )}
+          <div>
+            <div className="lbl">{tr(language, 'assignedToYou')}</div>
+            <div className="val">{active.length}</div>
+          </div>
+        </div>
+        <div className="ce-stat">
+          <div className="ico">
+            <CheckCircle2 aria-hidden="true" />
+          </div>
+          <div>
+            <div className="lbl">{tr(language, 'completedExercises')}</div>
+            <div className="val">{completed.length}</div>
+          </div>
+        </div>
+        <div className="ce-stat">
+          <div className="ico">
+            <BarChart3 aria-hidden="true" />
+          </div>
+          <div>
+            <div className="lbl">{tr(language, 'completionRate')}</div>
+            <div className="val">{completionRate}<small>%</small></div>
+          </div>
+        </div>
+        <div className="ce-stat alert">
+          <div className="ico">
+            <AlertCircle aria-hidden="true" />
+          </div>
+          <div>
+            <div className="lbl">{tr(language, 'lateExercises')}</div>
+            <div className="val">{late.length}</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="ce-filter-bar">
+        <button
+          type="button"
+          className={`ce-filter-tab ${filter === 'all' ? 'active' : ''}`}
+          onClick={() => setFilter('all')}
+        >
+          {tr(language, 'filterAll')}
+          <span className="count">{exercises.length}</span>
+        </button>
+        <button
+          type="button"
+          className={`ce-filter-tab ${filter === 'active' ? 'active' : ''}`}
+          onClick={() => setFilter('active')}
+        >
+          {tr(language, 'filterActive')}
+          <span className="count">{active.length}</span>
+        </button>
+        <button
+          type="button"
+          className={`ce-filter-tab ${filter === 'completed' ? 'active' : ''}`}
+          onClick={() => setFilter('completed')}
+        >
+          <CheckCircle2 aria-hidden="true" />
+          {tr(language, 'filterCompleted')}
+          <span className="count">{completed.length}</span>
+        </button>
+        <button
+          type="button"
+          className={`ce-filter-tab ${filter === 'late' ? 'active' : ''}`}
+          onClick={() => setFilter('late')}
+        >
+          <AlertCircle aria-hidden="true" />
+          {tr(language, 'filterLate')}
+          <span className="count">{late.length}</span>
+        </button>
+        <div className="ce-filter-spacer"></div>
+        <button type="button" className="ce-sort">
+          <Filter aria-hidden="true" />
+          {tr(language, 'sortByNewest')}
+        </button>
+      </div>
+
+      <div className="ce-sec-head">
+        <h2>
+          {tr(language, 'totalCount')}
+          <span className="count">{filtered.length} {tr(language, 'exerciseCountPlural')}</span>
+        </h2>
+        <span className="link">{tr(language, 'viewAccountsTab')}</span>
+      </div>
+
+      <div className="ce-table">
+          <div className="ce-t-head">
+          <div></div>
+          <div>{tr(language, 'exercises')}</div>
+          <div className="h-teacher">{tr(language, 'teacherName')}</div>
+          <div>{tr(language, 'dueDate')}</div>
+          <div>{tr(language, 'status')}</div>
+          <div className="h-action"></div>
+        </div>
+        {filtered.length === 0 ? (
+          <div className="ce-empty">{tr(language, 'noRecords')}</div>
+        ) : (
+          filtered.map(renderRow)
+        )}
+      </div>
     </div>
   );
 }

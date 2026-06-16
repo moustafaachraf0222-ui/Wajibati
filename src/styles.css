@@ -418,16 +418,16 @@ img {
 .app-shell {
   min-height: 100vh;
   display: grid;
-  grid-template-columns: 264px minmax(0, 1fr);
+  grid-template-columns: 224px minmax(0, 1fr);
 }
 
 .sidebar {
   background: linear-gradient(180deg, var(--paper) 0%, var(--paper-soft) 100%);
   border-inline-end: 1px solid var(--line);
-  padding: 20px 16px;
+  padding: 14px 12px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 14px;
   min-width: 0;
   box-shadow: 10px 0 34px rgba(0, 98, 51, 0.04);
 }
@@ -445,9 +445,9 @@ img {
 }
 
 .brand-mark {
-  width: 44px;
-  height: 44px;
-  border-radius: 8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
   display: grid;
   place-items: center;
   background: var(--teal-soft);
@@ -490,23 +490,24 @@ img {
 
 .nav-list {
   display: grid;
-  gap: 6px;
+  gap: 2px;
 }
 
 .nav-item {
   width: 100%;
-  min-height: 42px;
+  min-height: 32px;
   border: 1px solid transparent;
   background: transparent;
-  border-radius: 8px;
-  padding: 10px 12px;
+  border-radius: 6px;
+  padding: 6px 10px;
   color: var(--muted);
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 9px;
   text-align: start;
   position: relative;
   transition: transform 0.16s ease, background-color 0.16s ease, color 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+  font-size: 0.88rem;
 }
 
 .nav-item:hover {
@@ -591,28 +592,30 @@ img {
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: 8px;
-  padding: 16px 18px;
+  padding: 10px 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 14px;
   box-shadow: var(--shadow-soft);
+  min-height: 48px;
 }
 
 .topbar p,
 .panel-heading p {
-  margin: 0 0 4px;
+  margin: 0 0 2px;
   color: var(--muted);
-  font-size: 0.88rem;
+  font-size: 0.78rem;
 }
 
 .topbar h1,
 .panel-heading h2 {
   margin: 0;
-  font-size: 1.25rem;
-  line-height: 1.35;
+  font-size: 1.1rem;
+  line-height: 1.3;
   overflow-wrap: anywhere;
   letter-spacing: 0;
+  font-weight: 700;
 }
 
 .topbar-actions {
@@ -638,14 +641,14 @@ img {
 .back-button {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   background: var(--paper-soft);
   color: var(--ink);
   border: 1px solid var(--line);
   border-radius: 999px;
-  padding: 7px 14px 7px 10px;
+  padding: 5px 12px 5px 8px;
   font-weight: 600;
-  font-size: 0.92rem;
+  font-size: 0.85rem;
   cursor: pointer;
   transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
   flex: 0 0 auto;
@@ -3749,5 +3752,513 @@ summary.subject-group-heading:hover .subject-icon svg {
 
   .button-row .button {
     flex: 1 1 180px;
+  }
+}
+
+/* =============================================================
+   COMPACT EXERCISES VIEW (Prototype 11)
+   ============================================================= */
+
+.compact-exercises {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.compact-exercises .ce-page-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 4px;
+}
+
+.compact-exercises .ce-page-head h1 {
+  font-size: 1.45rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  margin: 0;
+}
+
+.compact-exercises .ce-page-head .ce-sub {
+  color: var(--muted);
+  font-size: 0.88rem;
+  margin-top: 3px;
+}
+
+.compact-exercises .ce-search {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 0.85rem;
+  width: 220px;
+  min-height: 32px;
+}
+
+.compact-exercises .ce-search input {
+  background: transparent;
+  border: none;
+  outline: none;
+  flex: 1;
+  min-width: 0;
+  font-family: inherit;
+  font-size: 0.85rem;
+  color: var(--ink);
+}
+
+.compact-exercises .ce-search input::placeholder {
+  color: var(--muted);
+}
+
+/* stat strip */
+.compact-exercises .ce-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.compact-exercises .ce-stat {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+}
+
+.compact-exercises .ce-stat .ico {
+  width: 30px;
+  height: 30px;
+  background: var(--paper-soft);
+  color: var(--ink-2, var(--muted));
+  border-radius: 7px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.compact-exercises .ce-stat .ico svg {
+  width: 15px;
+  height: 15px;
+}
+
+.compact-exercises .ce-stat .lbl {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.compact-exercises .ce-stat .val {
+  color: var(--ink);
+  font-size: 1.2rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  margin-top: 2px;
+}
+
+.compact-exercises .ce-stat .val small {
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin-inline-start: 1px;
+  font-weight: 500;
+}
+
+.compact-exercises .ce-stat.pri {
+  background: var(--teal-soft);
+  border-color: rgba(0, 98, 51, 0.22);
+}
+
+.compact-exercises .ce-stat.pri .ico {
+  background: var(--teal);
+  color: #fff;
+}
+
+.compact-exercises .ce-stat.pri .lbl {
+  color: var(--teal);
+  font-weight: 600;
+}
+
+.compact-exercises .ce-stat.alert {
+  background: rgba(220, 38, 38, 0.06);
+  border-color: rgba(220, 38, 38, 0.22);
+}
+
+.compact-exercises .ce-stat.alert .ico {
+  background: #dc2626;
+  color: #fff;
+}
+
+.compact-exercises .ce-stat.alert .lbl {
+  color: #dc2626;
+  font-weight: 600;
+}
+
+.compact-exercises .ce-stat.alert .val {
+  color: #dc2626;
+}
+
+/* filter bar */
+.compact-exercises .ce-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 4px;
+}
+
+.compact-exercises .ce-filter-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 5px;
+  color: var(--ink-2, var(--muted));
+  font-size: 0.83rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  min-height: 28px;
+}
+
+.compact-exercises .ce-filter-tab:hover {
+  background: var(--paper-soft);
+  color: var(--ink);
+}
+
+.compact-exercises .ce-filter-tab.active {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.compact-exercises .ce-filter-tab svg {
+  width: 13px;
+  height: 13px;
+}
+
+.compact-exercises .ce-filter-tab .count {
+  padding: 0 6px;
+  border-radius: 8px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  background: var(--paper-soft);
+  color: var(--muted);
+  min-width: 18px;
+  text-align: center;
+  line-height: 16px;
+  height: 16px;
+}
+
+.compact-exercises .ce-filter-tab.active .count {
+  background: rgba(255, 255, 255, 0.18);
+  color: var(--paper);
+}
+
+.compact-exercises .ce-filter-spacer {
+  flex: 1;
+}
+
+.compact-exercises .ce-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 5px;
+  color: var(--muted);
+  font-size: 0.83rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  min-height: 28px;
+}
+
+.compact-exercises .ce-sort:hover {
+  background: var(--paper-soft);
+  color: var(--ink);
+}
+
+.compact-exercises .ce-sort svg {
+  width: 13px;
+  height: 13px;
+}
+
+/* section header */
+.compact-exercises .ce-sec-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2px;
+  margin-top: 4px;
+}
+
+.compact-exercises .ce-sec-head h2 {
+  color: var(--ink);
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: -0.005em;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.compact-exercises .ce-sec-head .count {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+
+.compact-exercises .ce-sec-head .link {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.compact-exercises .ce-sec-head .link:hover {
+  color: var(--ink);
+}
+
+/* table */
+.compact-exercises .ce-table {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.compact-exercises .ce-t-head {
+  display: grid;
+  grid-template-columns: 6px minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 1fr) 92px 96px;
+  gap: 12px;
+  padding: 9px 14px;
+  background: var(--paper-soft);
+  color: var(--muted);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+  border-bottom: 1px solid var(--line);
+}
+
+.compact-exercises .ce-t-row {
+  display: grid;
+  grid-template-columns: 6px minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 1fr) 92px 96px;
+  gap: 12px;
+  padding: 11px 14px;
+  align-items: center;
+  border-bottom: 1px solid var(--line-soft, var(--line));
+  cursor: pointer;
+  transition: background 0.1s ease;
+}
+
+.compact-exercises .ce-t-row:last-child {
+  border-bottom: none;
+}
+
+.compact-exercises .ce-t-row:hover {
+  background: var(--paper-soft);
+}
+
+.compact-exercises .ce-t-row .bar {
+  width: 3px;
+  height: 28px;
+  border-radius: 2px;
+  background: var(--muted);
+  align-self: center;
+}
+
+.compact-exercises .ce-t-row.late .bar,
+.compact-exercises .ce-t-row.warn .bar {
+  background: #dc2626;
+}
+
+.compact-exercises .ce-t-row.done .bar {
+  background: var(--teal);
+}
+
+.compact-exercises .ce-t-row.pri .bar {
+  background: var(--teal);
+}
+
+.compact-exercises .ce-t-main {
+  min-width: 0;
+}
+
+.compact-exercises .ce-t-main .row1 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.compact-exercises .ce-t-main h4 {
+  color: var(--ink);
+  font-size: 0.88rem;
+  font-weight: 600;
+  line-height: 1.3;
+  margin: 0;
+}
+
+.compact-exercises .ce-t-main .row2 {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.compact-exercises .ce-t-main .row2 .tag {
+  font-weight: 500;
+}
+
+.compact-exercises .ce-t-main .row2 .tag::after {
+  content: '·';
+  margin-inline-start: 4px;
+  color: var(--muted);
+  opacity: 0.6;
+}
+
+.compact-exercises .ce-t-main .row2 .tag:last-child::after {
+  content: '';
+  margin: 0;
+}
+
+.compact-exercises .ce-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  background: var(--paper-soft);
+  color: var(--ink-2, var(--muted));
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+.compact-exercises .ce-badge.danger {
+  background: #dc2626;
+  color: #fff;
+}
+
+.compact-exercises .ce-badge.ok {
+  background: var(--teal-soft);
+  color: var(--teal);
+}
+
+.compact-exercises .ce-badge.warn {
+  background: rgba(217, 119, 6, 0.1);
+  color: #b45309;
+}
+
+.compact-exercises .ce-badge svg {
+  width: 11px;
+  height: 11px;
+}
+
+.compact-exercises .ce-t-cell {
+  color: var(--ink-2, var(--muted));
+  font-size: 0.82rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+.compact-exercises .ce-t-cell .ic {
+  width: 13px;
+  height: 13px;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.compact-exercises .ce-t-cell strong {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.compact-exercises .ce-teacher {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  min-width: 0;
+}
+
+.compact-exercises .ce-teacher .avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #d97706, #dc2626);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-size: 0.65rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.compact-exercises .ce-teacher .name {
+  color: var(--ink);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compact-exercises .ce-t-action {
+  text-align: end;
+}
+
+.compact-exercises .ce-t-action .button {
+  height: 28px;
+  padding: 0 10px;
+  font-size: 0.78rem;
+  gap: 4px;
+}
+
+.compact-exercises .ce-t-action .button svg {
+  width: 12px;
+  height: 12px;
+}
+
+.compact-exercises .ce-empty {
+  padding: 28px 14px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+@media (max-width: 900px) {
+  .compact-exercises .ce-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .compact-exercises .ce-t-head,
+  .compact-exercises .ce-t-row {
+    grid-template-columns: 6px minmax(0, 1.4fr) minmax(0, 1fr) 80px;
+  }
+  .compact-exercises .ce-t-head .h-teacher,
+  .compact-exercises .ce-t-head .h-action,
+  .compact-exercises .ce-t-row .ce-teacher,
+  .compact-exercises .ce-t-row .ce-t-action {
+    display: none;
   }
 }
