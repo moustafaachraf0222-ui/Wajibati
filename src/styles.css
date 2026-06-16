@@ -1519,6 +1519,58 @@ textarea:focus {
   background: var(--paper);
 }
 
+.user-groups-schools {
+  gap: 14px;
+}
+
+.user-group-school {
+  border-color: var(--teal-soft, var(--line));
+}
+
+.user-group-school > summary {
+  background: var(--teal-soft, var(--paper-soft));
+  min-height: 52px;
+  font-size: 1.02rem;
+}
+
+.user-group-school[open] > summary {
+  border-bottom: 1px solid var(--line);
+}
+
+.user-group-label-name {
+  font-weight: 700;
+}
+
+.user-group-label-meta,
+.user-group-label-stage {
+  color: var(--ink-muted, var(--teal));
+  font-weight: 500;
+  font-size: 0.86rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+}
+
+.user-groups-roles {
+  padding: 12px;
+  gap: 10px;
+  border-top: 1px solid var(--line);
+  background: var(--paper-soft);
+}
+
+.user-group-nested {
+  background: var(--paper);
+}
+
+.user-group-nested > summary,
+.user-group-nested > .user-group-title {
+  background: var(--paper-soft);
+  min-height: 40px;
+  padding: 9px 12px;
+  font-size: 0.94rem;
+}
+
 .credential-database-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

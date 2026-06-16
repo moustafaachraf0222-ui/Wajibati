@@ -4,15 +4,18 @@ import {
   ChevronDown,
   CircleOff,
   Edit3,
+  School,
+  ShieldCheck,
   Trash2,
   Users,
   X
 } from 'lucide-react';
 import { useState } from 'react';
-import type { Language, PlatformData, PlatformUser, Role } from '../types';
-import { schoolYearLabel, statusNames, tr } from '../i18n';
+import type { Language, PlatformData, PlatformUser, Role, SchoolRecord } from '../types';
+import { schoolYearLabel, stageNames, statusNames, tr } from '../i18n';
 import { assignmentSummaryLabel, hasAccountDetails, secondaryStreamLabel, teacherSubjectsLabel } from '../education';
 import { canDeleteUser, canEditUser, canToggleUser, getSchool } from '../data';
+import { schoolIsTrashed } from '../data-tombstones';
 import { AccountAssignmentDetails, ResponsiveTable, RoleLabel } from '../ui';
 
 export function UsersTable({
@@ -25,6 +28,7 @@ export function UsersTable({
   onDelete,
   onEdit,
   groupByRole = false,
+  groupBySchool = false,
   groupStudentsByClass = false
 }: {
   title: string;
@@ -36,6 +40,7 @@ export function UsersTable({
   onDelete: (user: PlatformUser) => void;
   onEdit?: (user: PlatformUser) => void;
   groupByRole?: boolean;
+  groupBySchool?: boolean;
   groupStudentsByClass?: boolean;
 }) {
   const [expandedUsers, setExpandedUsers] = useState<Record<string, boolean>>({});
@@ -208,6 +213,128 @@ export function UsersTable({
     .map((role) => ({ role, users: users.filter((user) => user.role === role) }))
     .filter((group) => group.users.length > 0);
 
+  const renderRoleGroup = (group: { role: Role; users: PlatformUser[] }, key: string) => {
+    if (group.users.length === 0) {
+      return null;
+    }
+
+    if (group.users.length > 1) {
+      return (
+        <details className="user-group user-group-nested" key={key}>
+          <summary>
+            <span className="user-group-label">
+              <RoleLabel role={group.role} language={language} />
+            </span>
+            <span className="user-group-meta">
+              <strong>{group.users.length}</strong>
+              <ChevronDown size={17} aria-hidden="true" />
+            </span>
+          </summary>
+          {groupStudentsByClass && group.role === 'student' ? renderStudentClassGroups(group.users) : renderTable(group.users)}
+        </details>
+      );
+    }
+
+    return (
+      <div className="user-group single user-group-nested" key={key}>
+        <div className="user-group-title">
+          <span className="user-group-label">
+            <RoleLabel role={group.role} language={language} />
+          </span>
+          <span className="user-group-meta">
+            <strong>{group.users.length}</strong>
+          </span>
+        </div>
+        {groupStudentsByClass && group.role === 'student' ? renderStudentClassGroups(group.users) : renderTable(group.users)}
+      </div>
+    );
+  };
+
+  const groupedByRoleForUsers = (groupUsers: PlatformUser[]) =>
+    (['admin', 'director', 'supervisor', 'lab', 'canteen', 'teacher', 'student'] as Role[])
+      .map((role) => ({ role, users: groupUsers.filter((user) => user.role === role) }))
+      .filter((group) => group.users.length > 0);
+
+  type SchoolGroup = {
+    key: string;
+    school: SchoolRecord | null;
+    users: PlatformUser[];
+  };
+
+  const groupedSchools = (() => {
+    if (!groupBySchool) {
+      return null;
+    }
+
+    const bySchoolId = new Map<string, PlatformUser[]>();
+    const adminsWithoutSchool: PlatformUser[] = [];
+
+    for (const user of users) {
+      if (!user.schoolId) {
+        adminsWithoutSchool.push(user);
+        continue;
+      }
+      const list = bySchoolId.get(user.schoolId) ?? [];
+      list.push(user);
+      bySchoolId.set(user.schoolId, list);
+    }
+
+    const knownSchoolIds = new Set(data.schools.map((school) => school.id));
+    const groups: SchoolGroup[] = [];
+
+    if (adminsWithoutSchool.length > 0) {
+      groups.push({ key: 'admins', school: null, users: adminsWithoutSchool });
+    }
+
+    const sortedSchools = [...data.schools]
+      .filter((school) => !schoolIsTrashed(school))
+      .sort((a, b) => a.name.localeCompare(b.name, language === 'ar' ? 'ar' : undefined, { sensitivity: 'base' }));
+
+    for (const school of sortedSchools) {
+      const schoolUsers = bySchoolId.get(school.id);
+      if (!schoolUsers || schoolUsers.length === 0) {
+        continue;
+      }
+      groups.push({ key: `school:${school.id}`, school, users: schoolUsers });
+    }
+
+    for (const [schoolId, schoolUsers] of bySchoolId) {
+      if (knownSchoolIds.has(schoolId)) {
+        continue;
+      }
+      groups.push({ key: `orphan:${schoolId}`, school: null, users: schoolUsers });
+    }
+
+    return groups;
+  })();
+
+  const schoolGroupSummary = (group: SchoolGroup) => {
+    if (group.school) {
+      return (
+        <span className="user-group-label">
+          <School size={18} aria-hidden="true" />
+          <span className="user-group-label-name">{group.school.name}</span>
+          {group.school.city ? <span className="user-group-label-meta">{group.school.city}</span> : null}
+          <span className="user-group-label-stage">{stageNames[language][group.school.stage]}</span>
+        </span>
+      );
+    }
+    if (group.key === 'admins') {
+      return (
+        <span className="user-group-label">
+          <ShieldCheck size={18} aria-hidden="true" />
+          <span className="user-group-label-name">{tr(language, 'platformAdministrators')}</span>
+        </span>
+      );
+    }
+    return (
+      <span className="user-group-label">
+        <School size={18} aria-hidden="true" />
+        <span className="user-group-label-name">{tr(language, 'schoolGroupFallback')}</span>
+      </span>
+    );
+  };
+
   return (
     <div className="panel">
       <div className="panel-heading">
@@ -217,37 +344,31 @@ export function UsersTable({
         </div>
         <Users size={24} aria-hidden="true" />
       </div>
-      {groupByRole ? (
-        <div className="user-groups">
-          {groupedUsers.length === 0 && <p className="empty-state">{tr(language, 'noRecords')}</p>}
-          {groupedUsers.map((group) =>
-            group.users.length > 1 ? (
-              <details className="user-group" key={group.role}>
+      {groupBySchool && groupedSchools ? (
+        <div className="user-groups user-groups-schools">
+          {groupedSchools.length === 0 && <p className="empty-state">{tr(language, 'noRecords')}</p>}
+          {groupedSchools.map((group) => {
+            const innerGroups = groupedByRoleForUsers(group.users);
+            return (
+              <details className="user-group user-group-school" key={group.key} open>
                 <summary>
-                  <span className="user-group-label">
-                    <RoleLabel role={group.role} language={language} />
-                  </span>
+                  {schoolGroupSummary(group)}
                   <span className="user-group-meta">
                     <strong>{group.users.length}</strong>
                     <ChevronDown size={17} aria-hidden="true" />
                   </span>
                 </summary>
-                {groupStudentsByClass && group.role === 'student' ? renderStudentClassGroups(group.users) : renderTable(group.users)}
-              </details>
-            ) : (
-              <div className="user-group single" key={group.role}>
-                <div className="user-group-title">
-                  <span className="user-group-label">
-                    <RoleLabel role={group.role} language={language} />
-                  </span>
-                  <span className="user-group-meta">
-                    <strong>{group.users.length}</strong>
-                  </span>
+                <div className="user-groups user-groups-roles">
+                  {innerGroups.map((innerGroup) => renderRoleGroup(innerGroup, `${group.key}:${innerGroup.role}`))}
                 </div>
-                {groupStudentsByClass && group.role === 'student' ? renderStudentClassGroups(group.users) : renderTable(group.users)}
-              </div>
-            )
-          )}
+              </details>
+            );
+          })}
+        </div>
+      ) : groupByRole ? (
+        <div className="user-groups">
+          {groupedUsers.length === 0 && <p className="empty-state">{tr(language, 'noRecords')}</p>}
+          {groupedUsers.map((group) => renderRoleGroup(group, group.role))}
         </div>
       ) : (
         renderTable(users)

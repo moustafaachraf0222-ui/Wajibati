@@ -486,7 +486,11 @@ export const copy: Record<Language, Record<string, string>> = {
     sendWeeklyReport: 'تنزيل التقرير PDF',
     noTeacherActivity: 'لا يوجد نشاط',
     noSubjectActivity: 'لا توجد مواد',
-    weeklyReportSummary: 'ملخص الأسبوع'
+    weeklyReportSummary: 'ملخص الأسبوع',
+    accountsBySchool: 'الحسابات موزعة على المدارس',
+    platformAdministrators: 'مشرفو المنصة',
+    schoolGroupFallback: 'مدرسة غير محددة',
+    schoolAccountsCount: 'حسابات المدرسة'
   },
   fr: {
     appTitle: 'واجباتي',
@@ -973,7 +977,11 @@ export const copy: Record<Language, Record<string, string>> = {
     sendWeeklyReport: 'Télécharger le PDF',
     noTeacherActivity: 'Aucune activité',
     noSubjectActivity: 'Aucune matière',
-    weeklyReportSummary: 'Résumé de la semaine'
+    weeklyReportSummary: 'Résumé de la semaine',
+    accountsBySchool: 'Comptes par école',
+    platformAdministrators: 'Administrateurs de la plateforme',
+    schoolGroupFallback: 'École non définie',
+    schoolAccountsCount: 'Comptes de l\'école'
   },
   en: {
     appTitle: 'واجباتي',
@@ -1460,7 +1468,11 @@ export const copy: Record<Language, Record<string, string>> = {
     sendWeeklyReport: 'Download PDF',
     noTeacherActivity: 'No activity',
     noSubjectActivity: 'No subjects',
-    weeklyReportSummary: 'Weekly summary'
+    weeklyReportSummary: 'Weekly summary',
+    accountsBySchool: 'Accounts by school',
+    platformAdministrators: 'Platform administrators',
+    schoolGroupFallback: 'Unassigned school',
+    schoolAccountsCount: 'School accounts'
   }
 };
 

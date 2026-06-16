@@ -249,7 +249,7 @@ export function AdminUsersPanel({
 
       {accountMode === 'view' && (
         <UsersTable
-          title={tr(language, 'allUsers')}
+          title={tr(language, 'accountsBySchool')}
           data={data}
           users={data.users}
           currentUser={currentUser}
@@ -257,7 +257,7 @@ export function AdminUsersPanel({
           onToggle={toggleStatus}
           onDelete={deleteUser}
           onEdit={(target) => setEditingUser(target)}
-          groupByRole
+          groupBySchool
         />
       )}
     </section>
