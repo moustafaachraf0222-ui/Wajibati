@@ -1,4 +1,4 @@
-import { Archive, MessageSquare, Plus, Trash2, Upload } from 'lucide-react';
+import { Archive, Clock, MessageSquare, Plus, Trash2, Upload } from 'lucide-react';
 import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
 import type { Announcement, DataSetter, Language, PlatformData, PlatformUser, SecondaryStream, Subject, TeacherNote, UploadedAttachment } from '../types';
 import { schoolYearLabel, subjectNames, tr } from '../i18n';
@@ -17,11 +17,11 @@ import { applyDeletedNoteTombstones, getSchool, makeId, scopedAnnouncements, sco
 import { formatDateTime } from '../dates';
 import { readAttachmentFromInput } from '../files';
 import {
-  announcementExpiresAt,
+  announcementStatus,
   canViewAnnouncementArchive,
   isAnnouncementArchived,
   isNoteArchived,
-  noteExpiresAt
+  noteStatus
 } from '../messages';
 import { AttachmentPreview, Field } from '../ui';
 
@@ -93,18 +93,26 @@ export function AnnouncementsView({ data, setData, currentUser, language }: Comm
   const renderAnnouncementCard = (announcement: Announcement, archived = false) => {
     const author = data.users.find((user) => user.id === announcement.authorId);
     const announcementSchool = data.schools.find((record) => record.id === announcement.schoolId);
-    const expiresAt = announcementExpiresAt(announcement);
+    const status = archived ? 'archived' : announcementStatus(announcement);
+    const statusKey = status === 'active' ? 'messageStatusActive' : status === 'expiring' ? 'messageStatusExpiring' : 'messageStatusArchived';
+    const StatusIcon = status === 'expiring' ? Clock : MessageSquare;
 
     return (
       <article className={archived ? 'message-card archived-message-card' : 'message-card'} key={announcement.id}>
         <div className="message-card-head">
           <h3>{announcement.title}</h3>
-          <small>{formatDateTime(language, announcement.createdAt)}</small>
+          <span className={`message-status ${status}`}>
+            <StatusIcon aria-hidden="true" />
+            {tr(language, statusKey)}
+          </span>
         </div>
         <div className="message-meta">
-          {currentUser.role === 'admin' && announcementSchool && <span>{announcementSchool.name}</span>}
-          <span>{author?.name ?? '-'}</span>
-          <span>{tr(language, archived ? 'archivedAt' : 'visibleUntil')}: {formatDateTime(language, expiresAt)}</span>
+          {currentUser.role === 'admin' && announcementSchool && <span className="mm-tag">{announcementSchool.name}</span>}
+          <span className="mm-tag">{author?.name ?? '-'}</span>
+          <span className="mm-tag">
+            <Clock aria-hidden="true" />
+            {formatDateTime(language, announcement.createdAt)}
+          </span>
         </div>
         <p>{announcement.body}</p>
         {announcement.image && <AttachmentPreview attachment={announcement.image} language={language} />}
@@ -463,18 +471,27 @@ function NotesList({
         {notes.length === 0 && <p className="empty-state">{tr(language, emptyKey)}</p>}
         {notes.map((note) => {
           const teacher = data.users.find((user) => user.id === note.teacherId);
+          const status = archived ? 'archived' : noteStatus(note);
+          const statusKey = status === 'active' ? 'messageStatusActive' : status === 'expiring' ? 'messageStatusExpiring' : 'messageStatusArchived';
+          const StatusIcon = status === 'expiring' ? Clock : MessageSquare;
           return (
             <article className={archived ? 'message-card archived-message-card' : 'message-card'} key={note.id}>
               <div className="message-card-head">
                 <h3>{note.title}</h3>
-                <small>{formatDateTime(language, note.createdAt)}</small>
+                <span className={`message-status ${status}`}>
+                  <StatusIcon aria-hidden="true" />
+                  {tr(language, statusKey)}
+                </span>
               </div>
               <div className="message-meta">
-                {note.subject && <span>{subjectNames[language][note.subject]}</span>}
-                {note.schoolYear && <span>{schoolYearLabel(language, note.stage, note.schoolYear)}</span>}
-                {note.stream && <span>{secondaryStreamLabel(language, note.stream, note.schoolYear)}</span>}
-                {note.classGroup && <span>{tr(language, 'classGroup')} {note.classGroup}</span>}
-                <span>{tr(language, archived ? 'archivedAt' : 'visibleUntil')}: {formatDateTime(language, noteExpiresAt(note))}</span>
+                {note.subject && <span className="mm-tag">{subjectNames[language][note.subject]}</span>}
+                {note.schoolYear && <span className="mm-tag">{schoolYearLabel(language, note.stage, note.schoolYear)}</span>}
+                {note.stream && <span className="mm-tag">{secondaryStreamLabel(language, note.stream, note.schoolYear)}</span>}
+                {note.classGroup && <span className="mm-tag">{tr(language, 'classGroup')} {note.classGroup}</span>}
+                <span className="mm-tag">
+                  <Clock aria-hidden="true" />
+                  {formatDateTime(language, note.createdAt)}
+                </span>
               </div>
               <p>{note.body}</p>
               {note.attachment && <AttachmentPreview attachment={note.attachment} language={language} />}

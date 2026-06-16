@@ -509,7 +509,10 @@ export const copy: Record<Language, Record<string, string>> = {
     active: 'نشط',
     teacherName: 'الأستاذ',
     lateExercises: 'تمارين متأخرة',
-    assignedToYou: 'مخصصة لك'
+    assignedToYou: 'مخصصة لك',
+    messageStatusActive: 'نشط',
+    messageStatusExpiring: 'ينتهي قريباً',
+    messageStatusArchived: 'منتهي'
   },
   fr: {
     appTitle: 'واجباتي',
@@ -1019,7 +1022,10 @@ export const copy: Record<Language, Record<string, string>> = {
     active: 'Actif',
     teacherName: 'Enseignant',
     lateExercises: 'Devoirs en retard',
-    assignedToYou: 'Pour vous'
+    assignedToYou: 'Pour vous',
+    messageStatusActive: 'Actif',
+    messageStatusExpiring: 'Expire bientôt',
+    messageStatusArchived: 'Archivé'
   },
   en: {
     appTitle: 'واجباتي',
@@ -1529,7 +1535,10 @@ export const copy: Record<Language, Record<string, string>> = {
     active: 'Active',
     teacherName: 'Teacher',
     lateExercises: 'Late exercises',
-    assignedToYou: 'Assigned to you'
+    assignedToYou: 'Assigned to you',
+    messageStatusActive: 'Active',
+    messageStatusExpiring: 'Expiring soon',
+    messageStatusArchived: 'Archived'
   }
 };
 

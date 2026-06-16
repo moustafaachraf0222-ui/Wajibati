@@ -1904,22 +1904,28 @@ tbody tr.account-details-row:hover td {
 
 .message-list {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .message-card {
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: var(--paper-soft);
-  padding: 14px;
+  background: var(--paper);
+  padding: 14px 16px;
   display: grid;
-  gap: 10px;
+  gap: 8px;
   overflow: hidden;
+  transition: border-color 0.15s ease;
+}
+
+.message-card:hover {
+  border-color: var(--ink-3, var(--muted));
 }
 
 .message-card.archived-message-card {
-  background: var(--paper);
+  background: var(--paper-soft);
   border-style: dashed;
+  opacity: 0.85;
 }
 
 .message-card-head {
@@ -1936,34 +1942,82 @@ tbody tr.account-details-row:hover td {
 }
 
 .message-card h3 {
-  font-size: 1rem;
-  line-height: 1.45;
+  font-size: 0.98rem;
+  line-height: 1.4;
+  font-weight: 700;
+  letter-spacing: -0.005em;
 }
 
 .message-card p {
-  color: var(--ink);
-  line-height: 1.7;
+  color: var(--ink-1, var(--ink));
+  font-size: 0.88rem;
+  line-height: 1.6;
   white-space: pre-wrap;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .message-card small {
   color: var(--muted);
+  font-size: 0.78rem;
 }
 
 .message-meta {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  align-items: center;
 }
 
-.message-meta span {
+.message-meta .mm-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   border: 1px solid var(--line);
   border-radius: 999px;
-  background: var(--paper);
+  background: var(--paper-soft);
   color: var(--muted);
-  padding: 4px 9px;
-  font-size: 0.82rem;
-  font-weight: 700;
+  padding: 3px 9px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.message-meta .mm-tag svg {
+  width: 11px;
+  height: 11px;
+  color: var(--muted);
+}
+
+.message-card .message-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  background: var(--teal-soft);
+  color: var(--teal);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.message-card .message-status.expiring {
+  background: rgba(217, 119, 6, 0.1);
+  color: #b45309;
+}
+
+.message-card .message-status.archived {
+  background: var(--paper-soft);
+  color: var(--muted);
+}
+
+.message-card .message-status svg {
+  width: 11px;
+  height: 11px;
 }
 
 .attachment-preview {
