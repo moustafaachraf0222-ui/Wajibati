@@ -3,6 +3,7 @@ import type { AccountStatus, Language, Role, SecondaryStream, Stage, Subject } f
 export const copy: Record<Language, Record<string, string>> = {
   ar: {
     appTitle: 'واجباتي',
+    appName: 'واجباتي',
     appSubtitle: 'منصة تربط الأسرة بالمدرسة',
     appInfo: 'معلومات عن المنصة',
     appInfoTitle: 'واجباتي 📚',
@@ -516,6 +517,7 @@ export const copy: Record<Language, Record<string, string>> = {
   },
   fr: {
     appTitle: 'واجباتي',
+    appName: 'Wajibati',
     appSubtitle: 'Plateforme famille-école',
     appInfo: 'Informations sur la plateforme',
     appInfoTitle: 'Wajibati 📚',
@@ -1029,6 +1031,7 @@ export const copy: Record<Language, Record<string, string>> = {
   },
   en: {
     appTitle: 'واجباتي',
+    appName: 'Wajibati',
     appSubtitle: 'Family-school homework platform',
     appInfo: 'About the platform',
     appInfoTitle: 'Wajibati 📚',

@@ -302,8 +302,8 @@ export function LoginPage({ data, setData, language, theme, onLanguageChange, on
   };
 
   return (
-    <main className="login-screen">
-      <section className="login-panel">
+    <main className="login-page">
+      <section className="login-card">
         <div className="login-corner-actions">
           <button
             className="corner-icon-button info-button"
@@ -312,7 +312,7 @@ export function LoginPage({ data, setData, language, theme, onLanguageChange, on
             aria-label={tr(language, 'appInfo')}
             onClick={() => setInfoOpen(true)}
           >
-            <Info size={18} aria-hidden="true" />
+            <Info size={15} aria-hidden="true" />
           </button>
           <LanguageMenu language={language} onLanguageChange={onLanguageChange} variant="corner" />
           <button
@@ -321,43 +321,51 @@ export function LoginPage({ data, setData, language, theme, onLanguageChange, on
             title={theme === 'dark' ? tr(language, 'lightMode') : tr(language, 'darkMode')}
             onClick={() => onThemeChange(theme === 'dark' ? 'light' : 'dark')}
           >
-            {theme === 'dark' ? <Sun size={18} aria-hidden="true" /> : <Moon size={18} aria-hidden="true" />}
+            {theme === 'dark' ? <Sun size={15} aria-hidden="true" /> : <Moon size={15} aria-hidden="true" />}
           </button>
         </div>
-        <div className="login-copy">
+        <div className="login-card-body">
           <div className="login-hero">
-            <h1 className="login-hero-title">
-              <span>{tr(language, 'loginHeroTitle')}</span>
-            </h1>
+            <span className="login-hero-eyebrow">{tr(language, 'appName')}</span>
+            <h1 className="login-hero-title">{tr(language, 'loginHeroTitle')}</h1>
             <p className="login-hero-lead">{tr(language, 'loginHeroSubtitle')}</p>
-            <p className="login-hero-copy">{tr(language, 'loginHeroText')}</p>
           </div>
 
           <SyncIndicator status={syncStatus} language={language} compact />
 
           {visibleRememberedAccounts.length > 0 && (
-            <div className="remembered-box">
-              <span className="remembered-title">{tr(language, 'rememberedAccounts')}</span>
-              <div className="remembered-list">
-                {visibleRememberedAccounts.map((account) => (
-                  <div className="remembered-account" key={account.id}>
-                    <button className="remembered-main" type="button" title={tr(language, 'useRememberedAccount')} onClick={() => loginWithRememberedAccount(account)}>
-                      <Users size={17} aria-hidden="true" />
-                      <span>
-                        <strong>{account.name}</strong>
-                        <small>{account.email}</small>
-                      </span>
-                    </button>
-                    <button className="remembered-remove" type="button" title={tr(language, 'forgetAccount')} onClick={() => forgetRememberedAccount(account)}>
-                      <X size={15} aria-hidden="true" />
-                    </button>
-                  </div>
-                ))}
-              </div>
+            <div className="login-stats">
+              <span className="login-stats-label">{tr(language, 'rememberedAccounts')}</span>
+              {visibleRememberedAccounts.map((account) => (
+                <div className="login-stat" key={account.id}>
+                  <button
+                    className="login-stat-info"
+                    type="button"
+                    title={tr(language, 'useRememberedAccount')}
+                    onClick={() => loginWithRememberedAccount(account)}
+                  >
+                    <div className="login-stat-ico">
+                      <Users size={14} aria-hidden="true" />
+                    </div>
+                    <div>
+                      <div className="login-stat-name">{account.name}</div>
+                      <div className="login-stat-email">{account.email}</div>
+                    </div>
+                  </button>
+                  <button
+                    className="login-stat-remove"
+                    type="button"
+                    title={tr(language, 'forgetAccount')}
+                    onClick={() => forgetRememberedAccount(account)}
+                  >
+                    <X size={13} aria-hidden="true" />
+                  </button>
+                </div>
+              ))}
             </div>
           )}
 
-          <form className="form-stack" onSubmit={submitLogin}>
+          <form className="login-form" onSubmit={submitLogin}>
             <label>
               <span>{tr(language, 'email')}</span>
               <input value={email} onChange={(event) => setEmail(event.target.value)} type="email" autoComplete="off" />
@@ -366,26 +374,39 @@ export function LoginPage({ data, setData, language, theme, onLanguageChange, on
               <span>{tr(language, 'password')}</span>
               <input value={password} onChange={(event) => setPassword(event.target.value)} type="password" autoComplete="new-password" />
             </label>
-            <label className="remember-row">
+            <label className="login-remember">
               <input name="remember" type="checkbox" checked={rememberMe} onChange={(event) => setRememberMe(event.target.checked)} />
               <span>{tr(language, 'rememberMe')}</span>
             </label>
-            {error && <p className="form-error">{error}</p>}
-            <button className="button primary wide" type="submit" disabled={isSubmitting}>
-              <ShieldCheck size={18} aria-hidden="true" />
-              <span>{tr(language, 'signIn')}</span>
-            </button>
+            <div className="login-form-foot">
+              {error && <p className="form-error">{error}</p>}
+              <div className="login-btn-row">
+                <button className="button primary" type="submit" disabled={isSubmitting}>
+                  <ShieldCheck size={15} aria-hidden="true" />
+                  <span>{tr(language, 'signIn')}</span>
+                </button>
+              </div>
+            </div>
           </form>
 
-          <div className="student-signup-box">
-            <button className="button ghost wide" type="button" onClick={() => setStudentSignupOpen((open) => !open)}>
-              <KeyRound size={18} aria-hidden="true" />
+          <div className="login-divider" />
+
+          <div className="login-signup-card">
+            <div className="login-signup-head">
+              <KeyRound size={15} aria-hidden="true" />
               <span>{tr(language, 'createStudentAccount')}</span>
+            </div>
+            <button
+              className="login-toggle-signup"
+              type="button"
+              onClick={() => setStudentSignupOpen((open) => !open)}
+            >
+              {studentSignupOpen ? tr(language, 'cancel') : tr(language, 'activateAccount')}
             </button>
             {studentSignupOpen && (
-              <form className="form-grid login-signup-form" onSubmit={submitStudentSignup}>
-                <p className="hint full">{tr(language, 'studentSignupHint')}</p>
-                <label className="full">
+              <form className="login-signup-form" onSubmit={submitStudentSignup}>
+                <p className="login-signup-hint">{tr(language, 'studentSignupHint')}</p>
+                <label>
                   <span>{tr(language, 'fullName')}</span>
                   <input
                     value={studentSignupForm.name}
@@ -398,7 +419,7 @@ export function LoginPage({ data, setData, language, theme, onLanguageChange, on
                     required
                   />
                 </label>
-                <label className="full">
+                <label>
                   <span>{tr(language, 'schoolDomain')}</span>
                   <input
                     dir="ltr"
@@ -412,7 +433,7 @@ export function LoginPage({ data, setData, language, theme, onLanguageChange, on
                     required
                   />
                 </label>
-                <label className="full">
+                <label>
                   <span>{tr(language, 'activationCode')}</span>
                   <input
                     dir="ltr"
@@ -492,30 +513,32 @@ export function LoginPage({ data, setData, language, theme, onLanguageChange, on
                     )}
                   </>
                 )}
-                {!studentSignupSuccess && <p className="hint full">{tr(language, 'validSchoolDomainHint')}</p>}
+                {!studentSignupSuccess && <p className="login-signup-hint">{tr(language, 'validSchoolDomainHint')}</p>}
 
                 {studentSignupSuccess && (
-                  <div className="created-account-box full">
+                  <div className="login-created-account">
                     <strong>{tr(language, 'studentAccountCreated')}</strong>
                     <span>{tr(language, 'email')}: <b dir="ltr">{studentSignupSuccess.email}</b></span>
                     <span>{tr(language, 'accountCode')}: <b dir="ltr">{studentSignupSuccess.password}</b></span>
                   </div>
                 )}
-                {studentSignupError && <p className="form-error full">{studentSignupError}</p>}
-                <button
-                  className="button primary form-submit"
-                  type="submit"
-                  disabled={
-                    isCreatingStudent ||
-                    !activationSchool ||
-                    !studentSignupForm.name.trim() ||
-                    !studentSignupForm.domain.trim() ||
-                    !studentSignupForm.code.trim()
-                  }
-                >
-                  <KeyRound size={17} aria-hidden="true" />
-                  <span>{tr(language, 'activateAccount')}</span>
-                </button>
+                {studentSignupError && <p className="form-error">{studentSignupError}</p>}
+                <div className="login-btn-row">
+                  <button
+                    className="button primary"
+                    type="submit"
+                    disabled={
+                      isCreatingStudent ||
+                      !activationSchool ||
+                      !studentSignupForm.name.trim() ||
+                      !studentSignupForm.domain.trim() ||
+                      !studentSignupForm.code.trim()
+                    }
+                  >
+                    <KeyRound size={14} aria-hidden="true" />
+                    <span>{tr(language, 'activateAccount')}</span>
+                  </button>
+                </div>
               </form>
             )}
           </div>
