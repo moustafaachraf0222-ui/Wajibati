@@ -27,7 +27,7 @@ import {
   Wrench,
   X
 } from 'lucide-react';
-import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
+import { useEffect, useState, type ChangeEvent, type FormEvent, type ReactElement } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import type {
   DataSetter,
@@ -942,10 +942,59 @@ function ExerciseList({
           )}
         </div>
       ) : (
-        <div className="exercise-grid compact-list">
-          {exercises.length === 0 && <p className="empty-state">{tr(language, 'noRecords')}</p>}
-          {[...exercises].sort(sortExercises).map(renderExerciseCard)}
-        </div>
+        <StudentExercisesView
+          exercises={exercises}
+          language={language}
+          renderExerciseCard={renderExerciseCard}
+        />
+      )}
+    </div>
+  );
+}
+
+function StudentExercisesView({
+  exercises,
+  language,
+  renderExerciseCard
+}: {
+  exercises: Exercise[];
+  language: Language;
+  renderExerciseCard: (exercise: Exercise) => ReactElement;
+}) {
+  const activeStudentExercises = exercises.filter((exercise) => !isPastExercise(exercise));
+  const archivedStudentExercises = exercises.filter(isPastExercise);
+  const archiveGroups = groupExercisesByMonth(archivedStudentExercises, language);
+  const sortedActive = [...activeStudentExercises].sort(sortExercises);
+
+  return (
+    <div className="student-exercise-groups">
+      {exercises.length === 0 && <p className="empty-state">{tr(language, 'noRecords')}</p>}
+      {activeStudentExercises.length === 0 && exercises.length > 0 && <p className="empty-state">{tr(language, 'homeworkArchive')}</p>}
+      <div className="exercise-grid compact-list">{sortedActive.map(renderExerciseCard)}</div>
+      {archiveGroups.length > 0 && (
+        <section className="homework-archive">
+          <div className="subject-group-heading">
+            <div className="subject-title">
+              <span className="subject-icon">
+                <Archive size={19} aria-hidden="true" />
+              </span>
+              <div>
+                <strong>{tr(language, 'homeworkArchive')}</strong>
+                <small>{tr(language, 'archiveByMonth')}</small>
+              </div>
+            </div>
+            <span className="subject-count">{archivedStudentExercises.length}</span>
+          </div>
+          {archiveGroups.map((group) => (
+            <details className="archive-month" key={group.key}>
+              <summary>
+                <span>{group.label}</span>
+                <strong>{group.exercises.length}</strong>
+              </summary>
+              <div className="exercise-grid compact-list">{group.exercises.map(renderExerciseCard)}</div>
+            </details>
+          ))}
+        </section>
       )}
     </div>
   );
