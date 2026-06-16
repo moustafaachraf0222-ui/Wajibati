@@ -1,4 +1,4 @@
-import { LogOut, Moon, School, Sun } from 'lucide-react';
+import { ArrowLeft, LogOut, Moon, School, Sun } from 'lucide-react';
 import type { ReactNode } from 'react';
 import type { Language, PlatformUser, SchoolRecord, SyncStatus, Theme, View } from './types';
 import { stageNames, tr } from './i18n';
@@ -12,6 +12,7 @@ import {
 } from './education';
 import { ConfirmDialog, LanguageMenu, RoleLabel, SyncIndicator } from './ui';
 import type { NavItem } from './navigation';
+import { canGoBack as stackCanGoBack, topView, type NavStack } from './nav-stack';
 
 type AppShellProps = {
   children: ReactNode;
@@ -19,10 +20,11 @@ type AppShellProps = {
   currentUser: PlatformUser;
   language: Language;
   logoutOpen: boolean;
-  safeView: View;
+  stack: NavStack;
   syncStatus: SyncStatus;
   tabs: NavItem[];
   theme: Theme;
+  onBack: () => void;
   onLanguageChange: (language: Language) => void;
   onLogoutCancel: () => void;
   onLogoutConfirm: () => void;
@@ -37,10 +39,11 @@ export function AppShell({
   currentUser,
   language,
   logoutOpen,
-  safeView,
+  stack,
   syncStatus,
   tabs,
   theme,
+  onBack,
   onLanguageChange,
   onLogoutCancel,
   onLogoutConfirm,
@@ -48,6 +51,9 @@ export function AppShell({
   onThemeChange,
   onViewChange
 }: AppShellProps) {
+  const activeView: View = topView(stack);
+  const canGoBackNow = stackCanGoBack(stack);
+
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -67,7 +73,7 @@ export function AppShell({
             return (
               <button
                 key={item.id}
-                className={safeView === item.id ? 'nav-item active' : 'nav-item'}
+                className={activeView === item.id ? 'nav-item active' : 'nav-item'}
                 type="button"
                 onClick={() => onViewChange(item.id)}
               >
@@ -98,9 +104,23 @@ export function AppShell({
 
       <main className="main-area">
         <header className="topbar">
-          <div>
-            <p>{tr(language, safeView)}</p>
-            <h1>{currentUser.name}</h1>
+          <div className="topbar-title">
+            {canGoBackNow && (
+              <button
+                className="back-button"
+                type="button"
+                onClick={onBack}
+                aria-label={tr(language, 'back')}
+                title={tr(language, 'back')}
+              >
+                <ArrowLeft size={20} aria-hidden="true" />
+                <span>{tr(language, 'back')}</span>
+              </button>
+            )}
+            <div>
+              <p>{tr(language, activeView)}</p>
+              <h1>{currentUser.name}</h1>
+            </div>
           </div>
           <div className="topbar-actions">
             <SyncIndicator status={syncStatus} language={language} />
@@ -121,7 +141,9 @@ export function AppShell({
           </div>
         </header>
 
-        {children}
+        <div className="screen-view" key={`${stack.length}:${activeView}`}>
+          {children}
+        </div>
       </main>
 
       {logoutOpen && <ConfirmDialog language={language} onCancel={onLogoutCancel} onConfirm={onLogoutConfirm} />}

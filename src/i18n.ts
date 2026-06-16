@@ -490,7 +490,8 @@ export const copy: Record<Language, Record<string, string>> = {
     accountsBySchool: 'الحسابات موزعة على المدارس',
     platformAdministrators: 'مشرفو المنصة',
     schoolGroupFallback: 'مدرسة غير محددة',
-    schoolAccountsCount: 'حسابات المدرسة'
+    schoolAccountsCount: 'حسابات المدرسة',
+    back: 'رجوع'
   },
   fr: {
     appTitle: 'واجباتي',
@@ -981,7 +982,8 @@ export const copy: Record<Language, Record<string, string>> = {
     accountsBySchool: 'Comptes par école',
     platformAdministrators: 'Administrateurs de la plateforme',
     schoolGroupFallback: 'École non définie',
-    schoolAccountsCount: 'Comptes de l\'école'
+    schoolAccountsCount: 'Comptes de l\'école',
+    back: 'Retour'
   },
   en: {
     appTitle: 'واجباتي',
@@ -1472,7 +1474,8 @@ export const copy: Record<Language, Record<string, string>> = {
     accountsBySchool: 'Accounts by school',
     platformAdministrators: 'Platform administrators',
     schoolGroupFallback: 'Unassigned school',
-    schoolAccountsCount: 'School accounts'
+    schoolAccountsCount: 'School accounts',
+    back: 'Back'
   }
 };
 

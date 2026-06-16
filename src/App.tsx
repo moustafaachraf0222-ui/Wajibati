@@ -57,16 +57,17 @@ function App() {
       currentUser={currentUser}
       language={language}
       logoutOpen={session.logoutOpen}
-      safeView={session.safeView}
+      stack={session.stack}
       syncStatus={syncStatus}
       tabs={session.tabs}
       theme={theme}
+      onBack={session.popView}
       onLanguageChange={setLanguage}
       onLogoutCancel={session.cancelLogout}
       onLogoutConfirm={session.confirmLogout}
       onLogoutRequest={session.requestLogout}
       onThemeChange={setTheme}
-      onViewChange={session.setActiveView}
+      onViewChange={session.pushView}
     >
       <AppRouter
         data={data}
@@ -74,7 +75,7 @@ function App() {
         currentUser={currentUser}
         language={language}
         theme={theme}
-        view={session.safeView}
+        stack={session.stack}
         onLanguageChange={setLanguage}
         onThemeChange={setTheme}
         onResetDemo={() => {

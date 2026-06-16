@@ -1,4 +1,4 @@
-import type { DataSetter, Language, PlatformData, PlatformUser, Theme, View } from './types';
+import type { DataSetter, Language, PlatformData, PlatformUser, Theme } from './types';
 import { AbsencesView } from './views/absences';
 import { UsersView } from './views/accounts';
 import { ExercisesView } from './views/exercises';
@@ -8,13 +8,14 @@ import { LaboratoriesView } from './views/labs';
 import { CanteenView } from './views/canteen';
 import { SchoolProfileView, SchoolsView } from './views/schools';
 import { SettingsView } from './views/settings';
+import { topView, type NavStack } from './nav-stack';
 
 type AppRouterProps = {
   data: PlatformData;
   currentUser: PlatformUser;
   language: Language;
   theme: Theme;
-  view: View;
+  stack: NavStack;
   setData: DataSetter;
   onLanguageChange: (language: Language) => void;
   onResetDemo: () => void;
@@ -26,12 +27,13 @@ export function AppRouter({
   currentUser,
   language,
   theme,
-  view,
+  stack,
   setData,
   onLanguageChange,
   onResetDemo,
   onThemeChange
 }: AppRouterProps) {
+  const view = topView(stack);
   switch (view) {
     case 'schools':
       return <SchoolsView data={data} setData={setData} currentUser={currentUser} language={language} />;
