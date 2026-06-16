@@ -4262,3 +4262,190 @@ summary.subject-group-heading:hover .subject-icon svg {
     display: none;
   }
 }
+
+/* =============================================================
+   COMPACT OVERVIEW (Prototype 11 design system)
+   ============================================================= */
+
+.ov-overview {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 1180px;
+}
+
+.ov-page-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 4px;
+}
+
+.ov-eyebrow {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 500;
+  margin-bottom: 3px;
+}
+
+.ov-h1 {
+  font-size: 1.45rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ov-h1 .role-label {
+  font-size: 1.45rem;
+}
+
+.ov-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.ov-stat {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  transition: border-color 0.15s ease;
+}
+
+.ov-stat:hover {
+  border-color: var(--ink-3, var(--muted));
+}
+
+.ov-stat .ico {
+  width: 30px;
+  height: 30px;
+  background: var(--paper-soft);
+  color: var(--ink-2, var(--muted));
+  border-radius: 7px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.ov-stat .ico svg {
+  width: 15px;
+  height: 15px;
+}
+
+.ov-stat .lbl {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.ov-stat .val {
+  color: var(--ink);
+  font-size: 1.2rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  margin-top: 2px;
+}
+
+.ov-stat.pri {
+  background: var(--teal-soft);
+  border-color: rgba(0, 98, 51, 0.22);
+}
+
+.ov-stat.pri .ico {
+  background: var(--teal);
+  color: #fff;
+}
+
+.ov-stat.pri .lbl {
+  color: var(--teal);
+  font-weight: 600;
+}
+
+.ov-panel {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.ov-panel-head {
+  padding: 12px 18px;
+  background: var(--paper-soft);
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ov-panel-head h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--ink);
+  margin: 0;
+  letter-spacing: -0.005em;
+}
+
+.ov-panel-head svg {
+  color: var(--teal);
+}
+
+.ov-detail-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 0;
+}
+
+.ov-detail-list > div {
+  padding: 11px 18px;
+  border-bottom: 1px solid var(--line-soft, var(--line));
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 44px;
+}
+
+.ov-detail-list > div:nth-last-child(-n+2):nth-child(odd) {
+  /* last odd item when not paired - still has border */
+}
+
+.ov-detail-list > div {
+  border-right: 1px solid var(--line-soft, var(--line));
+}
+
+.ov-detail-list > div:nth-child(2n) {
+  border-right: none;
+}
+
+.ov-detail-list > div dt {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 500;
+  flex-shrink: 0;
+  min-width: 110px;
+}
+
+.ov-detail-list > div dd {
+  color: var(--ink);
+  font-size: 0.88rem;
+  font-weight: 500;
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}

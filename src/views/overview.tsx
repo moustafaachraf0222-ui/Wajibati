@@ -16,7 +16,7 @@ import {
   todayIso,
   weekRangeLabel
 } from '../homework';
-import { RoleLabel, StatCard } from '../ui';
+import { RoleLabel } from '../ui';
 
 type CommonViewProps = {
   data: PlatformData;
@@ -201,30 +201,76 @@ export function OverviewView({ data, currentUser, language }: CommonViewProps) {
   }
 
   return (
-    <section className="content-grid">
-      <div className="stats-grid">
-        <StatCard icon={Users} label={tr(language, 'activeUsers')} value={activeCount.toString()} tone="teal" />
-        <StatCard icon={CircleOff} label={tr(language, 'disabledUsers')} value={disabledCount.toString()} tone="amber" />
-        <StatCard icon={BookOpen} label={tr(language, 'totalExercises')} value={exercises.length.toString()} tone="blue" />
+    <section className="ov-overview">
+      <div className="ov-page-head">
+        <div>
+          <div className="ov-eyebrow">{tr(language, 'visibleScope')}</div>
+          <h1 className="ov-h1">
+            <RoleLabel role={currentUser.role} language={language} />
+          </h1>
+        </div>
+      </div>
+
+      <div className="ov-stats">
+        <div className="ov-stat">
+          <div className="ico">
+            <Users size={15} aria-hidden="true" />
+          </div>
+          <div>
+            <div className="lbl">{tr(language, 'activeUsers')}</div>
+            <div className="val">{activeCount}</div>
+          </div>
+        </div>
+        <div className="ov-stat">
+          <div className="ico">
+            <CircleOff size={15} aria-hidden="true" />
+          </div>
+          <div>
+            <div className="lbl">{tr(language, 'disabledUsers')}</div>
+            <div className="val">{disabledCount}</div>
+          </div>
+        </div>
+        <div className="ov-stat pri">
+          <div className="ico">
+            <BookOpen size={15} aria-hidden="true" />
+          </div>
+          <div>
+            <div className="lbl">{tr(language, 'totalExercises')}</div>
+            <div className="val">{exercises.length}</div>
+          </div>
+        </div>
         {currentUser.role === 'student' && (
-          <StatCard icon={CheckCircle2} label={tr(language, 'completedExercises')} value={completed.toString()} tone="green" />
+          <div className="ov-stat">
+            <div className="ico">
+              <CheckCircle2 size={15} aria-hidden="true" />
+            </div>
+            <div>
+              <div className="lbl">{tr(language, 'completedExercises')}</div>
+              <div className="val">{completed}</div>
+            </div>
+          </div>
         )}
         {currentUser.role === 'student' && (
-          <StatCard icon={CircleOff} label={tr(language, 'absentCount')} value={absenceCount.toString()} tone="amber" />
+          <div className="ov-stat">
+            <div className="ico">
+              <CalendarDays size={15} aria-hidden="true" />
+            </div>
+            <div>
+              <div className="lbl">{tr(language, 'absentCount')}</div>
+              <div className="val">{absenceCount}</div>
+            </div>
+          </div>
         )}
       </div>
 
-      <div className="panel overview-context">
-        <div className="panel-heading">
-          <div>
-            <p>{tr(language, 'visibleScope')}</p>
-            <h2>
-              <RoleLabel role={currentUser.role} language={language} />
-            </h2>
-          </div>
-          <LockKeyhole size={24} aria-hidden="true" />
+      <div className="ov-panel">
+        <div className="ov-panel-head">
+          <h2>
+            <LockKeyhole size={15} aria-hidden="true" />
+            <span>{tr(language, 'visibleScope')}</span>
+          </h2>
         </div>
-        <dl className="detail-list">
+        <dl className="ov-detail-list">
           {school && (
             <>
               <div>
