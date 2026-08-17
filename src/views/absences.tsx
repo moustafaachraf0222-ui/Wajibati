@@ -1,4 +1,4 @@
-import { CalendarDays, Check, ClipboardCheck, Edit3, FileText, Plus, Printer, Save, Send, Trash2, Upload, X } from 'lucide-react';
+import { Archive, ArrowLeft, CalendarDays, Check, ChevronRight, ClipboardCheck, Clock, Edit3, FileText, Plus, Printer, Save, Send, Trash2, Upload, X } from 'lucide-react';
 import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from 'react';
 import type {
   AbsenceRecord,
@@ -1522,6 +1522,12 @@ function DirectorAbsenceReports({ data, setData, currentUser, language }: Common
   const reportSections = useMemo(() => reportSectionsForDirector(data, currentUser, selectedDate), [currentUser, data, selectedDate]);
   const currentReportSections = useMemo(() => reportSections.filter((section) => reportIsCurrent(section.report, now)), [now, reportSections]);
   const historyReportSections = useMemo(() => reportSections.filter((section) => !reportIsCurrent(section.report, now)), [now, reportSections]);
+  const [archiveOpen, setArchiveOpen] = useState(false);
+  const [archiveReportId, setArchiveReportId] = useState<string | null>(null);
+  const selectedArchiveSection = useMemo(
+    () => historyReportSections.find((section) => section.report.id === archiveReportId) ?? null,
+    [archiveReportId, historyReportSections]
+  );
   const currentReportEntries = currentReportSections.flatMap((section) => section.entries);
   const uniqueClasses = new Set(currentReportEntries.map((entry) => reportGroupKey(entry.record)));
   const uniqueStudents = new Set(currentReportEntries.map((entry) => entry.student.id));
@@ -1615,32 +1621,89 @@ function DirectorAbsenceReports({ data, setData, currentUser, language }: Common
         />
       </div>
 
-      <div className="panel full">
-        <div className="panel-heading">
-          <div>
-            <p>{tr(language, 'absenceHistoryHint')}</p>
-            <h2>{tr(language, 'absenceHistory')}</h2>
-          </div>
-          <FileText size={24} aria-hidden="true" />
-        </div>
-        <div className="absence-report-toolbar compact">
-          <button
-            className="button ghost"
-            type="button"
-            disabled={historyReportSections.length === 0}
-            onClick={() => printAbsenceReports(language, school?.name ?? '-', historyReportSections)}
-          >
-            <Printer size={17} aria-hidden="true" />
-            <span>{tr(language, 'printHistoryAbsenceReports')}</span>
-          </button>
-        </div>
-        <AbsenceReportList
-          emptyText={tr(language, 'noAbsenceHistory')}
-          language={language}
-          schoolName={school?.name ?? '-'}
-          sections={historyReportSections}
-        />
-      </div>
+      {archiveOpen ? (
+        <>
+          {selectedArchiveSection ? (
+            <>
+              <button type="button" className="back-button full" onClick={() => setArchiveReportId(null)}>
+                <ArrowLeft size={15} aria-hidden="true" />
+                <span>{tr(language, 'back')}</span>
+              </button>
+              <div className="panel full">
+                <div className="panel-heading">
+                  <div>
+                    <p>{tr(language, 'absenceHistoryHint')}</p>
+                    <h2>{tr(language, 'absenceHistory')}</h2>
+                  </div>
+                  <FileText size={24} aria-hidden="true" />
+                </div>
+                <div className="absence-report-toolbar compact">
+                  <button className="button ghost" type="button" onClick={() => printAbsenceReports(language, school?.name ?? '-', [selectedArchiveSection])}>
+                    <Printer size={17} aria-hidden="true" />
+                    <span>{tr(language, 'printAbsenceReport')}</span>
+                  </button>
+                </div>
+                <AbsenceReportList
+                  emptyText={tr(language, 'noAbsenceHistory')}
+                  language={language}
+                  schoolName={school?.name ?? '-'}
+                  sections={[selectedArchiveSection]}
+                />
+              </div>
+            </>
+          ) : (
+            <>
+              <button type="button" className="back-button full" onClick={() => setArchiveOpen(false)}>
+                <ArrowLeft size={15} aria-hidden="true" />
+                <span>{tr(language, 'back')}</span>
+              </button>
+              <div className="panel full">
+                <div className="panel-heading">
+                  <div>
+                    <p>{tr(language, 'absenceHistoryHint')}</p>
+                    <h2>{tr(language, 'absenceHistory')}</h2>
+                  </div>
+                  <Archive size={24} aria-hidden="true" />
+                </div>
+                <div className="user-groups">
+                  {historyReportSections.length === 0 && <p className="empty-state">{tr(language, 'noAbsenceHistory')}</p>}
+                  {historyReportSections.map((section) => (
+                    <button
+                      type="button"
+                      className="user-group drill-row"
+                      key={section.report.id}
+                      onClick={() => setArchiveReportId(section.report.id)}
+                    >
+                      <span className="user-group-title">
+                        <span className="user-group-label">
+                          <Clock size={16} aria-hidden="true" />
+                          <span className="user-group-label-name">{formatAbsenceDateTime(language, section.report.createdAt)}</span>
+                        </span>
+                        <span className="user-group-meta">
+                          <ChevronRight size={17} aria-hidden="true" />
+                        </span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+        </>
+      ) : (
+        <button type="button" className="user-group user-group-school drill-row full" onClick={() => setArchiveOpen(true)}>
+          <span className="user-group-title">
+            <span className="user-group-label">
+              <Archive size={18} aria-hidden="true" />
+              <span className="user-group-label-name">{tr(language, 'absenceHistory')}</span>
+            </span>
+            <span className="user-group-meta">
+              <strong>{historyReportSections.length}</strong>
+              <ChevronRight size={17} aria-hidden="true" />
+            </span>
+          </span>
+        </button>
+      )}
     </section>
   );
 }
