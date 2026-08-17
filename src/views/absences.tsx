@@ -1523,7 +1523,6 @@ function DirectorAbsenceReports({ data, setData, currentUser, language }: Common
   const currentReportSections = useMemo(() => reportSections.filter((section) => reportIsCurrent(section.report, now)), [now, reportSections]);
   const historyReportSections = useMemo(() => reportSections.filter((section) => !reportIsCurrent(section.report, now)), [now, reportSections]);
   const [archiveOpen, setArchiveOpen] = useState(false);
-  const [archiveDate, setArchiveDate] = useState<string | null>(null);
   const historyByDate = useMemo(() => {
     const groups = new Map<string, AbsenceReportSection[]>();
     historyReportSections.forEach((section) => {
@@ -1531,7 +1530,6 @@ function DirectorAbsenceReports({ data, setData, currentUser, language }: Common
     });
     return [...groups.entries()].sort((left, right) => right[0].localeCompare(left[0]));
   }, [historyReportSections]);
-  const selectedArchiveSections = useMemo(() => historyByDate.find(([date]) => date === archiveDate)?.[1] ?? [], [archiveDate, historyByDate]);
   const currentReportEntries = currentReportSections.flatMap((section) => section.entries);
   const uniqueClasses = new Set(currentReportEntries.map((entry) => reportGroupKey(entry.record)));
   const uniqueStudents = new Set(currentReportEntries.map((entry) => entry.student.id));
@@ -1627,68 +1625,41 @@ function DirectorAbsenceReports({ data, setData, currentUser, language }: Common
 
       {archiveOpen ? (
         <>
-          {archiveDate && selectedArchiveSections.length > 0 ? (
-            <>
-              <button type="button" className="back-button full" onClick={() => setArchiveDate(null)}>
-                <ArrowLeft size={15} aria-hidden="true" />
-                <span>{tr(language, 'back')}</span>
-              </button>
-              <div className="panel full">
-                <div className="panel-heading">
-                  <div>
-                    <p>{tr(language, 'absenceHistoryHint')}</p>
-                    <h2>{tr(language, 'absenceHistory')}</h2>
-                  </div>
-                  <FileText size={24} aria-hidden="true" />
-                </div>
-                <div className="absence-report-toolbar compact">
-                  <button className="button ghost" type="button" onClick={() => printAbsenceReports(language, school?.name ?? '-', selectedArchiveSections)}>
-                    <Printer size={17} aria-hidden="true" />
-                    <span>{tr(language, 'printHistoryAbsenceReports')}</span>
-                  </button>
-                </div>
-                <AbsenceReportList
-                  emptyText={tr(language, 'noAbsenceHistory')}
-                  language={language}
-                  schoolName={school?.name ?? '-'}
-                  sections={selectedArchiveSections}
-                />
+          <button type="button" className="back-button full" onClick={() => setArchiveOpen(false)}>
+            <ArrowLeft size={15} aria-hidden="true" />
+            <span>{tr(language, 'back')}</span>
+          </button>
+          <div className="panel full">
+            <div className="panel-heading">
+              <div>
+                <p>{tr(language, 'absenceHistoryHint')}</p>
+                <h2>{tr(language, 'absenceHistory')}</h2>
               </div>
-            </>
-          ) : (
-            <>
-              <button type="button" className="back-button full" onClick={() => setArchiveOpen(false)}>
-                <ArrowLeft size={15} aria-hidden="true" />
-                <span>{tr(language, 'back')}</span>
-              </button>
-              <div className="panel full">
-                <div className="panel-heading">
-                  <div>
-                    <p>{tr(language, 'absenceHistoryHint')}</p>
-                    <h2>{tr(language, 'absenceHistory')}</h2>
-                  </div>
-                  <Archive size={24} aria-hidden="true" />
-                </div>
-                <div className="user-groups">
-                  {historyByDate.length === 0 && <p className="empty-state">{tr(language, 'noAbsenceHistory')}</p>}
-                  {historyByDate.map(([date, sections]) => (
-                    <button type="button" className="user-group drill-row" key={date} onClick={() => setArchiveDate(date)}>
-                      <span className="user-group-title">
-                        <span className="user-group-label">
-                          <CalendarDays size={16} aria-hidden="true" />
-                          <span className="user-group-label-name">{formatAbsenceDate(language, date)}</span>
-                        </span>
-                        <span className="user-group-meta">
-                          <strong>{sections.length}</strong>
-                          <ChevronRight size={17} aria-hidden="true" />
-                        </span>
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </>
-          )}
+              <Archive size={24} aria-hidden="true" />
+            </div>
+            <div className="user-groups">
+              {historyByDate.length === 0 && <p className="empty-state">{tr(language, 'noAbsenceHistory')}</p>}
+              {historyByDate.map(([date, sections]) => (
+                <button
+                  type="button"
+                  className="user-group drill-row"
+                  key={date}
+                  onClick={() => printAbsenceReports(language, school?.name ?? '-', sections)}
+                >
+                  <span className="user-group-title">
+                    <span className="user-group-label">
+                      <CalendarDays size={16} aria-hidden="true" />
+                      <span className="user-group-label-name">{formatAbsenceDate(language, date)}</span>
+                    </span>
+                    <span className="user-group-meta">
+                      <strong>{sections.length}</strong>
+                      <Printer size={16} aria-hidden="true" />
+                    </span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
         </>
       ) : (
         <button type="button" className="user-group user-group-school drill-row full" onClick={() => setArchiveOpen(true)}>
