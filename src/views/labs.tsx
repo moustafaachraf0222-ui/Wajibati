@@ -1,5 +1,5 @@
-import { AlertTriangle, Camera, CheckCircle2, FlaskConical, Plus, Send, Wrench, XCircle } from 'lucide-react';
-import { useMemo, useState, type FormEvent } from 'react';
+import { AlertTriangle, Archive, ArrowLeft, CalendarDays, Camera, CheckCircle2, ChevronRight, FlaskConical, Plus, Printer, Send, Wrench, XCircle } from 'lucide-react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import type {
   DataSetter,
   LabAvailability,
@@ -84,6 +84,26 @@ function faultStatusLabel(language: Language, status: LabFaultReport['status']) 
   return tr(language, status === 'open' ? 'labFaultOpen' : 'labFaultRepaired');
 }
 
+const REPAIR_ARCHIVE_CURRENT_MS = 24 * 60 * 60 * 1000;
+
+function repairIsCurrent(report: LabFaultReport, now = Date.now()) {
+  const repairDate = Date.parse(report.repairDate ?? '');
+  return !Number.isFinite(repairDate) || now - repairDate < REPAIR_ARCHIVE_CURRENT_MS;
+}
+
+function formatDate(language: Language, value?: string) {
+  if (!value) {
+    return '-';
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat(localeNames[language], { dateStyle: 'medium' }).format(date);
+}
+
 function formatDateTime(language: Language, value?: string) {
   if (!value) {
     return '-';
@@ -99,6 +119,133 @@ function formatDateTime(language: Language, value?: string) {
 
 function userName(data: PlatformData, userId: string) {
   return data.users.find((user) => user.id === userId)?.name ?? '-';
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+type RepairPrintEntry = {
+  labName: string;
+  reportedByName: string;
+  report: LabFaultReport;
+  technicianName: string;
+};
+
+function printRepairReports(language: Language, schoolName: string, administrationName: string, entries: RepairPrintEntry[]) {
+  if (typeof document === 'undefined') {
+    return;
+  }
+
+  const direction = language === 'ar' ? 'rtl' : 'ltr';
+  const printedAt = new Intl.DateTimeFormat(localeNames[language], { dateStyle: 'medium', timeStyle: 'short' }).format(new Date());
+  const rows =
+    entries.length === 0
+      ? `<tr><td colspan="6">${escapeHtml(tr(language, 'noRepairArchive'))}</td></tr>`
+      : entries
+          .map(
+            (entry) => `
+          <tr>
+            <td>${escapeHtml(entry.labName)}</td>
+            <td>${escapeHtml(entry.report.deviceName)}</td>
+            <td>${entry.report.faultNumber}</td>
+            <td>${escapeHtml(entry.reportedByName)}</td>
+            <td>${escapeHtml(formatDateTime(language, entry.report.reportedAt))}</td>
+            <td>${escapeHtml(formatDateTime(language, entry.report.repairDate))}</td>
+          </tr>`
+          )
+          .join('');
+
+  const technicianNames = [...new Set(entries.map((entry) => entry.technicianName))];
+  const signatures = `
+    <div class="signatures">
+      <div class="signature">
+        <p>${escapeHtml(tr(language, 'administration'))}: ${escapeHtml(administrationName)}</p>
+        <div class="signature-line"></div>
+        <p>${escapeHtml(tr(language, 'signature'))}</p>
+      </div>
+      ${technicianNames
+        .map(
+          (name) => `
+      <div class="signature">
+        <p>${escapeHtml(tr(language, 'labTechnician'))}: ${escapeHtml(name)}</p>
+        <div class="signature-line"></div>
+        <p>${escapeHtml(tr(language, 'signature'))}</p>
+      </div>`
+        )
+        .join('')}
+    </div>`;
+
+  const frame = document.createElement('iframe');
+  frame.setAttribute('aria-hidden', 'true');
+  frame.style.position = 'fixed';
+  frame.style.inset = 'auto 0 0 auto';
+  frame.style.width = '0';
+  frame.style.height = '0';
+  frame.style.border = '0';
+  document.body.appendChild(frame);
+
+  const frameDocument = frame.contentDocument ?? frame.contentWindow?.document;
+  if (!frameDocument || !frame.contentWindow) {
+    frame.remove();
+    return;
+  }
+
+  frameDocument.open();
+  frameDocument.write(`<!doctype html>
+    <html lang="${language}" dir="${direction}">
+      <head>
+        <meta charset="utf-8" />
+        <title>${escapeHtml(tr(language, 'repairReport'))}</title>
+        <style>
+          @page { size: A4; margin: 16mm; }
+          * { box-sizing: border-box; }
+          body { margin: 0; color: #111827; font-family: Arial, Tahoma, sans-serif; direction: ${direction}; }
+          header { border-bottom: 3px solid #006233; padding-bottom: 12px; margin-bottom: 18px; }
+          h1 { margin: 0 0 6px; color: #006233; font-size: 22px; }
+          p { margin: 0 0 10px; color: #4b5563; font-size: 13px; }
+          table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 12px; }
+          th, td { border: 1px solid #d1d5db; padding: 9px 8px; text-align: start; vertical-align: middle; }
+          th { background: #f3f4f6; color: #111827; font-weight: 700; }
+          tbody tr:nth-child(even) td { background: #fafafa; }
+          .signatures { display: flex; gap: 48px; margin-top: 32px; }
+          .signature { flex: 1; }
+          .signature-line { border-top: 1px solid #111827; margin-top: 26px; }
+        </style>
+      </head>
+      <body>
+        <header>
+          <h1>${escapeHtml(tr(language, 'repairReport'))}</h1>
+          <p>${escapeHtml(schoolName)} - ${escapeHtml(printedAt)}</p>
+        </header>
+        <table>
+          <thead>
+            <tr>
+              <th>${escapeHtml(tr(language, 'laboratory'))}</th>
+              <th>${escapeHtml(tr(language, 'deviceName'))}</th>
+              <th>${escapeHtml(tr(language, 'faultNumber'))}</th>
+              <th>${escapeHtml(tr(language, 'reportedBy'))}</th>
+              <th>${escapeHtml(tr(language, 'reportedAt'))}</th>
+              <th>${escapeHtml(tr(language, 'repairDate'))}</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+        ${signatures}
+      </body>
+    </html>`);
+  frameDocument.close();
+
+  setTimeout(() => {
+    frame.contentWindow?.focus();
+    frame.contentWindow?.print();
+    setTimeout(() => frame.remove(), 500);
+  }, 120);
 }
 
 function defaultLabPeriods(): Record<LabPeriod, LabAvailability> {
@@ -756,6 +903,36 @@ function LabFaultReportsPanel({
   canHandleFaults: boolean;
 }) {
   const labById = new Map(labs.map((lab) => [lab.id, lab]));
+  const school = data.schools.find((record) => record.id === currentUser.schoolId);
+  const administrationName = school?.directorId ? userName(data, school.directorId) : '-';
+  const [now, setNow] = useState(() => Date.now());
+  const [archiveOpen, setArchiveOpen] = useState(false);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 60 * 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const visibleReports = reports.filter((report) => report.status !== 'repaired' || repairIsCurrent(report, now));
+  const archivedRepairs = useMemo(
+    () => reports.filter((report) => report.status === 'repaired' && !repairIsCurrent(report, now)),
+    [now, reports]
+  );
+  const repairsByDate = useMemo(() => {
+    const groups = new Map<string, RepairPrintEntry[]>();
+    archivedRepairs.forEach((report) => {
+      const lab = labById.get(report.labId);
+      const date = (report.repairDate ?? report.reportedAt).slice(0, 10);
+      const entry: RepairPrintEntry = {
+        report,
+        labName: lab?.name ?? '-',
+        technicianName: lab?.supervisorId ? userName(data, lab.supervisorId) : '-',
+        reportedByName: userName(data, report.reportedBy)
+      };
+      groups.set(date, [...(groups.get(date) ?? []), entry]);
+    });
+    return [...groups.entries()].sort((left, right) => right[0].localeCompare(left[0]));
+  }, [archivedRepairs, data, labById]);
   const markRepaired = (report: LabFaultReport) => {
     if (!canHandleFaults) {
       return;
@@ -774,49 +951,104 @@ function LabFaultReportsPanel({
   };
 
   return (
-    <div className="panel">
-      <div className="panel-heading">
-        <div>
-          <p>{tr(language, currentUser.role === 'director' ? 'labFaultDirectorHint' : 'labFaultReportsHint')}</p>
-          <h2>{tr(language, 'labFaultReports')}</h2>
+    <>
+      <div className="panel">
+        <div className="panel-heading">
+          <div>
+            <p>{tr(language, currentUser.role === 'director' ? 'labFaultDirectorHint' : 'labFaultReportsHint')}</p>
+            <h2>{tr(language, 'labFaultReports')}</h2>
+          </div>
+          <AlertTriangle size={24} aria-hidden="true" />
         </div>
-        <AlertTriangle size={24} aria-hidden="true" />
+        <ResponsiveTable
+          columns={[
+            tr(language, 'deviceImage'),
+            tr(language, 'laboratory'),
+            tr(language, 'deviceName'),
+            tr(language, 'faultNumber'),
+            tr(language, 'reportedBy'),
+            tr(language, 'reportedAt'),
+            tr(language, 'repairDate'),
+            tr(language, 'currentStatus'),
+            tr(language, 'actions')
+          ]}
+          emptyText={tr(language, 'noLabFaultReports')}
+        >
+          {visibleReports.map((report) => (
+            <tr key={report.id}>
+              <td>{report.deviceImage ? <img className="lab-device-thumb" src={report.deviceImage.dataUrl} alt={report.deviceName} /> : '-'}</td>
+              <td>{labById.get(report.labId)?.name ?? '-'}</td>
+              <td>{report.deviceName}</td>
+              <td>{report.faultNumber}</td>
+              <td>{userName(data, report.reportedBy)}</td>
+              <td>{formatDateTime(language, report.reportedAt)}</td>
+              <td>{formatDateTime(language, report.repairDate)}</td>
+              <td>
+                <span className={`status ${report.status === 'repaired' ? 'active' : 'disabled'}`}>{faultStatusLabel(language, report.status)}</span>
+              </td>
+              <td>
+                <button className="button ghost small" type="button" disabled={!canHandleFaults || report.status === 'repaired'} onClick={() => markRepaired(report)}>
+                  {report.status === 'repaired' ? <CheckCircle2 size={16} aria-hidden="true" /> : <Wrench size={16} aria-hidden="true" />}
+                  <span>{tr(language, 'markRepaired')}</span>
+                </button>
+              </td>
+            </tr>
+          ))}
+        </ResponsiveTable>
       </div>
-      <ResponsiveTable
-        columns={[
-          tr(language, 'deviceImage'),
-          tr(language, 'laboratory'),
-          tr(language, 'deviceName'),
-          tr(language, 'faultNumber'),
-          tr(language, 'reportedBy'),
-          tr(language, 'reportedAt'),
-          tr(language, 'repairDate'),
-          tr(language, 'currentStatus'),
-          tr(language, 'actions')
-        ]}
-        emptyText={tr(language, 'noLabFaultReports')}
-      >
-        {reports.map((report) => (
-          <tr key={report.id}>
-            <td>{report.deviceImage ? <img className="lab-device-thumb" src={report.deviceImage.dataUrl} alt={report.deviceName} /> : '-'}</td>
-            <td>{labById.get(report.labId)?.name ?? '-'}</td>
-            <td>{report.deviceName}</td>
-            <td>{report.faultNumber}</td>
-            <td>{userName(data, report.reportedBy)}</td>
-            <td>{formatDateTime(language, report.reportedAt)}</td>
-            <td>{formatDateTime(language, report.repairDate)}</td>
-            <td>
-              <span className={`status ${report.status === 'repaired' ? 'active' : 'disabled'}`}>{faultStatusLabel(language, report.status)}</span>
-            </td>
-            <td>
-              <button className="button ghost small" type="button" disabled={!canHandleFaults || report.status === 'repaired'} onClick={() => markRepaired(report)}>
-                {report.status === 'repaired' ? <CheckCircle2 size={16} aria-hidden="true" /> : <Wrench size={16} aria-hidden="true" />}
-                <span>{tr(language, 'markRepaired')}</span>
-              </button>
-            </td>
-          </tr>
-        ))}
-      </ResponsiveTable>
-    </div>
+
+      {archiveOpen ? (
+        <>
+          <button type="button" className="back-button full" onClick={() => setArchiveOpen(false)}>
+            <ArrowLeft size={15} aria-hidden="true" />
+            <span>{tr(language, 'back')}</span>
+          </button>
+          <div className="panel full">
+            <div className="panel-heading">
+              <div>
+                <p>{tr(language, 'repairArchiveHint')}</p>
+                <h2>{tr(language, 'repairArchive')}</h2>
+              </div>
+              <Archive size={24} aria-hidden="true" />
+            </div>
+            <div className="user-groups">
+              {repairsByDate.length === 0 && <p className="empty-state">{tr(language, 'noRepairArchive')}</p>}
+              {repairsByDate.map(([date, entries]) => (
+                <button
+                  type="button"
+                  className="user-group drill-row"
+                  key={date}
+                  onClick={() => printRepairReports(language, school?.name ?? '-', administrationName, entries)}
+                >
+                  <span className="user-group-title">
+                    <span className="user-group-label">
+                      <CalendarDays size={16} aria-hidden="true" />
+                      <span className="user-group-label-name">{formatDate(language, date)}</span>
+                    </span>
+                    <span className="user-group-meta">
+                      <strong>{entries.length}</strong>
+                      <Printer size={16} aria-hidden="true" />
+                    </span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
+      ) : (
+        <button type="button" className="user-group user-group-school drill-row full" onClick={() => setArchiveOpen(true)}>
+          <span className="user-group-title">
+            <span className="user-group-label">
+              <Archive size={18} aria-hidden="true" />
+              <span className="user-group-label-name">{tr(language, 'repairArchive')}</span>
+            </span>
+            <span className="user-group-meta">
+              <strong>{repairsByDate.length}</strong>
+              <ChevronRight size={17} aria-hidden="true" />
+            </span>
+          </span>
+        </button>
+      )}
+    </>
   );
 }
