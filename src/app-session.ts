@@ -21,7 +21,8 @@ export function useAppSession(data: PlatformData) {
   const currentUser = data.users.find((user) => user.id === sessionUserId && canAuthenticateUser(data, user)) ?? null;
   const tabs = currentUser ? navItemsForUser(currentUser) : [];
   const activeView = topView(stack);
-  const safeView: View = tabs.some((tab) => tab.id === activeView) ? activeView : tabs[0]?.id ?? 'overview';
+  const canShowView = (view: View) => tabs.some((tab) => tab.id === view) || (view === 'labDevices' && currentUser?.role === 'lab');
+  const safeView: View = canShowView(activeView) ? activeView : tabs[0]?.id ?? 'overview';
   const stackIsSafe = stack.length > 0 && topView(stack) === safeView;
   const safeStack: NavStack = stackIsSafe
     ? stack

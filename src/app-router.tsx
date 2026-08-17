@@ -1,10 +1,10 @@
-import type { Accent, DataSetter, Language, PlatformData, PlatformUser, Theme } from './types';
+import type { Accent, DataSetter, Language, PlatformData, PlatformUser, Theme, View } from './types';
 import { AbsencesView } from './views/absences';
 import { UsersView } from './views/accounts';
 import { ExercisesView } from './views/exercises';
 import { AnnouncementsView, NotesView } from './views/messages';
 import { OverviewView } from './views/overview';
-import { LaboratoriesView } from './views/labs';
+import { LaboratoriesView, LabDevicesView } from './views/labs';
 import { CanteenView } from './views/canteen';
 import { SchoolProfileView, SchoolsView } from './views/schools';
 import { SettingsView } from './views/settings';
@@ -22,6 +22,7 @@ type AppRouterProps = {
   onResetDemo: () => void;
   onThemeChange: (theme: Theme) => void;
   onAccentChange: (accent: Accent) => void;
+  onViewChange: (view: View) => void;
 };
 
 export function AppRouter({
@@ -35,7 +36,8 @@ export function AppRouter({
   onLanguageChange,
   onResetDemo,
   onThemeChange,
-  onAccentChange
+  onAccentChange,
+  onViewChange
 }: AppRouterProps) {
   const view = topView(stack);
   switch (view) {
@@ -54,7 +56,9 @@ export function AppRouter({
     case 'absences':
       return <AbsencesView data={data} setData={setData} currentUser={currentUser} language={language} />;
     case 'labs':
-      return <LaboratoriesView data={data} setData={setData} currentUser={currentUser} language={language} />;
+      return <LaboratoriesView data={data} setData={setData} currentUser={currentUser} language={language} onViewChange={onViewChange} />;
+    case 'labDevices':
+      return <LabDevicesView data={data} setData={setData} currentUser={currentUser} language={language} />;
     case 'canteen':
       return <CanteenView data={data} setData={setData} currentUser={currentUser} language={language} />;
     case 'settings':

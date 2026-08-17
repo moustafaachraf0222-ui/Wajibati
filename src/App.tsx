@@ -85,6 +85,7 @@ function App() {
         onLanguageChange={setLanguage}
         onThemeChange={setTheme}
         onAccentChange={setAccent}
+        onViewChange={session.pushView}
         onResetDemo={() => {
           setData(cloneSeedData());
           session.logoutUser();

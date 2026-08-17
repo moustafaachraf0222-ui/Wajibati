@@ -58,6 +58,7 @@ export type View =
   | 'notes'
   | 'absences'
   | 'labs'
+  | 'labDevices'
   | 'canteen'
   | 'settings';
 
