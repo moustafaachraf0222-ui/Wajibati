@@ -1643,6 +1643,43 @@ textarea:focus {
   gap: 14px;
 }
 
+.stage-picker-card {
+  width: 100%;
+  text-align: start;
+  font: inherit;
+  border-block-start: 3px solid currentColor;
+}
+
+.stage-picker-count-label {
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.4;
+}
+
+.school-drill-row {
+  width: 100%;
+  display: block;
+  padding: 0;
+  font: inherit;
+  text-align: start;
+  color: inherit;
+}
+
+.school-drill-row .user-group-title {
+  min-height: 52px;
+  background: var(--paper-soft);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.school-drill-row:hover .user-group-title {
+  background: var(--teal-soft, var(--paper-soft));
+  color: var(--teal);
+}
+
+[dir='rtl'] .school-drill-row .user-group-meta svg {
+  transform: scaleX(-1);
+}
+
 .credential-database-card {
   border: 1px solid var(--line);
   border-radius: 8px;
