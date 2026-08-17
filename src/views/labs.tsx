@@ -1,4 +1,4 @@
-import { AlertTriangle, Archive, ArrowLeft, CalendarDays, Camera, CheckCircle2, ChevronRight, FlaskConical, Plus, Printer, Send, Wrench, XCircle } from 'lucide-react';
+﻿import { AlertTriangle, Archive, ArrowLeft, CalendarDays, Camera, CheckCircle2, ChevronRight, FlaskConical, Plus, Printer, Send, Wrench, XCircle } from 'lucide-react';
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import type {
   DataSetter,
@@ -35,10 +35,6 @@ const defaultLabSlotTemplates: Array<Omit<LabTimeSlot, 'availability'>> = [
 
 function periodLabel(language: Language, period: LabPeriod) {
   return tr(language, period === 'morning' ? 'labMorningPeriod' : 'labAfternoonPeriod');
-}
-
-function availabilityLabel(language: Language, availability: LabAvailability) {
-  return tr(language, availability === 'available' ? 'labAvailable' : 'labReserved');
 }
 
 function reservationStatusLabel(language: Language, status: LabReservationRequest['status']) {
@@ -85,6 +81,7 @@ function faultStatusLabel(language: Language, status: LabFaultReport['status']) 
 }
 
 const REPAIR_ARCHIVE_CURRENT_MS = 24 * 60 * 60 * 1000;
+const LAB_RESERVATION_VISIBLE_MS = 72 * 60 * 60 * 1000;
 
 function repairIsCurrent(report: LabFaultReport, now = Date.now()) {
   const repairDate = Date.parse(report.repairDate ?? '');
@@ -268,18 +265,6 @@ function reportsForLabs(data: PlatformData, labs: Laboratory[]) {
     .sort((left, right) => Date.parse(right.reportedAt) - Date.parse(left.reportedAt));
 }
 
-function activeTeacherReservationForSlot(data: PlatformData, teacherId: string, labId: string, slotId: string) {
-  return data.labReservationRequests
-    .filter(
-      (request) =>
-        request.teacherId === teacherId &&
-        request.labId === labId &&
-        request.slotId === slotId &&
-        (request.status === 'pending' || request.status === 'confirmed')
-    )
-    .sort((left, right) => Date.parse(right.updatedAt ?? right.requestedAt) - Date.parse(left.updatedAt ?? left.requestedAt))[0];
-}
-
 function compareReservationRequests(left: LabReservationRequest, right: LabReservationRequest) {
   const statusRank = { pending: 0, confirmed: 1, rejected: 2 };
   return (
@@ -332,8 +317,6 @@ export function LaboratoriesView({
       {currentUser.role === 'lab' && (
         <LabReservationRequestsPanel data={data} setData={setData} currentUser={currentUser} language={language} labs={labs} />
       )}
-
-      <LabStatusPanel data={data} setData={setData} currentUser={currentUser} labs={labs} devicesByLab={devicesByLab} language={language} />
 
       {(currentUser.role === 'director' || currentUser.role === 'lab') && (
         <LabFaultReportsPanel
@@ -632,8 +615,19 @@ function LabReservationRequestsPanel({
 }) {
   const labIds = new Set(labs.map((lab) => lab.id));
   const labById = new Map(labs.map((lab) => [lab.id, lab]));
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 60 * 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
   const requests = data.labReservationRequests
     .filter((request) => request.labSupervisorId === currentUser.id && labIds.has(request.labId))
+    .filter((request) => {
+      const requestedAt = Date.parse(request.requestedAt);
+      return !Number.isFinite(requestedAt) || now - requestedAt < LAB_RESERVATION_VISIBLE_MS;
+    })
     .sort(compareReservationRequests);
 
   const respondToReservation = (request: LabReservationRequest, status: 'confirmed' | 'rejected') => {
@@ -748,139 +742,6 @@ function LabReservationRequestsPanel({
           </tr>
         ))}
       </ResponsiveTable>
-    </div>
-  );
-}
-
-function LabStatusPanel({
-  data,
-  setData,
-  currentUser,
-  labs,
-  devicesByLab,
-  language
-}: {
-  data: PlatformData;
-  currentUser: PlatformUser;
-  language: Language;
-  setData: DataSetter;
-  labs: Laboratory[];
-  devicesByLab: Record<string, LabDevice[]>;
-}) {
-  const requestReservation = (lab: Laboratory, slot: LabTimeSlot) => {
-    if (currentUser.role !== 'teacher' || !currentUser.schoolId || slot.availability !== 'available') {
-      return;
-    }
-
-    const now = new Date().toISOString();
-    setData((previous) => {
-      const latestLab = previous.laboratories.find((item) => item.id === lab.id);
-      const latestSlot = latestLab ? labTimeSlots(latestLab).find((item) => item.id === slot.id) : undefined;
-      const alreadyPending = previous.labReservationRequests.some(
-        (request) =>
-          request.teacherId === currentUser.id &&
-          request.labId === lab.id &&
-          request.slotId === slot.id &&
-          request.status === 'pending'
-      );
-
-      if (!latestLab || latestSlot?.availability !== 'available' || alreadyPending) {
-        return previous;
-      }
-
-      return {
-        ...previous,
-        labReservationRequests: [
-          ...previous.labReservationRequests,
-          {
-            id: makeId('lab-request'),
-            schoolId: lab.schoolId,
-            labId: lab.id,
-            slotId: slot.id,
-            period: slot.period,
-            startsAt: slot.startsAt,
-            endsAt: slot.endsAt,
-            teacherId: currentUser.id,
-            labSupervisorId: lab.supervisorId,
-            status: 'pending',
-            requestedAt: now,
-            updatedAt: now
-          }
-        ]
-      };
-    });
-  };
-
-  return (
-    <div className="panel">
-      <div className="panel-heading">
-        <div>
-          <p>{tr(language, 'labStatusHint')}</p>
-          <h2>{tr(language, 'labStatus')}</h2>
-        </div>
-        <FlaskConical size={24} aria-hidden="true" />
-      </div>
-      <div className="lab-status-grid">
-        {labs.length === 0 && <p className="empty-state">{tr(language, 'noLaboratories')}</p>}
-        {labs.map((lab) => {
-          const labDevices = devicesByLab[lab.id] ?? [];
-
-          return (
-            <article className="lab-status-card" key={lab.id}>
-              <h3>{lab.name}</h3>
-              {currentUser.role === 'teacher' && (
-                <section className="lab-teacher-devices">
-                  <h4>{tr(language, 'labDeviceNames')}</h4>
-                  {labDevices.length === 0 ? (
-                    <p className="empty-state">{tr(language, 'noDevices')}</p>
-                  ) : (
-                    <div className="lab-device-name-list">
-                      {labDevices.map((device) => (
-                        <span className={`lab-device-name-chip ${device.status}`} key={device.id}>
-                          <strong>{device.name}</strong>
-                          <small>{deviceStatusLabel(language, device.status)}</small>
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </section>
-              )}
-              <div className="lab-period-badges">
-                {labPeriods.map((period) => {
-                  return (
-                    <section className="lab-status-period" key={period}>
-                      <h4>{periodLabel(language, period)}</h4>
-                      <div className="lab-slot-badges">
-                        {labTimeSlots(lab)
-                          .filter((slot) => slot.period === period)
-                          .map((slot) => {
-                            const activeRequest =
-                              currentUser.role === 'teacher' ? activeTeacherReservationForSlot(data, currentUser.id, lab.id, slot.id) : undefined;
-                            const canRequest = currentUser.role === 'teacher' && slot.availability === 'available' && !activeRequest;
-
-                            return (
-                              <span className={`lab-period-badge ${slot.availability}`} key={slot.id}>
-                                <strong>{slot.startsAt}-{slot.endsAt}</strong>
-                                <small>{availabilityLabel(language, slot.availability)}</small>
-                                {activeRequest && <small>{reservationStatusLabel(language, activeRequest.status)}</small>}
-                                {canRequest && (
-                                  <button className="button ghost small lab-request-button" type="button" onClick={() => requestReservation(lab, slot)}>
-                                    <Send size={15} aria-hidden="true" />
-                                    <span>{tr(language, 'requestLabReservation')}</span>
-                                  </button>
-                                )}
-                              </span>
-                            );
-                          })}
-                      </div>
-                    </section>
-                  );
-                })}
-              </div>
-            </article>
-          );
-        })}
-      </div>
     </div>
   );
 }

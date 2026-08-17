@@ -56,7 +56,6 @@ export const navItems: Record<Role, NavItem[]> = {
   ],
   teacher: [
     { id: 'overview', labelKey: 'overview', icon: GraduationCap },
-    { id: 'labs', labelKey: 'laboratories', icon: FlaskConical },
     { id: 'announcements', labelKey: 'announcements', icon: MessageSquare },
     { id: 'exercises', labelKey: 'exercises', icon: BookOpen },
     { id: 'notes', labelKey: 'notes', icon: MessageSquare },
