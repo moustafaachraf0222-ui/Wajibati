@@ -4,6 +4,7 @@ export type Role = 'admin' | 'director' | 'supervisor' | 'lab' | 'canteen' | 'te
 export type Stage = 'primary' | 'middle' | 'secondary';
 export type Language = 'ar' | 'fr' | 'en';
 export type Theme = 'light' | 'dark';
+export type Accent = 'green' | 'navy' | 'teal' | 'amber' | 'crimson' | 'violet';
 export type AccountStatus = 'active' | 'disabled';
 export type HomeworkDifficulty = 'easy' | 'medium' | 'hard';
 

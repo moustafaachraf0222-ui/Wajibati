@@ -1,8 +1,21 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { Globe2, Moon, Phone, Save, Settings, Sun, Trash2 } from 'lucide-react';
-import type { DataSetter, Language, PlatformData, PlatformUser, Theme } from '../types';
+import { Globe2, Moon, Palette, Phone, Save, Settings, Sun, Trash2 } from 'lucide-react';
+import type { Accent, DataSetter, Language, PlatformData, PlatformUser, Theme } from '../types';
 import { languageNames, tr } from '../i18n';
 import { Field, languages } from '../ui';
+
+const accentOptions: Accent[] = ['green', 'navy', 'teal', 'amber', 'crimson', 'violet'];
+
+function accentKey(accent: Accent) {
+  return {
+    green: 'accentGreen',
+    navy: 'accentNavy',
+    teal: 'accentTeal',
+    amber: 'accentAmber',
+    crimson: 'accentCrimson',
+    violet: 'accentViolet'
+  }[accent];
+}
 type CommonViewProps = {
   data: PlatformData;
   currentUser: PlatformUser;
@@ -15,14 +28,18 @@ export function SettingsView({
   currentUser,
   language,
   theme,
+  accent,
   onLanguageChange,
   onThemeChange,
+  onAccentChange,
   onResetDemo
 }: CommonViewProps & {
   setData: DataSetter;
   theme: Theme;
+  accent: Accent;
   onLanguageChange: (language: Language) => void;
   onThemeChange: (theme: Theme) => void;
+  onAccentChange: (accent: Accent) => void;
   onResetDemo: () => void;
 }) {
   const [guardianPhone, setGuardianPhone] = useState(currentUser.guardianPhone ?? '');
@@ -108,6 +125,22 @@ export function SettingsView({
               <span>{tr(language, 'darkMode')}</span>
             </button>
           </div>
+          <label className="settings-accent-field">
+            <span className="settings-accent-label">
+              <Palette size={15} aria-hidden="true" />
+              {tr(language, 'themeColor')}
+            </span>
+            <select
+              value={accent}
+              onChange={(event) => onAccentChange(event.target.value as Accent)}
+            >
+              {accentOptions.map((option) => (
+                <option value={option} key={option}>
+                  {tr(language, accentKey(option))}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
 
         {currentUser.role === 'student' && (

@@ -1,8 +1,8 @@
 import { Capacitor } from '@capacitor/core';
 import { PushNotifications, type Token } from '@capacitor/push-notifications';
 import { useEffect } from 'react';
-import type { DataSetter, Language, PlatformUser, SyncStatus, Theme } from './types';
-import { LANGUAGE_KEY, SESSION_KEY, THEME_KEY, purgeExpiredAbsenceJustifications, purgeExpiredTrashedSchools, upsertPushToken } from './data';
+import type { Accent, DataSetter, Language, PlatformUser, SyncStatus, Theme } from './types';
+import { ACCENT_KEY, LANGUAGE_KEY, SESSION_KEY, THEME_KEY, purgeExpiredAbsenceJustifications, purgeExpiredTrashedSchools, upsertPushToken } from './data';
 
 export function useLanguagePreference(language: Language) {
   useEffect(() => {
@@ -17,6 +17,13 @@ export function useThemePreference(theme: Theme) {
     localStorage.setItem(THEME_KEY, theme);
     document.documentElement.dataset.theme = theme;
   }, [theme]);
+}
+
+export function useAccentPreference(accent: Accent) {
+  useEffect(() => {
+    localStorage.setItem(ACCENT_KEY, accent);
+    document.documentElement.dataset.accent = accent;
+  }, [accent]);
 }
 
 export function useSessionPersistence(sessionUserId: string | null) {

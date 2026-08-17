@@ -1,4 +1,4 @@
-import type { DataSetter, Language, PlatformData, PlatformUser, Theme } from './types';
+import type { Accent, DataSetter, Language, PlatformData, PlatformUser, Theme } from './types';
 import { AbsencesView } from './views/absences';
 import { UsersView } from './views/accounts';
 import { ExercisesView } from './views/exercises';
@@ -15,11 +15,13 @@ type AppRouterProps = {
   currentUser: PlatformUser;
   language: Language;
   theme: Theme;
+  accent: Accent;
   stack: NavStack;
   setData: DataSetter;
   onLanguageChange: (language: Language) => void;
   onResetDemo: () => void;
   onThemeChange: (theme: Theme) => void;
+  onAccentChange: (accent: Accent) => void;
 };
 
 export function AppRouter({
@@ -27,11 +29,13 @@ export function AppRouter({
   currentUser,
   language,
   theme,
+  accent,
   stack,
   setData,
   onLanguageChange,
   onResetDemo,
-  onThemeChange
+  onThemeChange,
+  onAccentChange
 }: AppRouterProps) {
   const view = topView(stack);
   switch (view) {
@@ -60,9 +64,11 @@ export function AppRouter({
           setData={setData}
           language={language}
           theme={theme}
+          accent={accent}
           currentUser={currentUser}
           onLanguageChange={onLanguageChange}
           onThemeChange={onThemeChange}
+          onAccentChange={onAccentChange}
           onResetDemo={onResetDemo}
         />
       );

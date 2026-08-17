@@ -1,16 +1,19 @@
 import { useState } from 'react';
 import type {
+  Accent,
   Language,
   PlatformData,
   Theme
 } from './types';
 import {
   cloneSeedData,
+  loadAccent,
   loadData,
   loadLanguage,
   loadTheme
 } from './data';
 import {
+  useAccentPreference,
   useExpiredSchoolTrashPurge,
   useLanguagePreference,
   usePushRegistration,
@@ -25,6 +28,7 @@ import { LoginPage } from './views/login';
 function App() {
   const [language, setLanguage] = useState<Language>(loadLanguage);
   const [theme, setTheme] = useState<Theme>(loadTheme);
+  const [accent, setAccent] = useState<Accent>(loadAccent);
   const [data, setData] = useState<PlatformData>(loadData);
   const session = useAppSession(data);
   const currentUser = session.currentUser;
@@ -33,6 +37,7 @@ function App() {
   useExpiredSchoolTrashPurge(setData);
   useLanguagePreference(language);
   useThemePreference(theme);
+  useAccentPreference(accent);
   usePushRegistration(currentUser, syncStatus, setData);
 
   if (!currentUser) {
@@ -75,9 +80,11 @@ function App() {
         currentUser={currentUser}
         language={language}
         theme={theme}
+        accent={accent}
         stack={session.stack}
         onLanguageChange={setLanguage}
         onThemeChange={setTheme}
+        onAccentChange={setAccent}
         onResetDemo={() => {
           setData(cloneSeedData());
           session.logoutUser();

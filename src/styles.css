@@ -1,13 +1,13 @@
 :root {
   color-scheme: light;
-  --bg: #f4f8f5;
+  --bg: #f5f6f8;
   --paper: #ffffff;
-  --paper-soft: #f8fcf9;
-  --ink: #111f18;
-  --muted: #5f7168;
-  --line: #dbe8df;
+  --paper-soft: #fafbfc;
+  --ink: #171a21;
+  --muted: #5d6570;
+  --line: #e3e6eb;
   --teal: #006233;
-  --teal-soft: #e5f3eb;
+  --teal-soft: #e8f3ee;
   --blue: #007a3d;
   --blue-soft: #edf8f1;
   --amber: #d21034;
@@ -16,20 +16,70 @@
   --green-soft: #e8f6ee;
   --rose: #d21034;
   --rose-soft: #fff0f3;
-  --shadow: 0 18px 44px rgba(0, 98, 51, 0.08);
-  --shadow-soft: 0 8px 22px rgba(0, 98, 51, 0.06);
-  --focus: rgba(0, 98, 51, 0.16);
+  --shadow: 0 16px 40px rgba(16, 24, 40, 0.08);
+  --shadow-soft: 0 6px 20px rgba(16, 24, 40, 0.05);
+  --focus: rgba(0, 98, 51, 0.14);
   font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+}
+
+:root[data-accent="navy"] {
+  --teal: #2a4bd7;
+  --teal-soft: #eef1fd;
+  --blue: #2a4bd7;
+  --blue-soft: #eef1fd;
+  --green: #2a4bd7;
+  --green-soft: #eef1fd;
+  --focus: rgba(42, 75, 215, 0.16);
+}
+
+:root[data-accent="teal"] {
+  --teal: #0d9488;
+  --teal-soft: #e6f7f5;
+  --blue: #0d9488;
+  --blue-soft: #e6f7f5;
+  --green: #0d9488;
+  --green-soft: #e6f7f5;
+  --focus: rgba(13, 148, 136, 0.16);
+}
+
+:root[data-accent="amber"] {
+  --teal: #b45309;
+  --teal-soft: #fdf3e7;
+  --blue: #b45309;
+  --blue-soft: #fdf3e7;
+  --green: #b45309;
+  --green-soft: #fdf3e7;
+  --focus: rgba(180, 83, 9, 0.16);
+}
+
+:root[data-accent="crimson"] {
+  --teal: #c8102e;
+  --teal-soft: #fcecef;
+  --blue: #c8102e;
+  --blue-soft: #fcecef;
+  --green: #c8102e;
+  --green-soft: #fcecef;
+  --focus: rgba(200, 16, 46, 0.16);
+}
+
+:root[data-accent="violet"] {
+  --teal: #6d28d9;
+  --teal-soft: #f1ecfd;
+  --blue: #6d28d9;
+  --blue-soft: #f1ecfd;
+  --green: #6d28d9;
+  --green-soft: #f1ecfd;
+  --focus: rgba(109, 40, 217, 0.16);
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #050806;
-  --paper: #0d1511;
-  --paper-soft: #080f0c;
-  --ink: #f5fbf7;
-  --muted: #aec4b7;
-  --line: #24342b;
+  --bg: #0b0d10;
+  --paper: #131619;
+  --paper-soft: #0f1216;
+  --ink: #f2f4f7;
+  --muted: #9aa3ad;
+  --line: #262b33;
   --teal: #2fd06f;
   --teal-soft: #0c2618;
   --blue: #36d47a;
@@ -40,9 +90,59 @@
   --green-soft: #102719;
   --rose: #ff4d68;
   --rose-soft: #341018;
-  --shadow: 0 18px 42px rgba(0, 0, 0, 0.28);
-  --shadow-soft: 0 10px 24px rgba(0, 0, 0, 0.2);
+  --shadow: 0 16px 40px rgba(0, 0, 0, 0.3);
+  --shadow-soft: 0 8px 20px rgba(0, 0, 0, 0.22);
   --focus: rgba(47, 208, 111, 0.2);
+}
+
+:root[data-theme="dark"][data-accent="navy"] {
+  --teal: #7d9bff;
+  --teal-soft: #151f45;
+  --blue: #7d9bff;
+  --blue-soft: #151f45;
+  --green: #7d9bff;
+  --green-soft: #151f45;
+  --focus: rgba(125, 155, 255, 0.2);
+}
+
+:root[data-theme="dark"][data-accent="teal"] {
+  --teal: #2dd4bf;
+  --teal-soft: #0d2623;
+  --blue: #2dd4bf;
+  --blue-soft: #0d2623;
+  --green: #2dd4bf;
+  --green-soft: #0d2623;
+  --focus: rgba(45, 212, 191, 0.2);
+}
+
+:root[data-theme="dark"][data-accent="amber"] {
+  --teal: #f0a020;
+  --teal-soft: #32230d;
+  --blue: #f0a020;
+  --blue-soft: #32230d;
+  --green: #f0a020;
+  --green-soft: #32230d;
+  --focus: rgba(240, 160, 32, 0.2);
+}
+
+:root[data-theme="dark"][data-accent="crimson"] {
+  --teal: #ff4d68;
+  --teal-soft: #3a1018;
+  --blue: #ff4d68;
+  --blue-soft: #3a1018;
+  --green: #ff4d68;
+  --green-soft: #3a1018;
+  --focus: rgba(255, 77, 104, 0.2);
+}
+
+:root[data-theme="dark"][data-accent="violet"] {
+  --teal: #a78bfa;
+  --teal-soft: #241742;
+  --blue: #a78bfa;
+  --blue-soft: #241742;
+  --green: #a78bfa;
+  --green-soft: #241742;
+  --focus: rgba(167, 139, 250, 0.2);
 }
 
 * {
@@ -4704,6 +4804,38 @@ summary.subject-group-heading:hover .subject-icon svg {
 .settings-theme-btn svg {
   width: 14px;
   height: 14px;
+}
+
+.settings-accent-field {
+  display: grid;
+  gap: 8px;
+  padding: 0 20px 18px;
+}
+
+.settings-accent-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ink-1, var(--ink));
+}
+
+.settings-accent-field select {
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--paper-soft);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  font-size: 0.9rem;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.settings-accent-field select:focus-visible {
+  outline: 2px solid var(--focus);
+  border-color: var(--teal);
 }
 
 .settings-form {

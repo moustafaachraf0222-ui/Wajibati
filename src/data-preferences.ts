@@ -1,5 +1,5 @@
-import type { Language, PlatformUser, RememberedAccount, Role, Theme } from './types';
-import { LANGUAGE_KEY, REMEMBERED_ACCOUNTS_KEY, THEME_KEY } from './data-constants';
+import type { Accent, Language, PlatformUser, RememberedAccount, Role, Theme } from './types';
+import { ACCENT_KEY, LANGUAGE_KEY, REMEMBERED_ACCOUNTS_KEY, THEME_KEY } from './data-constants';
 
 export function isLanguage(value: string | null): value is Language {
   return value === 'ar' || value === 'fr' || value === 'en';
@@ -17,6 +17,15 @@ export function isTheme(value: string | null): value is Theme {
 export function loadTheme(): Theme {
   const stored = localStorage.getItem(THEME_KEY);
   return isTheme(stored) ? stored : 'light';
+}
+
+export function isAccent(value: string | null): value is Accent {
+  return value === 'green' || value === 'navy' || value === 'teal' || value === 'amber' || value === 'crimson' || value === 'violet';
+}
+
+export function loadAccent(): Accent {
+  const stored = localStorage.getItem(ACCENT_KEY);
+  return isAccent(stored) ? stored : 'green';
 }
 
 export function isRole(value: unknown): value is Role {
