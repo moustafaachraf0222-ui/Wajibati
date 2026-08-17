@@ -61,8 +61,6 @@ export function AdminUsersPanel({
   const stageIcon = (stage: Stage) =>
     stage === 'primary' ? <GraduationCap size={16} aria-hidden="true" /> : stage === 'middle' ? <BookOpen size={16} aria-hidden="true" /> : <Building2 size={16} aria-hidden="true" />;
 
-  const stageTone: Record<Stage, string> = { primary: 'green', middle: 'blue', secondary: 'amber' };
-
   const createDirector = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (data.users.some((user) => user.email.toLowerCase() === form.email.trim().toLowerCase())) {
@@ -284,7 +282,7 @@ export function AdminUsersPanel({
               return (
                 <button
                   type="button"
-                  className={`stat-card stage-picker-card ${stageTone[stage]}`}
+                  className="stat-card stage-picker-card green"
                   key={stage}
                   onClick={() => {
                     setDrillStage(stage);
