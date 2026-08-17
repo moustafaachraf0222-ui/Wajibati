@@ -1,4 +1,4 @@
-import { Archive, Clock, MessageSquare, Plus, Trash2, Upload } from 'lucide-react';
+import { Archive, ArrowLeft, ChevronRight, Clock, MessageSquare, Plus, Trash2, Upload } from 'lucide-react';
 import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
 import type { Announcement, DataSetter, Language, PlatformData, PlatformUser, SecondaryStream, Subject, TeacherNote, UploadedAttachment } from '../types';
 import { schoolYearLabel, subjectNames, tr } from '../i18n';
@@ -53,6 +53,9 @@ export function AnnouncementsView({ data, setData, currentUser, language }: Comm
     : [];
   const [form, setForm] = useState<{ title: string; body: string; image: UploadedAttachment | null }>({ title: '', body: '', image: null });
   const [error, setError] = useState('');
+  const [archiveOpen, setArchiveOpen] = useState(false);
+  const [archiveAnnouncementId, setArchiveAnnouncementId] = useState<string | null>(null);
+  const selectedArchivedAnnouncement = archiveAnnouncementId ? archivedAnnouncements.find((announcement) => announcement.id === archiveAnnouncementId) : null;
 
   const readImage = (event: ChangeEvent<HTMLInputElement>) => {
     readAttachmentFromInput(
@@ -120,66 +123,127 @@ export function AnnouncementsView({ data, setData, currentUser, language }: Comm
     );
   };
 
+  const renderArchiveRow = (announcement: Announcement) => {
+    const author = data.users.find((user) => user.id === announcement.authorId);
+    const announcementSchool = data.schools.find((record) => record.id === announcement.schoolId);
+
+    return (
+      <button
+        type="button"
+        className="user-group drill-row"
+        key={announcement.id}
+        onClick={() => setArchiveAnnouncementId(announcement.id)}
+      >
+        <span className="user-group-title">
+          <span className="user-group-label">
+            <Clock size={16} aria-hidden="true" />
+            <span className="user-group-label-name">{formatDateTime(language, announcement.createdAt)}</span>
+          </span>
+          <span className="user-group-meta">
+            <span className="user-group-label-stage">{announcementSchool?.name ?? '-'}</span>
+            <span className="user-group-label-stage">{author?.name ?? '-'}</span>
+            <ChevronRight size={17} aria-hidden="true" />
+          </span>
+        </span>
+      </button>
+    );
+  };
+
   return (
     <section className="content-grid">
-      {currentUser.role === 'director' && (
-        <div className="panel">
-          <div className="panel-heading">
-            <div>
-              <p>{school?.name ?? tr(language, 'schoolAnnouncements')}</p>
-              <h2>{tr(language, 'announcements')}</h2>
+      {canViewAnnouncementArchive(currentUser) && archiveOpen && !archiveAnnouncementId && (
+        <>
+          <button type="button" className="back-button full" onClick={() => setArchiveOpen(false)}>
+            <ArrowLeft size={15} aria-hidden="true" />
+            <span>{tr(language, 'back')}</span>
+          </button>
+          <div className="panel">
+            <div className="panel-heading">
+              <div>
+                <p>{tr(language, 'announcementArchiveHint')}</p>
+                <h2>{tr(language, 'announcementArchive')}</h2>
+              </div>
+              <Archive size={24} aria-hidden="true" />
             </div>
-            <MessageSquare size={24} aria-hidden="true" />
+            <div className="user-groups">
+              {archivedAnnouncements.length === 0 && <p className="empty-state">{tr(language, 'noArchivedAnnouncements')}</p>}
+              {archivedAnnouncements.map((announcement) => renderArchiveRow(announcement))}
+            </div>
           </div>
-          <form className="form-stack" onSubmit={submit}>
-            <Field label={tr(language, 'announcementTitle')} value={form.title} onChange={(value) => setForm({ ...form, title: value })} required />
-            <label>
-              <span>{tr(language, 'announcementBody')}</span>
-              <textarea value={form.body} onChange={(event) => setForm({ ...form, body: event.target.value })} required rows={5} />
-            </label>
-            <label className="file-field">
-              <span>{tr(language, 'uploadImage')}</span>
-              <input type="file" accept="image/*" onChange={readImage} />
-              <Upload size={18} aria-hidden="true" />
-            </label>
-            {form.image && <AttachmentPreview attachment={form.image} language={language} />}
-            {error && <p className="form-error">{error}</p>}
-            <button className="button primary" type="submit">
-              <Plus size={17} aria-hidden="true" />
-              <span>{tr(language, 'publishAnnouncement')}</span>
-            </button>
-          </form>
-        </div>
+        </>
       )}
 
-      <div className="panel">
-        <div className="panel-heading">
-          <div>
-            <p>{school?.name ?? tr(language, 'scopedData')}</p>
-            <h2>{tr(language, 'activeAnnouncements')}</h2>
-          </div>
-          <MessageSquare size={24} aria-hidden="true" />
-        </div>
-        <div className="message-list">
-          {activeAnnouncements.length === 0 && <p className="empty-state">{tr(language, 'noAnnouncements')}</p>}
-          {activeAnnouncements.map((announcement) => renderAnnouncementCard(announcement))}
-        </div>
-      </div>
+      {canViewAnnouncementArchive(currentUser) && archiveOpen && archiveAnnouncementId && selectedArchivedAnnouncement && (
+        <>
+          <button type="button" className="back-button full" onClick={() => setArchiveAnnouncementId(null)}>
+            <ArrowLeft size={15} aria-hidden="true" />
+            <span>{tr(language, 'back')}</span>
+          </button>
+          <div className="panel full">{renderAnnouncementCard(selectedArchivedAnnouncement, true)}</div>
+        </>
+      )}
 
-      {canViewAnnouncementArchive(currentUser) && (
-        <div className="panel">
-          <div className="panel-heading">
-            <div>
-              <p>{tr(language, 'announcementArchiveHint')}</p>
-              <h2>{tr(language, 'announcementArchive')}</h2>
+      {(!archiveOpen || !canViewAnnouncementArchive(currentUser)) && (
+        <>
+          {currentUser.role === 'director' && (
+            <div className="panel">
+              <div className="panel-heading">
+                <div>
+                  <p>{school?.name ?? tr(language, 'schoolAnnouncements')}</p>
+                  <h2>{tr(language, 'announcements')}</h2>
+                </div>
+                <MessageSquare size={24} aria-hidden="true" />
+              </div>
+              <form className="form-stack" onSubmit={submit}>
+                <Field label={tr(language, 'announcementTitle')} value={form.title} onChange={(value) => setForm({ ...form, title: value })} required />
+                <label>
+                  <span>{tr(language, 'announcementBody')}</span>
+                  <textarea value={form.body} onChange={(event) => setForm({ ...form, body: event.target.value })} required rows={5} />
+                </label>
+                <label className="file-field">
+                  <span>{tr(language, 'uploadImage')}</span>
+                  <input type="file" accept="image/*" onChange={readImage} />
+                  <Upload size={18} aria-hidden="true" />
+                </label>
+                {form.image && <AttachmentPreview attachment={form.image} language={language} />}
+                {error && <p className="form-error">{error}</p>}
+                <button className="button primary" type="submit">
+                  <Plus size={17} aria-hidden="true" />
+                  <span>{tr(language, 'publishAnnouncement')}</span>
+                </button>
+              </form>
             </div>
-            <Archive size={24} aria-hidden="true" />
+          )}
+
+          <div className="panel">
+            <div className="panel-heading">
+              <div>
+                <p>{school?.name ?? tr(language, 'scopedData')}</p>
+                <h2>{tr(language, 'activeAnnouncements')}</h2>
+              </div>
+              <MessageSquare size={24} aria-hidden="true" />
+            </div>
+            <div className="message-list">
+              {activeAnnouncements.length === 0 && <p className="empty-state">{tr(language, 'noAnnouncements')}</p>}
+              {activeAnnouncements.map((announcement) => renderAnnouncementCard(announcement))}
+            </div>
           </div>
-          <div className="message-list">
-            {archivedAnnouncements.length === 0 && <p className="empty-state">{tr(language, 'noArchivedAnnouncements')}</p>}
-            {archivedAnnouncements.map((announcement) => renderAnnouncementCard(announcement, true))}
-          </div>
-        </div>
+
+          {canViewAnnouncementArchive(currentUser) && (
+            <button type="button" className="user-group user-group-school drill-row" onClick={() => setArchiveOpen(true)}>
+              <span className="user-group-title">
+                <span className="user-group-label">
+                  <Archive size={18} aria-hidden="true" />
+                  <span className="user-group-label-name">{tr(language, 'announcementArchive')}</span>
+                </span>
+                <span className="user-group-meta">
+                  <strong>{archivedAnnouncements.length}</strong>
+                  <ChevronRight size={17} aria-hidden="true" />
+                </span>
+              </span>
+            </button>
+          )}
+        </>
       )}
     </section>
   );

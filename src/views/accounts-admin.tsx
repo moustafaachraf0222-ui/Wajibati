@@ -318,7 +318,7 @@ export function AdminUsersPanel({
             {stageSchools(drillStage).map((school) => (
               <button
                 type="button"
-                className="user-group user-group-school school-drill-row"
+                className="user-group user-group-school drill-row"
                 key={school.id}
                 onClick={() => setDrillSchoolId(school.id)}
               >

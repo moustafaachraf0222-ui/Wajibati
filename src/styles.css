@@ -1660,7 +1660,7 @@ textarea:focus {
   line-height: 1.4;
 }
 
-.school-drill-row {
+.drill-row {
   width: 100%;
   display: block;
   padding: 0;
@@ -1669,18 +1669,18 @@ textarea:focus {
   color: inherit;
 }
 
-.school-drill-row .user-group-title {
+.drill-row .user-group-title {
   min-height: 52px;
   background: var(--paper-soft);
   transition: background 0.15s ease, color 0.15s ease;
 }
 
-.school-drill-row:hover .user-group-title {
+.drill-row:hover .user-group-title {
   background: var(--teal-soft, var(--paper-soft));
   color: var(--teal);
 }
 
-[dir='rtl'] .school-drill-row .user-group-meta svg {
+[dir='rtl'] .drill-row .user-group-meta svg {
   transform: scaleX(-1);
 }
 
