@@ -2427,6 +2427,17 @@ tbody tr.account-details-row:hover td {
   grid-column: 1 / -1;
 }
 
+.lab-device-card .lab-device-pending {
+  grid-column: 1 / -1;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--rose);
+  background: color-mix(in srgb, var(--rose-soft) 60%, transparent);
+  border: 1px solid color-mix(in srgb, var(--rose) 30%, var(--line));
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+
 .lab-device-card.working {
   border-color: color-mix(in srgb, var(--green) 35%, var(--line));
 }

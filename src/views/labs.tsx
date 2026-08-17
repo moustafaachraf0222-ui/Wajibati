@@ -560,17 +560,24 @@ export function LabDevicesView({
     updateDraft(lab.id, { name: '', image: null, error: '' });
   };
 
-  const setDeviceStatus = (device: LabDevice, status: LabDevice['status']) => {
+  const markDeviceBroken = (device: LabDevice) => {
     const now = new Date().toISOString();
     setData((previous) => {
       const latestDevice = previous.labDevices.find((item) => item.id === device.id) ?? device;
       const openReport = previous.labFaultReports.find((report) => report.deviceId === device.id && report.status === 'open');
       const reportsForDevice = previous.labFaultReports.filter((report) => report.deviceId === device.id);
-      let nextReports = previous.labFaultReports;
 
-      if (status === 'broken' && latestDevice.status !== 'broken' && !openReport) {
-        nextReports = [
-          ...nextReports,
+      if (latestDevice.status === 'broken' || openReport) {
+        return previous;
+      }
+
+      return {
+        ...previous,
+        labDevices: previous.labDevices.map((item) =>
+          item.id === latestDevice.id ? { ...item, status: 'broken', updatedAt: now } : item
+        ),
+        labFaultReports: [
+          ...previous.labFaultReports,
           {
             id: makeId('fault'),
             schoolId: latestDevice.schoolId,
@@ -583,21 +590,7 @@ export function LabDevicesView({
             faultNumber: reportsForDevice.length + 1,
             status: 'open'
           }
-        ];
-      }
-
-      if (status === 'working' && openReport) {
-        nextReports = nextReports.map((report) =>
-          report.id === openReport.id ? { ...report, status: 'repaired', repairDate: now, updatedAt: now } : report
-        );
-      }
-
-      return {
-        ...previous,
-        labDevices: previous.labDevices.map((item) =>
-          item.id === latestDevice.id ? { ...item, status, updatedAt: now } : item
-        ),
-        labFaultReports: nextReports
+        ]
       };
     });
   };
@@ -656,10 +649,14 @@ export function LabDevicesView({
                     <strong>{device.name}</strong>
                     <small>{deviceStatusLabel(language, device.status)}</small>
                   </div>
-                  <select value={device.status} onChange={(event) => setDeviceStatus(device, event.target.value as LabDevice['status'])}>
-                    <option value="working">{tr(language, 'labDeviceWorking')}</option>
-                    <option value="broken">{tr(language, 'labDeviceBroken')}</option>
-                  </select>
+                  {device.status === 'working' ? (
+                    <button className="button ghost small" type="button" onClick={() => markDeviceBroken(device)}>
+                      <Wrench size={15} aria-hidden="true" />
+                      <span>{tr(language, 'markDeviceBroken')}</span>
+                    </button>
+                  ) : (
+                    <small className="lab-device-pending">{tr(language, 'labDeviceRepairPending')}</small>
+                  )}
                 </article>
               ))}
             </div>
