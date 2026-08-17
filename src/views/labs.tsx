@@ -1,4 +1,4 @@
-﻿import { AlertTriangle, Archive, ArrowLeft, CalendarDays, Camera, CheckCircle2, ChevronRight, FlaskConical, Plus, Printer, Send, Wrench, XCircle } from 'lucide-react';
+﻿import { AlertTriangle, Archive, ArrowLeft, CalendarDays, Camera, CheckCircle2, ChevronRight, Cpu, FlaskConical, Plus, Printer, Send, Wrench, XCircle } from 'lucide-react';
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import type {
   DataSetter,
@@ -352,6 +352,9 @@ function LabManagementPanel({
   const [customLabName, setCustomLabName] = useState('');
   const [labError, setLabError] = useState('');
   const [deviceDrafts, setDeviceDrafts] = useState<Record<string, { name: string; image: UploadedAttachment | null; error: string }>>({});
+  const [devicesOpen, setDevicesOpen] = useState(false);
+  const [devicesLabId, setDevicesLabId] = useState<string | null>(null);
+  const selectedLab = labs.find((lab) => lab.id === devicesLabId) ?? null;
 
   const addLab = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -487,116 +490,185 @@ function LabManagementPanel({
   };
 
   return (
-    <div className="panel">
-      <div className="panel-heading">
-        <div>
-          <p>{tr(language, 'labManagementHint')}</p>
-          <h2>{tr(language, 'labManagement')}</h2>
+    <>
+      <div className="panel">
+        <div className="panel-heading">
+          <div>
+            <p>{tr(language, 'labManagementHint')}</p>
+            <h2>{tr(language, 'labManagement')}</h2>
+          </div>
+          <FlaskConical size={24} aria-hidden="true" />
         </div>
-        <FlaskConical size={24} aria-hidden="true" />
-      </div>
-      <form className="form-grid" onSubmit={addLab}>
-        <label>
-          <span>{tr(language, 'labQuickChoice')}</span>
-          <select value={labChoice} onChange={(event) => setLabChoice(event.target.value as (typeof quickLabChoices)[number])}>
-            <option value="lab1">{tr(language, 'labOne')}</option>
-            <option value="lab2">{tr(language, 'labTwo')}</option>
-            <option value="custom">{tr(language, 'customLabName')}</option>
-          </select>
-        </label>
-        {labChoice === 'custom' && (
-          <Field label={tr(language, 'labName')} value={customLabName} onChange={setCustomLabName} required />
-        )}
-        {labError && <p className="form-error full">{labError}</p>}
-        <button className="button primary form-submit" type="submit">
-          <Plus size={17} aria-hidden="true" />
-          <span>{tr(language, 'addLaboratory')}</span>
-        </button>
-      </form>
+        <form className="form-grid" onSubmit={addLab}>
+          <label>
+            <span>{tr(language, 'labQuickChoice')}</span>
+            <select value={labChoice} onChange={(event) => setLabChoice(event.target.value as (typeof quickLabChoices)[number])}>
+              <option value="lab1">{tr(language, 'labOne')}</option>
+              <option value="lab2">{tr(language, 'labTwo')}</option>
+              <option value="custom">{tr(language, 'customLabName')}</option>
+            </select>
+          </label>
+          {labChoice === 'custom' && (
+            <Field label={tr(language, 'labName')} value={customLabName} onChange={setCustomLabName} required />
+          )}
+          {labError && <p className="form-error full">{labError}</p>}
+          <button className="button primary form-submit" type="submit">
+            <Plus size={17} aria-hidden="true" />
+            <span>{tr(language, 'addLaboratory')}</span>
+          </button>
+        </form>
 
-      <div className="lab-card-list">
-        {labs.length === 0 && <p className="empty-state">{tr(language, 'noLaboratories')}</p>}
-        {labs.map((lab) => (
-          <article className="lab-card" key={lab.id}>
-            <div className="lab-card-head">
-              <div>
-                <small>{tr(language, 'laboratory')}</small>
-                <h3>{lab.name}</h3>
+        <div className="lab-card-list">
+          {labs.length === 0 && <p className="empty-state">{tr(language, 'noLaboratories')}</p>}
+          {labs.map((lab) => (
+            <article className="lab-card" key={lab.id}>
+              <div className="lab-card-head">
+                <div>
+                  <small>{tr(language, 'laboratory')}</small>
+                  <h3>{lab.name}</h3>
+                </div>
+                <FlaskConical size={21} aria-hidden="true" />
               </div>
-              <FlaskConical size={21} aria-hidden="true" />
-            </div>
-            <div className="lab-slots-board">
-              {labPeriods.map((period) => (
-                <section className="lab-slot-period" key={period}>
-                  <h4>{periodLabel(language, period)}</h4>
-                  <div className="lab-slot-list">
-                    {labTimeSlots(lab)
-                      .filter((slot) => slot.period === period)
-                      .map((slot) => (
-                        <label className={`lab-slot-control ${slot.availability}`} key={slot.id}>
-                          <span>
-                            {slot.startsAt}-{slot.endsAt}
-                          </span>
-                          <select value={slot.availability} onChange={(event) => updateLabSlotAvailability(lab, slot.id, event.target.value as LabAvailability)}>
-                            <option value="available">{tr(language, 'labAvailable')}</option>
-                            <option value="reserved">{tr(language, 'labReserved')}</option>
-                          </select>
-                        </label>
-                      ))}
-                  </div>
-                </section>
-              ))}
-            </div>
-
-            <form className="lab-device-form" onSubmit={(event) => addDevice(event, lab)}>
-              <Field
-                label={tr(language, 'deviceName')}
-                value={deviceDrafts[lab.id]?.name ?? ''}
-                onChange={(value) => updateDraft(lab.id, { name: value, error: '' })}
-                required
-              />
-              <label>
-                <span>{tr(language, 'deviceImage')}</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(event) =>
-                    readAttachmentFromInput(
-                      event,
-                      (image) => updateDraft(lab.id, { image, error: '' }),
-                      () => updateDraft(lab.id, { error: tr(language, 'fileTooLarge') })
-                    )
-                  }
-                />
-              </label>
-              {deviceDrafts[lab.id]?.image && <AttachmentPreview attachment={deviceDrafts[lab.id].image!} language={language} />}
-              {deviceDrafts[lab.id]?.error && <p className="form-error full">{deviceDrafts[lab.id].error}</p>}
-              <button className="button ghost" type="submit">
-                <Plus size={16} aria-hidden="true" />
-                <span>{tr(language, 'addDevice')}</span>
-              </button>
-            </form>
-
-            <div className="lab-device-grid">
-              {(devicesByLab[lab.id] ?? []).length === 0 && <p className="empty-state">{tr(language, 'noDevices')}</p>}
-              {(devicesByLab[lab.id] ?? []).map((device) => (
-                <article className={`lab-device-card ${device.status}`} key={device.id}>
-                  {device.image ? <img src={device.image.dataUrl} alt={device.name} /> : <Camera size={28} aria-hidden="true" />}
-                  <div>
-                    <strong>{device.name}</strong>
-                    <small>{deviceStatusLabel(language, device.status)}</small>
-                  </div>
-                  <select value={device.status} onChange={(event) => setDeviceStatus(device, event.target.value as LabDevice['status'])}>
-                    <option value="working">{tr(language, 'labDeviceWorking')}</option>
-                    <option value="broken">{tr(language, 'labDeviceBroken')}</option>
-                  </select>
-                </article>
-              ))}
-            </div>
-          </article>
-        ))}
+              <div className="lab-slots-board">
+                {labPeriods.map((period) => (
+                  <section className="lab-slot-period" key={period}>
+                    <h4>{periodLabel(language, period)}</h4>
+                    <div className="lab-slot-list">
+                      {labTimeSlots(lab)
+                        .filter((slot) => slot.period === period)
+                        .map((slot) => (
+                          <label className={`lab-slot-control ${slot.availability}`} key={slot.id}>
+                            <span>
+                              {slot.startsAt}-{slot.endsAt}
+                            </span>
+                            <select value={slot.availability} onChange={(event) => updateLabSlotAvailability(lab, slot.id, event.target.value as LabAvailability)}>
+                              <option value="available">{tr(language, 'labAvailable')}</option>
+                              <option value="reserved">{tr(language, 'labReserved')}</option>
+                            </select>
+                          </label>
+                        ))}
+                    </div>
+                  </section>
+                ))}
+              </div>
+            </article>
+          ))}
+        </div>
       </div>
-    </div>
+
+      {devicesOpen ? (
+        <>
+          {devicesLabId && selectedLab ? (
+            <>
+              <button type="button" className="back-button full" onClick={() => setDevicesLabId(null)}>
+                <ArrowLeft size={15} aria-hidden="true" />
+                <span>{tr(language, 'back')}</span>
+              </button>
+              <div className="panel full">
+                <div className="panel-heading">
+                  <div>
+                    <p>{tr(language, 'laboratory')}</p>
+                    <h2>{selectedLab.name}</h2>
+                  </div>
+                  <Cpu size={24} aria-hidden="true" />
+                </div>
+                <form className="lab-device-form" onSubmit={(event) => addDevice(event, selectedLab)}>
+                  <Field
+                    label={tr(language, 'deviceName')}
+                    value={deviceDrafts[selectedLab.id]?.name ?? ''}
+                    onChange={(value) => updateDraft(selectedLab.id, { name: value, error: '' })}
+                    required
+                  />
+                  <label>
+                    <span>{tr(language, 'deviceImage')}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(event) =>
+                        readAttachmentFromInput(
+                          event,
+                          (image) => updateDraft(selectedLab.id, { image, error: '' }),
+                          () => updateDraft(selectedLab.id, { error: tr(language, 'fileTooLarge') })
+                        )
+                      }
+                    />
+                  </label>
+                  {deviceDrafts[selectedLab.id]?.image && <AttachmentPreview attachment={deviceDrafts[selectedLab.id].image!} language={language} />}
+                  {deviceDrafts[selectedLab.id]?.error && <p className="form-error full">{deviceDrafts[selectedLab.id].error}</p>}
+                  <button className="button ghost" type="submit">
+                    <Plus size={16} aria-hidden="true" />
+                    <span>{tr(language, 'addDevice')}</span>
+                  </button>
+                </form>
+
+                <div className="lab-device-grid">
+                  {(devicesByLab[selectedLab.id] ?? []).length === 0 && <p className="empty-state">{tr(language, 'noDevices')}</p>}
+                  {(devicesByLab[selectedLab.id] ?? []).map((device) => (
+                    <article className={`lab-device-card ${device.status}`} key={device.id}>
+                      {device.image ? <img src={device.image.dataUrl} alt={device.name} /> : <Camera size={28} aria-hidden="true" />}
+                      <div>
+                        <strong>{device.name}</strong>
+                        <small>{deviceStatusLabel(language, device.status)}</small>
+                      </div>
+                      <select value={device.status} onChange={(event) => setDeviceStatus(device, event.target.value as LabDevice['status'])}>
+                        <option value="working">{tr(language, 'labDeviceWorking')}</option>
+                        <option value="broken">{tr(language, 'labDeviceBroken')}</option>
+                      </select>
+                    </article>
+                  ))}
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <button type="button" className="back-button full" onClick={() => setDevicesOpen(false)}>
+                <ArrowLeft size={15} aria-hidden="true" />
+                <span>{tr(language, 'back')}</span>
+              </button>
+              <div className="panel full">
+                <div className="panel-heading">
+                  <div>
+                    <p>{tr(language, 'labDevicesHint')}</p>
+                    <h2>{tr(language, 'labDeviceNames')}</h2>
+                  </div>
+                  <Cpu size={24} aria-hidden="true" />
+                </div>
+                <div className="user-groups">
+                  {labs.length === 0 && <p className="empty-state">{tr(language, 'noLaboratories')}</p>}
+                  {labs.map((lab) => (
+                    <button type="button" className="user-group drill-row" key={lab.id} onClick={() => setDevicesLabId(lab.id)}>
+                      <span className="user-group-title">
+                        <span className="user-group-label">
+                          <FlaskConical size={16} aria-hidden="true" />
+                          <span className="user-group-label-name">{lab.name}</span>
+                        </span>
+                        <span className="user-group-meta">
+                          <strong>{(devicesByLab[lab.id] ?? []).length}</strong>
+                          <ChevronRight size={17} aria-hidden="true" />
+                        </span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+        </>
+      ) : (
+        <button type="button" className="user-group user-group-school drill-row full" onClick={() => setDevicesOpen(true)}>
+          <span className="user-group-title">
+            <span className="user-group-label">
+              <Cpu size={18} aria-hidden="true" />
+              <span className="user-group-label-name">{tr(language, 'labDeviceNames')}</span>
+            </span>
+            <span className="user-group-meta">
+              <strong>{labs.reduce((sum, lab) => sum + (devicesByLab[lab.id] ?? []).length, 0)}</strong>
+              <ChevronRight size={17} aria-hidden="true" />
+            </span>
+          </span>
+        </button>
+      )}
+    </>
   );
 }
 
