@@ -1,4 +1,4 @@
-import { Archive, ArrowLeft, CalendarDays, Check, ChevronRight, ClipboardCheck, Clock, Edit3, FileText, Plus, Printer, Save, Send, Trash2, Upload, X } from 'lucide-react';
+import { Archive, ArrowLeft, CalendarDays, Check, ChevronRight, ClipboardCheck, Edit3, FileText, Plus, Printer, Save, Send, Trash2, Upload, X } from 'lucide-react';
 import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from 'react';
 import type {
   AbsenceRecord,
@@ -1523,11 +1523,15 @@ function DirectorAbsenceReports({ data, setData, currentUser, language }: Common
   const currentReportSections = useMemo(() => reportSections.filter((section) => reportIsCurrent(section.report, now)), [now, reportSections]);
   const historyReportSections = useMemo(() => reportSections.filter((section) => !reportIsCurrent(section.report, now)), [now, reportSections]);
   const [archiveOpen, setArchiveOpen] = useState(false);
-  const [archiveReportId, setArchiveReportId] = useState<string | null>(null);
-  const selectedArchiveSection = useMemo(
-    () => historyReportSections.find((section) => section.report.id === archiveReportId) ?? null,
-    [archiveReportId, historyReportSections]
-  );
+  const [archiveDate, setArchiveDate] = useState<string | null>(null);
+  const historyByDate = useMemo(() => {
+    const groups = new Map<string, AbsenceReportSection[]>();
+    historyReportSections.forEach((section) => {
+      groups.set(section.report.date, [...(groups.get(section.report.date) ?? []), section]);
+    });
+    return [...groups.entries()].sort((left, right) => right[0].localeCompare(left[0]));
+  }, [historyReportSections]);
+  const selectedArchiveSections = useMemo(() => historyByDate.find(([date]) => date === archiveDate)?.[1] ?? [], [archiveDate, historyByDate]);
   const currentReportEntries = currentReportSections.flatMap((section) => section.entries);
   const uniqueClasses = new Set(currentReportEntries.map((entry) => reportGroupKey(entry.record)));
   const uniqueStudents = new Set(currentReportEntries.map((entry) => entry.student.id));
@@ -1623,9 +1627,9 @@ function DirectorAbsenceReports({ data, setData, currentUser, language }: Common
 
       {archiveOpen ? (
         <>
-          {selectedArchiveSection ? (
+          {archiveDate && selectedArchiveSections.length > 0 ? (
             <>
-              <button type="button" className="back-button full" onClick={() => setArchiveReportId(null)}>
+              <button type="button" className="back-button full" onClick={() => setArchiveDate(null)}>
                 <ArrowLeft size={15} aria-hidden="true" />
                 <span>{tr(language, 'back')}</span>
               </button>
@@ -1638,16 +1642,16 @@ function DirectorAbsenceReports({ data, setData, currentUser, language }: Common
                   <FileText size={24} aria-hidden="true" />
                 </div>
                 <div className="absence-report-toolbar compact">
-                  <button className="button ghost" type="button" onClick={() => printAbsenceReports(language, school?.name ?? '-', [selectedArchiveSection])}>
+                  <button className="button ghost" type="button" onClick={() => printAbsenceReports(language, school?.name ?? '-', selectedArchiveSections)}>
                     <Printer size={17} aria-hidden="true" />
-                    <span>{tr(language, 'printAbsenceReport')}</span>
+                    <span>{tr(language, 'printHistoryAbsenceReports')}</span>
                   </button>
                 </div>
                 <AbsenceReportList
                   emptyText={tr(language, 'noAbsenceHistory')}
                   language={language}
                   schoolName={school?.name ?? '-'}
-                  sections={[selectedArchiveSection]}
+                  sections={selectedArchiveSections}
                 />
               </div>
             </>
@@ -1666,20 +1670,16 @@ function DirectorAbsenceReports({ data, setData, currentUser, language }: Common
                   <Archive size={24} aria-hidden="true" />
                 </div>
                 <div className="user-groups">
-                  {historyReportSections.length === 0 && <p className="empty-state">{tr(language, 'noAbsenceHistory')}</p>}
-                  {historyReportSections.map((section) => (
-                    <button
-                      type="button"
-                      className="user-group drill-row"
-                      key={section.report.id}
-                      onClick={() => setArchiveReportId(section.report.id)}
-                    >
+                  {historyByDate.length === 0 && <p className="empty-state">{tr(language, 'noAbsenceHistory')}</p>}
+                  {historyByDate.map(([date, sections]) => (
+                    <button type="button" className="user-group drill-row" key={date} onClick={() => setArchiveDate(date)}>
                       <span className="user-group-title">
                         <span className="user-group-label">
-                          <Clock size={16} aria-hidden="true" />
-                          <span className="user-group-label-name">{formatAbsenceDateTime(language, section.report.createdAt)}</span>
+                          <CalendarDays size={16} aria-hidden="true" />
+                          <span className="user-group-label-name">{formatAbsenceDate(language, date)}</span>
                         </span>
                         <span className="user-group-meta">
+                          <strong>{sections.length}</strong>
                           <ChevronRight size={17} aria-hidden="true" />
                         </span>
                       </span>
@@ -1698,7 +1698,7 @@ function DirectorAbsenceReports({ data, setData, currentUser, language }: Common
               <span className="user-group-label-name">{tr(language, 'absenceHistory')}</span>
             </span>
             <span className="user-group-meta">
-              <strong>{historyReportSections.length}</strong>
+              <strong>{historyByDate.length}</strong>
               <ChevronRight size={17} aria-hidden="true" />
             </span>
           </span>
