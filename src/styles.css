@@ -1650,6 +1650,10 @@ textarea:focus {
   border-block-start: 3px solid currentColor;
 }
 
+.stage-picker-card > svg {
+  color: var(--green);
+}
+
 .stage-picker-count-label {
   color: var(--muted);
   font-size: 0.86rem;

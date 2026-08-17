@@ -59,7 +59,7 @@ export function AdminUsersPanel({
   };
 
   const stageIcon = (stage: Stage) =>
-    stage === 'primary' ? <GraduationCap size={22} aria-hidden="true" /> : stage === 'middle' ? <BookOpen size={22} aria-hidden="true" /> : <Building2 size={22} aria-hidden="true" />;
+    stage === 'primary' ? <GraduationCap size={16} aria-hidden="true" /> : stage === 'middle' ? <BookOpen size={16} aria-hidden="true" /> : <Building2 size={16} aria-hidden="true" />;
 
   const stageTone: Record<Stage, string> = { primary: 'green', middle: 'blue', secondary: 'amber' };
 
