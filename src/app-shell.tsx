@@ -1,5 +1,5 @@
 import { ArrowLeft, LogOut, Moon, School, Sun } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import type { Language, PlatformUser, SchoolRecord, SyncStatus, Theme, View } from './types';
 import { stageNames, tr } from './i18n';
 import {
@@ -13,6 +13,7 @@ import {
 import { ConfirmDialog, LanguageMenu, RoleLabel, SyncIndicator } from './ui';
 import type { NavItem } from './navigation';
 import { canGoBack as stackCanGoBack, topView, type NavStack } from './nav-stack';
+import { triggerBackShortcut } from './back-shortcut';
 
 type AppShellProps = {
   children: ReactNode;
@@ -53,6 +54,31 @@ export function AppShell({
 }: AppShellProps) {
   const activeView: View = topView(stack);
   const canGoBackNow = stackCanGoBack(stack);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Backspace') {
+        return;
+      }
+      const target = event.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable)
+      ) {
+        return;
+      }
+      if (triggerBackShortcut()) {
+        event.preventDefault();
+        return;
+      }
+      if (canGoBackNow) {
+        event.preventDefault();
+        onBack();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [canGoBackNow, onBack]);
 
   return (
     <div className="app-shell">

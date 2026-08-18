@@ -16,6 +16,7 @@ import { assignedYearClassGroups, assignedYearStreamClassGroups, sameClassGroup,
 import { absenceJustificationExpiresAt, absenceJustificationIsExpired, getSchool, makeId } from '../data';
 import { readAttachmentFromInput } from '../files';
 import { AttachmentPreview, ResponsiveTable } from '../ui';
+import { useBackShortcut } from '../back-shortcut';
 
 type AbsenceClassGroup = {
   key: string;
@@ -1523,6 +1524,14 @@ function DirectorAbsenceReports({ data, setData, currentUser, language }: Common
   const currentReportSections = useMemo(() => reportSections.filter((section) => reportIsCurrent(section.report, now)), [now, reportSections]);
   const historyReportSections = useMemo(() => reportSections.filter((section) => !reportIsCurrent(section.report, now)), [now, reportSections]);
   const [archiveOpen, setArchiveOpen] = useState(false);
+
+  useBackShortcut(() => {
+    if (archiveOpen) {
+      setArchiveOpen(false);
+      return true;
+    }
+    return false;
+  });
   const historyByDate = useMemo(() => {
     const groups = new Map<string, AbsenceReportSection[]>();
     historyReportSections.forEach((section) => {

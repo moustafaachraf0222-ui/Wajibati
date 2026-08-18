@@ -10,6 +10,7 @@ import { CredentialDatabasePanel } from './accounts-credentials';
 import { AccountEditPanel } from './accounts-edit';
 import { DirectorCreateAccountPanel } from './accounts-director-create';
 import { UsersTable } from './accounts-table';
+import { useBackShortcut } from '../back-shortcut';
 
 const directorRoleIcons: Partial<Record<Role, LucideIcon>> = {
   supervisor: ClipboardCheck,
@@ -35,6 +36,18 @@ export function DirectorUsersPanel({
   const [editingUser, setEditingUser] = useState<PlatformUser | null>(null);
   const [drillRole, setDrillRole] = useState<Role | null>(null);
   const [drillClassKey, setDrillClassKey] = useState<string | null>(null);
+
+  useBackShortcut(() => {
+    if (drillClassKey) {
+      setDrillClassKey(null);
+      return true;
+    }
+    if (drillRole) {
+      setDrillRole(null);
+      return true;
+    }
+    return false;
+  });
 
   const schoolUsers = scopedUsers(data, currentUser);
   const roleUsers = (role: Role) => schoolUsers.filter((user) => user.role === role);

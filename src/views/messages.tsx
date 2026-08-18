@@ -24,6 +24,7 @@ import {
   noteStatus
 } from '../messages';
 import { AttachmentPreview, Field } from '../ui';
+import { useBackShortcut } from '../back-shortcut';
 
 type CommonViewProps = {
   data: PlatformData;
@@ -56,6 +57,18 @@ export function AnnouncementsView({ data, setData, currentUser, language }: Comm
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [archiveAnnouncementId, setArchiveAnnouncementId] = useState<string | null>(null);
   const selectedArchivedAnnouncement = archiveAnnouncementId ? archivedAnnouncements.find((announcement) => announcement.id === archiveAnnouncementId) : null;
+
+  useBackShortcut(() => {
+    if (archiveAnnouncementId) {
+      setArchiveAnnouncementId(null);
+      return true;
+    }
+    if (archiveOpen) {
+      setArchiveOpen(false);
+      return true;
+    }
+    return false;
+  });
 
   const readImage = (event: ChangeEvent<HTMLInputElement>) => {
     readAttachmentFromInput(

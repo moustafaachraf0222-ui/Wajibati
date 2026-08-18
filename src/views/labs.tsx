@@ -19,6 +19,7 @@ import { localeNames, tr } from '../i18n';
 import { makeId } from '../data';
 import { readAttachmentFromInput } from '../files';
 import { AttachmentPreview, Field, ResponsiveTable } from '../ui';
+import { useBackShortcut } from '../back-shortcut';
 
 const labPeriods: LabPeriod[] = ['morning', 'afternoon'];
 const quickLabChoices = ['lab1', 'lab2', 'custom'] as const;
@@ -516,6 +517,14 @@ export function LabDevicesView({
     [data.labDevices, labs]
   );
   const [labId, setLabId] = useState<string | null>(null);
+
+  useBackShortcut(() => {
+    if (labId) {
+      setLabId(null);
+      return true;
+    }
+    return false;
+  });
   const [deviceDrafts, setDeviceDrafts] = useState<Record<string, { name: string; image: UploadedAttachment | null; error: string }>>({});
   const selectedLab = labs.find((lab) => lab.id === labId) ?? null;
 
@@ -862,6 +871,14 @@ function LabFaultReportsPanel({
   const administrationName = school?.directorId ? userName(data, school.directorId) : '-';
   const [now, setNow] = useState(() => Date.now());
   const [archiveOpen, setArchiveOpen] = useState(false);
+
+  useBackShortcut(() => {
+    if (archiveOpen) {
+      setArchiveOpen(false);
+      return true;
+    }
+    return false;
+  });
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 60 * 1000);

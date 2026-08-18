@@ -8,6 +8,7 @@ import { schoolIsTrashed } from '../data-tombstones';
 import { Field } from '../ui';
 import { AccountEditPanel } from './accounts-edit';
 import { UsersTable } from './accounts-table';
+import { useBackShortcut } from '../back-shortcut';
 
 export function AdminUsersPanel({
   data,
@@ -45,6 +46,26 @@ export function AdminUsersPanel({
   const [drillSchoolId, setDrillSchoolId] = useState<string | null>(null);
   const [drillCategory, setDrillCategory] = useState<Role | null>(null);
   const [drillStudentGroup, setDrillStudentGroup] = useState<string | null>(null);
+
+  useBackShortcut(() => {
+    if (drillStudentGroup) {
+      setDrillStudentGroup(null);
+      return true;
+    }
+    if (drillCategory) {
+      setDrillCategory(null);
+      return true;
+    }
+    if (drillSchoolId) {
+      setDrillSchoolId(null);
+      return true;
+    }
+    if (drillStage) {
+      setDrillStage(null);
+      return true;
+    }
+    return false;
+  });
 
   const liveSchools = data.schools.filter((school) => !schoolIsTrashed(school));
   const stageSchools = (stage: Stage) =>
