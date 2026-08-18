@@ -37,6 +37,9 @@ export function MoveAccountPanel({
 
   const currentSchool = data.schools.find((school) => school.id === target.schoolId);
   const sameStage = currentSchool?.stage ?? target.stage;
+  const hasPendingRequest = data.transferRequests.some(
+    (request) => request.userId === target.id && request.status === 'pending'
+  );
   const targetSchools = data.schools
     .filter(
       (school) =>
@@ -48,7 +51,7 @@ export function MoveAccountPanel({
 
   const requestTransfer = () => {
     const targetSchool = data.schools.find((school) => school.id === targetSchoolId);
-    if (!targetSchool) {
+    if (!targetSchool || hasPendingRequest) {
       return;
     }
 
@@ -128,9 +131,15 @@ export function MoveAccountPanel({
           </select>
         </label>
         {targetSchools.length === 0 && <p className="modal-copy">{tr(language, 'noMoveTargets')}</p>}
+        {hasPendingRequest && <p className="modal-warning">{tr(language, 'transferAlreadyPending')}</p>}
         <p className="modal-warning">{tr(language, 'transferNeedsConfirmation')}</p>
         <div className="button-row center">
-          <button className="button primary" type="button" disabled={!targetSchoolId || targetSchools.length === 0} onClick={requestTransfer}>
+          <button
+            className="button primary"
+            type="button"
+            disabled={!targetSchoolId || targetSchools.length === 0 || hasPendingRequest}
+            onClick={requestTransfer}
+          >
             <School size={17} aria-hidden="true" />
             <span>{tr(language, 'requestTransfer')}</span>
           </button>
