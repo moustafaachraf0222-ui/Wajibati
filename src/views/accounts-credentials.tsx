@@ -33,7 +33,6 @@ function printCredentialTable(language: Language, title: string, schoolName: str
           <td>${index + 1}</td>
           <td>${escapeHtml(user.name)}</td>
           <td dir="ltr">${escapeHtml(user.email)}</td>
-          <td dir="ltr">${escapeHtml(user.password)}</td>
         </tr>`
     )
     .join('');
@@ -82,7 +81,6 @@ function printCredentialTable(language: Language, title: string, schoolName: str
               <th>#</th>
               <th>${escapeHtml(tr(language, 'fullName'))}</th>
               <th>${escapeHtml(tr(language, 'email'))}</th>
-              <th>${escapeHtml(tr(language, 'accountCode'))}</th>
             </tr>
           </thead>
           <tbody>${rows}</tbody>
@@ -288,7 +286,7 @@ function CredentialDatabaseCard({
   schoolName: string;
   language: Language;
 }) {
-  const columns = [tr(language, 'fullName'), tr(language, 'email'), tr(language, 'accountCode')];
+  const columns = [tr(language, 'fullName'), tr(language, 'email')];
 
   return (
     <section className="credential-database-card">
@@ -307,7 +305,6 @@ function CredentialDatabaseCard({
           <tr key={user.id}>
             <td>{user.name}</td>
             <td dir="ltr">{user.email}</td>
-            <td dir="ltr">{user.password}</td>
           </tr>
         ))}
       </ResponsiveTable>

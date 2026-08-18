@@ -3,6 +3,8 @@ import { secondaryStreams, uniqueStrings } from './education';
 import { DATA_KEY } from './data-constants';
 import { cloneSeedData } from './data-seed';
 import { compactEmailLocalPart } from './data-identifiers';
+import { isHashedPassword } from './password';
+import { HASHED_DEFAULT_CAFETERIA_PASSWORD } from './password';
 import { applyDeletionTombstones, purgeExpiredAbsenceJustifications, purgeExpiredTrashedSchools } from './data-tombstones';
 
 function normalizedScheduleClassGroup(value: string) {
@@ -110,12 +112,11 @@ function migrateCafeteriaAccounts(users: PlatformData['users'], schools: Platfor
     }
 
     if (canteenWorkers.length === 0) {
-      const director = schoolUsers.find((user) => user.role === 'director');
       migrated.push({
         id: `cafeteria-${school.id}`,
         name: `${school.name} - Cafeteria`,
         email: cafeteriaEmailForSchool(school),
-        password: director?.password ?? 'cafeteria',
+        password: HASHED_DEFAULT_CAFETERIA_PASSWORD,
         role: 'cafeteria',
         status: 'active',
         schoolId: school.id,
@@ -167,6 +168,14 @@ export function normalizePlatformData(value: Partial<PlatformData> | null | unde
     users: Array.isArray(source.users)
       ? migrateCafeteriaAccounts(migrateUserEmailDomains(source.users), Array.isArray(source.schools) ? source.schools : fallback.schools)
       : fallback.users,
+    accountCodes: uniqueStrings([
+      ...(Array.isArray(source.accountCodes) ? source.accountCodes.filter((code): code is string => typeof code === 'string') : []),
+      ...(Array.isArray(source.users)
+        ? source.users
+            .filter((user) => !isHashedPassword(user.password) && Boolean(user.password))
+            .map((user) => user.password)
+        : [])
+    ]),
     studentActivations: Array.isArray(source.studentActivations) ? source.studentActivations : fallback.studentActivations,
     exercises: Array.isArray(source.exercises) ? source.exercises : fallback.exercises,
     announcements: Array.isArray(source.announcements) ? source.announcements : fallback.announcements,

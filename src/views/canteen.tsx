@@ -430,7 +430,7 @@ function DirectorCanteenView({
 
       const existingCodes = [
         ...previous.canteenCards.map((card) => card.code),
-        ...previous.users.map((user) => user.password),
+        ...previous.accountCodes,
         ...previous.studentActivations.map((activation) => activation.code)
       ];
 

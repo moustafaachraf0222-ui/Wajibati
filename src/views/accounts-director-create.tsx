@@ -31,6 +31,7 @@ import {
   uniqueNumbers
 } from '../education';
 import { generateSchoolEmail, generateUniqueCode, makeId } from '../data';
+import { hashPassword } from '../password';
 import { Field, RoleLabel } from '../ui';
 
 const initialBulkStudentForm = {
@@ -103,7 +104,7 @@ export function DirectorCreateAccountPanel({
       ? (['teacher', 'student'] as const)
       : (['supervisor', 'lab', 'teacher', 'student'] as const);
 
-  const createAccount = (event: FormEvent<HTMLFormElement>) => {
+  const createAccount = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!school || !currentUser.stage) {
       return;
@@ -188,14 +189,16 @@ export function DirectorCreateAccountPanel({
         : form.role === 'teacher'
           ? teacherYearClassGroups[String(primaryYear)]?.[0] ?? ''
           : undefined;
+    const existingCodes = [...data.accountCodes, ...data.studentActivations.map((activation) => activation.code)];
+    const accountCode = generateUniqueCode(existingCodes);
+    const hashedPassword = await hashPassword(accountCode);
     setData((previous) => {
       const users = [...previous.users];
-      const existingCodes = [...users.map((user) => user.password), ...previous.studentActivations.map((activation) => activation.code)];
       const nextUser: PlatformUser = {
         id: makeId(form.role),
         name: accountName,
         email: generateSchoolEmail(accountName, form.role, school.domain, users),
-        password: generateUniqueCode(existingCodes),
+        password: hashedPassword,
         role: form.role,
         status: 'active',
         schoolId: currentUser.schoolId,
@@ -213,7 +216,8 @@ export function DirectorCreateAccountPanel({
 
       return {
         ...previous,
-        users: [...users, nextUser]
+        users: [...users, nextUser],
+        accountCodes: previous.accountCodes.includes(accountCode) ? previous.accountCodes : [...previous.accountCodes, accountCode]
       };
     });
 
@@ -252,7 +256,7 @@ export function DirectorCreateAccountPanel({
 
     setData((previous) => {
       const studentActivations = [...previous.studentActivations];
-      const usedCodes = [...previous.users.map((user) => user.password), ...studentActivations.map((activation) => activation.code)];
+      const usedCodes = [...previous.accountCodes, ...studentActivations.map((activation) => activation.code)];
       studentNames.forEach((name) => {
         const activation = createStudentActivationRecord({
           name,

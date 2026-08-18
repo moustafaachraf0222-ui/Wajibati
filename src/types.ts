@@ -358,6 +358,7 @@ export type TransferRequest = {
 export type PlatformData = {
   schools: SchoolRecord[];
   users: PlatformUser[];
+  accountCodes: string[];
   studentActivations: StudentActivationRecord[];
   exercises: Exercise[];
   announcements: Announcement[];
@@ -399,7 +400,6 @@ export type AccountEditState = {
   role: Role;
   name: string;
   email: string;
-  password: string;
   status: AccountStatus;
   schoolName: string;
   domain: string;

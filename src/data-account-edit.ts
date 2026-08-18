@@ -22,7 +22,6 @@ export function makeAccountEditState(target: PlatformUser, data: PlatformData): 
     role: target.role,
     name: target.name,
     email: target.email,
-    password: target.password,
     status: target.status,
     schoolName: school?.name ?? '',
     domain: school?.domain ?? '',

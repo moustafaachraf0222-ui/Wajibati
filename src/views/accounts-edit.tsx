@@ -34,6 +34,8 @@ import {
   uniqueNumbers
 } from '../education';
 import { canEditUser, getSchool, makeAccountEditState } from '../data';
+import { generateUniqueCode } from '../data';
+import { hashPassword } from '../password';
 import { Field, RoleLabel } from '../ui';
 
 export function AccountEditPanel({
@@ -56,6 +58,7 @@ export function AccountEditPanel({
   const targetSchool = getSchool(data, target);
   const [edit, setEdit] = useState<AccountEditState>(() => makeAccountEditState(target, data));
   const [error, setError] = useState('');
+  const [resetPasswordResult, setResetPasswordResult] = useState('');
   const editStage = target.role === 'director' ? edit.stage : target.stage ?? targetSchool?.stage ?? 'middle';
   const studentStreamOptions = secondaryStreamsForYear(targetSchool, edit.schoolYear);
   const availableYearLabels = schoolYearNames[language][editStage];
@@ -325,7 +328,6 @@ export function AccountEditPanel({
           ...user,
           name: edit.name.trim(),
           email: edit.email.trim(),
-          password: edit.password,
           status: edit.status
         };
 
@@ -364,6 +366,17 @@ export function AccountEditPanel({
     onSaved();
   };
 
+  const resetPassword = async () => {
+    const newCode = generateUniqueCode([...data.accountCodes, ...data.studentActivations.map((activation) => activation.code)]);
+    const hashedPassword = await hashPassword(newCode);
+    setData((previous) => ({
+      ...previous,
+      users: previous.users.map((user) => (user.id === target.id ? { ...user, password: hashedPassword } : user)),
+      accountCodes: previous.accountCodes.includes(newCode) ? previous.accountCodes : [...previous.accountCodes, newCode]
+    }));
+    setResetPasswordResult(newCode);
+  };
+
   return (
     <div className="panel">
       <div className="panel-heading">
@@ -378,7 +391,6 @@ export function AccountEditPanel({
       <form className="form-grid" onSubmit={saveEdit}>
         <Field label={tr(language, 'fullName')} value={edit.name} onChange={(value) => setEdit({ ...edit, name: value })} required />
         <Field label={tr(language, 'email')} value={edit.email} onChange={(value) => setEdit({ ...edit, email: value })} type="email" required />
-        <Field label={tr(language, 'passwordDefault')} value={edit.password} onChange={(value) => setEdit({ ...edit, password: value })} required />
         <label>
           <span>{tr(language, 'status')}</span>
           <select value={edit.status} onChange={(event) => setEdit({ ...edit, status: event.target.value as AccountStatus })}>
@@ -386,6 +398,23 @@ export function AccountEditPanel({
             <option value="disabled">{statusNames[language].disabled}</option>
           </select>
         </label>
+        <div className="full">
+          <div className="button-row">
+            <button className="button ghost" type="button" disabled={Boolean(resetPasswordResult)} onClick={() => void resetPassword()}>
+              <Plus size={17} aria-hidden="true" />
+              <span>{tr(language, 'resetPassword')}</span>
+            </button>
+          </div>
+          {resetPasswordResult && (
+            <div className="login-created-account">
+              <strong>{tr(language, 'resetPasswordDone')}</strong>
+              <span dir="ltr" style={{ direction: 'ltr' }}>
+                {tr(language, 'accountCode')}: <b dir="ltr">{resetPasswordResult}</b>
+              </span>
+              <span>{tr(language, 'resetPasswordShownOnce')}</span>
+            </div>
+          )}
+        </div>
 
         {target.role === 'director' && currentUser.role === 'admin' && targetSchool && (
           <>

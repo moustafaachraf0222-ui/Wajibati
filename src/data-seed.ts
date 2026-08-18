@@ -1,4 +1,5 @@
 import type { PlatformData } from './types';
+import { HASHED_DEFAULT_ADMIN_PASSWORD } from './password';
 
 const seedData: PlatformData = {
   schools: [],
@@ -7,11 +8,12 @@ const seedData: PlatformData = {
       id: 'user-admin',
       name: 'Administrator',
       email: 'wajibati@admin.dz',
-      password: 'LATTOUI1qaz0plm@7',
+      password: HASHED_DEFAULT_ADMIN_PASSWORD,
       role: 'admin',
       status: 'active'
     }
   ],
+  accountCodes: [],
   studentActivations: [],
   exercises: [],
   announcements: [],
@@ -52,6 +54,7 @@ export function isSeedOnlyData(data: PlatformData) {
     data.notes.length === 0 &&
     data.users.length === 1 &&
     data.users[0]?.id === seedData.users[0].id &&
+    data.accountCodes.length === 0 &&
     data.studentActivations.length === 0 &&
     data.deletedSchoolIds.length === 0 &&
     data.deletedExerciseIds.length === 0 &&

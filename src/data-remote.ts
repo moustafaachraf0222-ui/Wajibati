@@ -101,6 +101,7 @@ export function mergeDeletionTombstones(baseData: PlatformData, sourceData: Plat
   return applyDeletionTombstones({
     ...baseData,
     studentActivations: mergeStudentActivations(baseData, sourceData),
+    accountCodes: uniqueStrings([...baseData.accountCodes, ...sourceData.accountCodes]),
     deletedSchoolIds: uniqueStrings([...baseData.deletedSchoolIds, ...sourceData.deletedSchoolIds]),
     deletedExerciseIds: uniqueStrings([...baseData.deletedExerciseIds, ...sourceData.deletedExerciseIds]),
     deletedNoteIds: uniqueStrings([...baseData.deletedNoteIds, ...sourceData.deletedNoteIds]),

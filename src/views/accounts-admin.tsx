@@ -6,6 +6,7 @@ import { secondaryStreams, secondaryStreamLabel, stages } from '../education';
 import { canDeleteUser, canToggleUser, compactEmailLocalPart, deleteUserRecords, makeId } from '../data';
 import { schoolIsTrashed } from '../data-tombstones';
 import { Field } from '../ui';
+import { hashPassword } from '../password';
 import { AccountEditPanel } from './accounts-edit';
 import { MoveAccountPanel } from './accounts-move';
 import { UsersTable } from './accounts-table';
@@ -123,7 +124,7 @@ export function AdminUsersPanel({
     return first?.stream ? `${secondaryStreamLabel(language, first.stream, first.schoolYear ?? 1)} ${className}` : className;
   };
 
-  const createDirector = (event: FormEvent<HTMLFormElement>) => {
+  const createDirector = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const localPart = compactEmailLocalPart(form.schoolName.trim()) || 'school';
     const domain = 'wajibati.dz';
@@ -134,6 +135,7 @@ export function AdminUsersPanel({
       return;
     }
 
+    const hashedPassword = await hashPassword(form.password);
     const schoolId = makeId('school');
     const directorId = makeId('director');
 
@@ -159,7 +161,7 @@ export function AdminUsersPanel({
           id: directorId,
           name: form.name.trim(),
           email: directorEmail,
-          password: form.password,
+          password: hashedPassword,
           role: 'director',
           status: 'active',
           schoolId,
@@ -169,7 +171,7 @@ export function AdminUsersPanel({
           id: `cafeteria-${schoolId}`,
           name: `${form.schoolName.trim()} - Cafeteria`,
           email: cafeteriaEmail,
-          password: form.password,
+          password: hashedPassword,
           role: 'cafeteria',
           status: 'active',
           schoolId,

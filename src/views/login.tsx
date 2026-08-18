@@ -25,6 +25,7 @@ import {
   rememberedAccountListsEqual
 } from '../data';
 import { defaultClassGroups, normalizeClassGroup, secondaryStreamLabel, secondaryStreamsForYear } from '../education';
+import { hashPassword, isHashedPassword, verifyPassword } from '../password';
 import { AppInfoDialog, LanguageMenu, SyncIndicator } from '../ui';
 
 type LoginProps = {
@@ -161,9 +162,10 @@ export function LoginPage({ data, setData, language, theme, onLanguageChange, on
     setIsSubmitting(true);
     const latestData = await onRefreshData();
     const account = latestData.users.find((user) => user.email.toLowerCase() === email.trim().toLowerCase());
+    const credentialsValid = account ? await verifyPassword(password, account.password) : false;
     setIsSubmitting(false);
 
-    if (!account || account.password !== password) {
+    if (!account || !credentialsValid) {
       setError(tr(language, 'invalidCredentials'));
       return;
     }
@@ -171,6 +173,14 @@ export function LoginPage({ data, setData, language, theme, onLanguageChange, on
     if (!canAuthenticateUser(latestData, account)) {
       setError(tr(language, 'disabledAccount'));
       return;
+    }
+
+    if (!isHashedPassword(account.password)) {
+      const upgradedPassword = await hashPassword(password);
+      setData((previous) => ({
+        ...previous,
+        users: previous.users.map((user) => (user.id === account.id ? { ...user, password: upgradedPassword } : user))
+      }));
     }
 
     if (shouldRemember) {
@@ -217,6 +227,7 @@ export function LoginPage({ data, setData, language, theme, onLanguageChange, on
     const existingAccount = activationRecord.activatedUserId
       ? latestData.users.find((user) => user.id === activationRecord.activatedUserId)
       : undefined;
+    const activationCode = normalizeActivationCode(activationRecord.code);
     if (existingAccount) {
       if (!canAuthenticateUser(latestData, existingAccount)) {
         setStudentSignupError(tr(language, 'disabledAccount'));
@@ -225,9 +236,9 @@ export function LoginPage({ data, setData, language, theme, onLanguageChange, on
 
       rememberAccount(existingAccount);
       setEmail(existingAccount.email);
-      setPassword(existingAccount.password);
+      setPassword(activationCode);
       setRememberMe(true);
-      setStudentSignupSuccess({ email: existingAccount.email, password: existingAccount.password });
+      setStudentSignupSuccess({ email: existingAccount.email, password: activationCode });
       setStudentSignupForm(initialStudentActivationForm);
       onLogin(existingAccount.id);
       return;
@@ -260,7 +271,7 @@ export function LoginPage({ data, setData, language, theme, onLanguageChange, on
       id: makeId('student'),
       name: activationRecord.name,
       email: generateSchoolEmail(activationRecord.name, 'student', school.domain, latestData.users),
-      password: activationRecord.code,
+      password: await hashPassword(activationCode),
       role: 'student',
       status: 'active',
       schoolId: school.id,
@@ -279,6 +290,7 @@ export function LoginPage({ data, setData, language, theme, onLanguageChange, on
     setData((previous) => ({
       ...previous,
       users: previous.users.some((user) => user.id === activatedAccount.id) ? previous.users : [...previous.users, activatedAccount],
+      accountCodes: previous.accountCodes.includes(activationCode) ? previous.accountCodes : [...previous.accountCodes, activationCode],
       studentActivations: previous.studentActivations.map((activation) =>
         activation.id === activationRecord.id
           ? {
@@ -294,9 +306,9 @@ export function LoginPage({ data, setData, language, theme, onLanguageChange, on
     }));
     rememberAccount(activatedAccount);
     setEmail(activatedAccount.email);
-    setPassword(activatedAccount.password);
+    setPassword(activationCode);
     setRememberMe(true);
-    setStudentSignupSuccess({ email: activatedAccount.email, password: activatedAccount.password });
+    setStudentSignupSuccess({ email: activatedAccount.email, password: activationCode });
     setStudentSignupForm(initialStudentActivationForm);
     onLogin(activatedAccount.id);
   };
