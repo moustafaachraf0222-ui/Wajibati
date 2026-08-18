@@ -45,7 +45,7 @@ export function MoveAccountPanel({
       (school) =>
         !schoolIsTrashed(school) &&
         school.id !== target.schoolId &&
-        (target.role === 'teacher' || school.stage === sameStage)
+        (target.role !== 'student' || school.stage === sameStage)
     )
     .sort((left, right) => left.name.localeCompare(right.name, language === 'ar' ? 'ar' : undefined, { sensitivity: 'base' }));
 
