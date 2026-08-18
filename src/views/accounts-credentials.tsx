@@ -19,13 +19,7 @@ function sortedCredentials(credentials: AccountCredential[], role: AccountCreden
     .sort((left, right) => left.name.localeCompare(right.name, undefined, { numeric: true, sensitivity: 'base' }));
 }
 
-function sortedCredentialUsers(users: PlatformUser[], role: 'supervisor' | 'lab' | 'teacher' | 'student') {
-  return users
-    .filter((user) => user.role === role)
-    .sort((left, right) => left.name.localeCompare(right.name, undefined, { numeric: true, sensitivity: 'base' }));
-}
-
-function printCredentialTable(language: Language, title: string, schoolName: string, credentials: AccountCredential[], showCode = true) {
+function printCredentialTable(language: Language, title: string, schoolName: string, credentials: AccountCredential[]) {
   if (typeof document === 'undefined') {
     return;
   }
@@ -39,7 +33,7 @@ function printCredentialTable(language: Language, title: string, schoolName: str
           <td>${index + 1}</td>
           <td>${escapeHtml(credential.name)}</td>
           <td dir="ltr">${escapeHtml(credential.email)}</td>
-          ${showCode ? `<td dir="ltr">${escapeHtml(credential.code)}</td>` : ''}
+          <td dir="ltr">${escapeHtml(credential.code)}</td>
         </tr>`
     )
     .join('');
@@ -88,7 +82,7 @@ function printCredentialTable(language: Language, title: string, schoolName: str
               <th>#</th>
               <th>${escapeHtml(tr(language, 'fullName'))}</th>
               <th>${escapeHtml(tr(language, 'email'))}</th>
-              ${showCode ? `<th>${escapeHtml(tr(language, 'accountCode'))}</th>` : ''}
+              <th>${escapeHtml(tr(language, 'accountCode'))}</th>
             </tr>
           </thead>
           <tbody>${rows}</tbody>
@@ -194,13 +188,11 @@ function printActivationTable(language: Language, title: string, school: SchoolR
 }
 
 export function CredentialDatabasePanel({
-  users,
   credentials,
   studentActivations,
   school,
   language
 }: {
-  users: PlatformUser[];
   credentials: AccountCredential[];
   studentActivations: StudentActivationRecord[];
   school: SchoolRecord | undefined;
@@ -209,10 +201,6 @@ export function CredentialDatabasePanel({
   const teacherCredentials = sortedCredentials(credentials, 'teacher');
   const supervisorCredentials = sortedCredentials(credentials, 'supervisor');
   const labCredentials = sortedCredentials(credentials, 'lab');
-  const teacherUsers = sortedCredentialUsers(users, 'teacher');
-  const supervisorUsers = sortedCredentialUsers(users, 'supervisor');
-  const labUsers = sortedCredentialUsers(users, 'lab');
-  const studentUsers = sortedCredentialUsers(users, 'student');
   const activationRecords = sortedStudentActivations(studentActivations);
   const schoolName = school?.name ?? '-';
 
@@ -229,7 +217,6 @@ export function CredentialDatabasePanel({
         <CredentialDatabaseCard title={tr(language, 'supervisorDatabase')} credentials={supervisorCredentials} schoolName={schoolName} language={language} />
         <CredentialDatabaseCard title={tr(language, 'labDatabase')} credentials={labCredentials} schoolName={schoolName} language={language} />
         <CredentialDatabaseCard title={tr(language, 'teacherDatabase')} credentials={teacherCredentials} schoolName={schoolName} language={language} />
-        <CredentialDatabaseCard title={tr(language, 'studentDatabase')} users={studentUsers} schoolName={schoolName} language={language} />
         <StudentActivationDatabaseCard title={tr(language, 'studentActivationDatabase')} activations={activationRecords} school={school} language={language} />
       </div>
     </div>
@@ -291,65 +278,41 @@ function StudentActivationDatabaseCard({
 function CredentialDatabaseCard({
   title,
   credentials,
-  users,
   schoolName,
   language
 }: {
   title: string;
-  credentials?: AccountCredential[];
-  users?: PlatformUser[];
+  credentials: AccountCredential[];
   schoolName: string;
   language: Language;
 }) {
-  const recordCount = credentials ? credentials.length : (users?.length ?? 0);
-  const columns = credentials
-    ? [tr(language, 'fullName'), tr(language, 'email'), tr(language, 'accountCode')]
-    : [tr(language, 'fullName'), tr(language, 'email')];
+  const columns = [tr(language, 'fullName'), tr(language, 'email'), tr(language, 'accountCode')];
 
   return (
     <section className="credential-database-card">
       <div className="credential-database-head">
         <div>
           <h3>{title}</h3>
-          <span>{recordCount}</span>
+          <span>{credentials.length}</span>
         </div>
         <button
           className="button ghost"
           type="button"
-          disabled={recordCount === 0}
-          onClick={() =>
-            credentials
-              ? printCredentialTable(language, title, schoolName, credentials)
-              : printCredentialTable(language, title, schoolName, (users ?? []).map((user) => ({
-                  id: user.id,
-                  userId: user.id,
-                  role: user.role as AccountCredential['role'],
-                  name: user.name,
-                  email: user.email,
-                  code: '',
-                  createdAt: ''
-                })), false)
-          }
+          disabled={credentials.length === 0}
+          onClick={() => printCredentialTable(language, title, schoolName, credentials)}
         >
           <Printer size={17} aria-hidden="true" />
           <span>{tr(language, 'printTable')}</span>
         </button>
       </div>
       <ResponsiveTable columns={columns} emptyText={tr(language, 'databaseEmpty')}>
-        {credentials
-          ? credentials.map((credential) => (
-              <tr key={credential.id}>
-                <td>{credential.name}</td>
-                <td dir="ltr">{credential.email}</td>
-                <td dir="ltr">{credential.code}</td>
-              </tr>
-            ))
-          : (users ?? []).map((user) => (
-              <tr key={user.id}>
-                <td>{user.name}</td>
-                <td dir="ltr">{user.email}</td>
-              </tr>
-            ))}
+        {credentials.map((credential) => (
+          <tr key={credential.id}>
+            <td>{credential.name}</td>
+            <td dir="ltr">{credential.email}</td>
+            <td dir="ltr">{credential.code}</td>
+          </tr>
+        ))}
       </ResponsiveTable>
     </section>
   );
