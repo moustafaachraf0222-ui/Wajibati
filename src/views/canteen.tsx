@@ -610,14 +610,27 @@ function CanteenWorkerView({
   const streamRef = useRef<MediaStream | null>(null);
   const scanTimeoutRef = useRef<number | null>(null);
   const lastScanRef = useRef<{ code: string; at: number } | null>(null);
-  const todayScans = useMemo(
-    () =>
-      data.canteenMealScans
-        .filter((scan) => scan.schoolId === currentUser.schoolId && scan.date === localDateKey())
-        .sort((left, right) => right.scannedAt.localeCompare(left.scannedAt))
-        .slice(0, 25),
-    [currentUser.schoolId, data.canteenMealScans]
-  );
+  const todayScans = useMemo(() => {
+    const seenStudents = new Set<string>();
+    return data.canteenMealScans
+      .filter(
+        (scan) =>
+          scan.schoolId === currentUser.schoolId &&
+          scan.date === localDateKey() &&
+          scan.result === 'allowed' &&
+          scan.studentId
+      )
+      .sort((left, right) => right.scannedAt.localeCompare(left.scannedAt))
+      .filter((scan) => {
+        const studentId = scan.studentId as string;
+        if (seenStudents.has(studentId)) {
+          return false;
+        }
+        seenStudents.add(studentId);
+        return true;
+      })
+      .slice(0, 25);
+  }, [currentUser.schoolId, data.canteenMealScans]);
 
   const stopScanner = useCallback(() => {
     if (scanTimeoutRef.current) {
@@ -801,16 +814,13 @@ function CanteenWorkerView({
           </div>
           <Utensils size={24} aria-hidden="true" />
         </div>
-        <ResponsiveTable columns={[tr(language, 'fullName'), tr(language, 'classGroup'), tr(language, 'scanResult'), tr(language, 'scannedAt')]} emptyText={tr(language, 'noCanteenScans')}>
+        <ResponsiveTable columns={[tr(language, 'fullName'), tr(language, 'classGroup'), tr(language, 'scannedAt')]} emptyText={tr(language, 'noCanteenScans')}>
           {todayScans.map((scan) => {
             const student = scan.studentId ? data.users.find((user) => user.id === scan.studentId) : undefined;
             return (
               <tr key={scan.id}>
                 <td>{student?.name ?? '-'}</td>
                 <td>{classLabel(language, student)}</td>
-                <td>
-                  <span className={`status ${scan.result === 'allowed' ? 'active' : 'disabled'}`}>{resultLabel(language, scan.result)}</span>
-                </td>
                 <td>{formatDateTime(language, scan.scannedAt)}</td>
               </tr>
             );
