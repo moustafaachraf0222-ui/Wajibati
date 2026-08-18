@@ -4681,6 +4681,78 @@ summary.subject-group-heading:hover .subject-icon svg {
   gap: 12px;
 }
 
+.settings-layout {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.settings-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 230px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px;
+}
+
+.settings-nav button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  background: none;
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: start;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.settings-nav button svg {
+  width: 17px;
+  height: 17px;
+  flex-shrink: 0;
+}
+
+.settings-nav button:hover {
+  background: var(--line-soft, rgba(0, 0, 0, 0.04));
+}
+
+.settings-nav button.active {
+  background: var(--teal-soft);
+  color: var(--teal);
+}
+
+.settings-pane {
+  flex: 1;
+  min-width: 0;
+}
+
+@media (max-width: 860px) {
+  .settings-layout {
+    flex-direction: column;
+  }
+
+  .settings-nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .settings-nav button {
+    width: auto;
+    flex: 1 1 auto;
+  }
+}
+
 .settings-card {
   background: var(--paper);
   border: 1px solid var(--line);
