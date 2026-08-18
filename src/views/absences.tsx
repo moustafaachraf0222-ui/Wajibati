@@ -53,6 +53,12 @@ type AbsenceReportSection = {
   report: AbsenceReport;
 };
 
+type DailyAbsenceGroup = {
+  date: string;
+  entries: AbsenceReportEntry[];
+  markers: PlatformUser[];
+};
+
 type MonthlyAbsenceStudentSummary = {
   absenceCount: number;
   student: PlatformUser;
@@ -545,45 +551,84 @@ function reportSectionsForDirector(data: PlatformData, currentUser: PlatformUser
     .sort((left, right) => right.report.createdAt.localeCompare(left.report.createdAt));
 }
 
-function printAbsenceReports(language: Language, schoolName: string, sections: AbsenceReportSection[]) {
+function buildDailyAbsenceGroups(sections: AbsenceReportSection[]): DailyAbsenceGroup[] {
+  const groups = new Map<string, DailyAbsenceGroup>();
+
+  sections.forEach((section) => {
+    const existing = groups.get(section.report.date);
+    if (existing) {
+      existing.entries.push(...section.entries);
+      if (!existing.markers.some((marker) => marker.id === section.marker.id)) {
+        existing.markers.push(section.marker);
+      }
+      return;
+    }
+
+    groups.set(section.report.date, {
+      date: section.report.date,
+      entries: [...section.entries],
+      markers: [section.marker]
+    });
+  });
+
+  return [...groups.values()].sort((left, right) => right.date.localeCompare(left.date));
+}
+
+function dailyAbsenceGroupLabel(language: Language, date: string) {
+  const weekday = weekdayForDate(date);
+  const weekdayLabel = weekday === undefined ? '' : `${weekdayNames[language][weekday] ?? ''} `;
+  return `${tr(language, 'dailyAbsenceReportFor')} ${weekdayLabel}${formatAbsenceDate(language, date)}`;
+}
+
+function printDailyAbsenceReports(language: Language, schoolName: string, groups: DailyAbsenceGroup[]) {
   if (typeof document === 'undefined') {
     return;
   }
 
   const direction = language === 'ar' ? 'rtl' : 'ltr';
   const printedAt = new Intl.DateTimeFormat(localeNames[language], { dateStyle: 'medium', timeStyle: 'short' }).format(new Date());
-  const reportHtml = sections
-    .map((section) => {
-      const rows =
-        section.entries.length === 0
-          ? `<tr><td colspan="4">${escapeHtml(tr(language, 'noAbsenceReports'))}</td></tr>`
-          : section.entries
-              .map(
-                (entry) => `
+  const reportHtml = groups
+    .map((group) => {
+      const classHtml = buildAbsenceReportGroups(group.entries)
+        .map((classGroup) => {
+          const rows =
+            classGroup.entries.length === 0
+              ? `<tr><td colspan="5">${escapeHtml(tr(language, 'noAbsenceReports'))}</td></tr>`
+              : classGroup.entries
+                  .map(
+                    (entry) => `
                   <tr>
                     <td>${escapeHtml(entry.student.name)}</td>
-                    <td>${escapeHtml(schoolYearLabel(language, section.report.stage, entry.record.schoolYear))}</td>
+                    <td>${escapeHtml(schoolYearLabel(language, entry.student.stage, entry.record.schoolYear))}</td>
                     <td>${entry.record.stream ? escapeHtml(secondaryStreamLabel(language, entry.record.stream, entry.record.schoolYear)) : '-'}</td>
                     <td>${escapeHtml(entry.record.classGroup)}</td>
+                    <td>${escapeHtml(absenceRecordSessionLabel(entry.record))}</td>
                   </tr>`
-              )
-              .join('');
+                  )
+                  .join('');
+
+          return `
+            <h3>${escapeHtml(classLabel(language, classGroup, classGroup.entries[0]?.student.stage))}</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>${escapeHtml(tr(language, 'fullName'))}</th>
+                  <th>${escapeHtml(tr(language, 'schoolYear'))}</th>
+                  <th>${escapeHtml(tr(language, 'stream'))}</th>
+                  <th>${escapeHtml(tr(language, 'classGroup'))}</th>
+                  <th>${escapeHtml(tr(language, 'session'))}</th>
+                </tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>`;
+        })
+        .join('');
 
       return `
         <section>
-          <h2>${escapeHtml(formatAbsenceDate(language, section.report.date))} - ${escapeHtml(reportSessionLabel(section.report))}</h2>
-          <p>${escapeHtml(tr(language, 'reportedBy'))}: ${escapeHtml(section.marker.name)} | ${escapeHtml(tr(language, 'sentAt'))}: ${escapeHtml(formatAbsenceDateTime(language, section.report.createdAt))}</p>
-          <table>
-            <thead>
-              <tr>
-                <th>${escapeHtml(tr(language, 'fullName'))}</th>
-                <th>${escapeHtml(tr(language, 'schoolYear'))}</th>
-                <th>${escapeHtml(tr(language, 'stream'))}</th>
-                <th>${escapeHtml(tr(language, 'classGroup'))}</th>
-              </tr>
-            </thead>
-            <tbody>${rows}</tbody>
-          </table>
+          <h2>${escapeHtml(dailyAbsenceGroupLabel(language, group.date))}</h2>
+          <p>${escapeHtml(tr(language, 'reportedBy'))}: ${escapeHtml(group.markers.map((marker) => marker.name).join('، ') || '-')}</p>
+          ${classHtml || `<p>${escapeHtml(tr(language, 'noAbsenceReports'))}</p>`}
         </section>`;
     })
     .join('');
@@ -616,6 +661,7 @@ function printAbsenceReports(language: Language, schoolName: string, sections: A
           header { border-bottom: 3px solid #006233; padding-bottom: 12px; margin-bottom: 18px; }
           h1 { margin: 0 0 6px; color: #006233; font-size: 22px; }
           h2 { margin: 22px 0 6px; color: #111827; font-size: 17px; }
+          h3 { margin: 16px 0 6px; color: #374151; font-size: 14px; }
           p { margin: 0 0 10px; color: #4b5563; font-size: 13px; }
           table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 12px; }
           th, td { border: 1px solid #d1d5db; padding: 9px 8px; text-align: start; vertical-align: middle; }
@@ -782,43 +828,43 @@ function AbsenceReportList({
   emptyText,
   language,
   schoolName,
-  sections
+  groups
 }: {
   emptyText: string;
   language: Language;
   schoolName: string;
-  sections: AbsenceReportSection[];
+  groups: DailyAbsenceGroup[];
 }) {
   return (
     <div className="absence-report-list">
-      {sections.length === 0 && <p className="empty-state">{emptyText}</p>}
-      {sections.map((section) => (
-        <details className="absence-report-group" key={section.report.id} open>
+      {groups.length === 0 && <p className="empty-state">{emptyText}</p>}
+      {groups.map((group) => (
+        <details className="absence-report-group" key={group.date} open>
           <summary>
             <span className="absence-report-group-title">
-              <strong>{formatAbsenceDate(language, section.report.date)} - {reportSessionLabel(section.report)}</strong>
+              <strong>{dailyAbsenceGroupLabel(language, group.date)}</strong>
               <small>
-                {tr(language, 'reportedBy')}: {section.marker.name} | {tr(language, 'sentAt')}: {formatAbsenceDateTime(language, section.report.createdAt)}
+                {tr(language, 'reportedBy')}: {group.markers.map((marker) => marker.name).join('، ') || '-'}
               </small>
             </span>
-            <span className="absence-report-count">{section.entries.length}</span>
+            <span className="absence-report-count">{group.entries.length}</span>
           </summary>
           <div className="absence-report-inner">
             <div className="absence-report-actions">
-              <button className="button ghost" type="button" onClick={() => printAbsenceReports(language, schoolName, [section])}>
+              <button className="button ghost" type="button" onClick={() => printDailyAbsenceReports(language, schoolName, [group])}>
                 <Printer size={17} aria-hidden="true" />
                 <span>{tr(language, 'printAbsenceReport')}</span>
               </button>
             </div>
-            {section.entries.length === 0 && <p className="empty-state">{tr(language, 'noAbsenceReports')}</p>}
-            {buildAbsenceReportGroups(section.entries).map((group) => (
-              <div className="absence-report-class" key={`${section.report.id}-${group.key}`}>
-                <strong>{classLabel(language, group, section.report.stage)}</strong>
+            {group.entries.length === 0 && <p className="empty-state">{tr(language, 'noAbsenceReports')}</p>}
+            {buildAbsenceReportGroups(group.entries).map((classGroup) => (
+              <div className="absence-report-class" key={`${group.date}-${classGroup.key}`}>
+                <strong>{classLabel(language, classGroup, classGroup.entries[0]?.student.stage)}</strong>
                 <ResponsiveTable columns={[tr(language, 'fullName'), tr(language, 'session')]} emptyText={tr(language, 'noAbsenceReports')}>
-                  {group.entries.map((entry) => (
+                  {classGroup.entries.map((entry) => (
                     <tr key={entry.record.id}>
                       <td>{entry.student.name}</td>
-                      <td>{reportSessionLabel(section.report)}</td>
+                      <td>{absenceRecordSessionLabel(entry.record)}</td>
                     </tr>
                   ))}
                 </ResponsiveTable>
@@ -1523,6 +1569,7 @@ function DirectorAbsenceReports({ data, setData, currentUser, language }: Common
   const reportSections = useMemo(() => reportSectionsForDirector(data, currentUser, selectedDate), [currentUser, data, selectedDate]);
   const currentReportSections = useMemo(() => reportSections.filter((section) => reportIsCurrent(section.report, now)), [now, reportSections]);
   const historyReportSections = useMemo(() => reportSections.filter((section) => !reportIsCurrent(section.report, now)), [now, reportSections]);
+  const currentDailyGroups = useMemo(() => buildDailyAbsenceGroups(currentReportSections), [currentReportSections]);
   const [archiveOpen, setArchiveOpen] = useState(false);
 
   useBackShortcut(() => {
@@ -1583,8 +1630,8 @@ function DirectorAbsenceReports({ data, setData, currentUser, language }: Common
           <button
             className="button ghost"
             type="button"
-            disabled={currentReportSections.length === 0}
-            onClick={() => printAbsenceReports(language, school?.name ?? '-', currentReportSections)}
+            disabled={currentDailyGroups.length === 0}
+            onClick={() => printDailyAbsenceReports(language, school?.name ?? '-', currentDailyGroups)}
           >
             <Printer size={17} aria-hidden="true" />
             <span>{tr(language, 'printCurrentAbsenceReports')}</span>
@@ -1593,7 +1640,7 @@ function DirectorAbsenceReports({ data, setData, currentUser, language }: Common
         <div className="absence-report-stats">
           <div className="absence-report-stat">
             <span>{tr(language, 'currentAbsenceReports')}</span>
-            <strong>{currentReportSections.length}</strong>
+            <strong>{currentDailyGroups.length}</strong>
           </div>
           <div className="absence-report-stat">
             <span>{tr(language, 'absenceMarkCount')}</span>
@@ -1628,7 +1675,7 @@ function DirectorAbsenceReports({ data, setData, currentUser, language }: Common
           emptyText={tr(language, 'noCurrentAbsenceReports')}
           language={language}
           schoolName={school?.name ?? '-'}
-          sections={currentReportSections}
+          groups={currentDailyGroups}
         />
       </div>
 
@@ -1653,7 +1700,7 @@ function DirectorAbsenceReports({ data, setData, currentUser, language }: Common
                   type="button"
                   className="user-group drill-row"
                   key={date}
-                  onClick={() => printAbsenceReports(language, school?.name ?? '-', sections)}
+                  onClick={() => printDailyAbsenceReports(language, school?.name ?? '-', buildDailyAbsenceGroups(sections))}
                 >
                   <span className="user-group-title">
                     <span className="user-group-label">
