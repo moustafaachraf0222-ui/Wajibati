@@ -91,7 +91,7 @@ export function AppShell({
       if (isEditableTarget(event.target)) {
         return;
       }
-      if (event.key === 'Backspace' || event.key === 'ArrowRight') {
+      if (event.key === 'Backspace') {
         event.preventDefault();
         if (triggerBackShortcut()) {
           return;
@@ -101,19 +101,9 @@ export function AppShell({
         }
         return;
       }
-      if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+      if (event.key === 'ArrowUp' || event.key === 'ArrowDown' || event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
         event.preventDefault();
         moveFocusWithArrows(event.key);
-        return;
-      }
-      if (event.key === 'ArrowLeft') {
-        event.preventDefault();
-        const active = document.activeElement;
-        if (active instanceof HTMLElement && active.tagName === 'BUTTON') {
-          active.click();
-        } else {
-          moveFocusWithArrows('ArrowDown');
-        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
