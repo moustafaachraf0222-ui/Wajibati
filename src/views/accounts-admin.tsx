@@ -1,8 +1,8 @@
-import { ArrowLeft, BookOpen, Building2, ChevronRight, Edit3, GraduationCap, Plus, Save, School, UserCog, Users, X } from 'lucide-react';
+import { ArrowLeft, BookOpen, Building2, ChevronRight, Edit3, Eye, FlaskConical, GraduationCap, Plus, Save, School, UserCog, Users, UtensilsCrossed, X } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
-import type { DataSetter, Language, PlatformData, PlatformUser, Stage } from '../types';
-import { stageNames, tr } from '../i18n';
-import { secondaryStreams, stages } from '../education';
+import type { DataSetter, Language, PlatformData, PlatformUser, Role, Stage } from '../types';
+import { roleNames, stageNames, tr } from '../i18n';
+import { secondaryStreams, secondaryStreamLabel, stages } from '../education';
 import { canDeleteUser, canToggleUser, deleteUserRecords, makeId } from '../data';
 import { schoolIsTrashed } from '../data-tombstones';
 import { Field } from '../ui';
@@ -43,6 +43,8 @@ export function AdminUsersPanel({
   }>(null);
   const [drillStage, setDrillStage] = useState<Stage | null>(null);
   const [drillSchoolId, setDrillSchoolId] = useState<string | null>(null);
+  const [drillCategory, setDrillCategory] = useState<Role | null>(null);
+  const [drillStudentGroup, setDrillStudentGroup] = useState<string | null>(null);
 
   const liveSchools = data.schools.filter((school) => !schoolIsTrashed(school));
   const stageSchools = (stage: Stage) =>
@@ -56,10 +58,49 @@ export function AdminUsersPanel({
     setAccountMode(mode);
     setDrillStage(null);
     setDrillSchoolId(null);
+    setDrillCategory(null);
+    setDrillStudentGroup(null);
   };
 
   const stageIcon = (stage: Stage) =>
     stage === 'primary' ? <GraduationCap size={16} aria-hidden="true" /> : stage === 'middle' ? <BookOpen size={16} aria-hidden="true" /> : <Building2 size={16} aria-hidden="true" />;
+
+  const schoolCategoryIcon = (role: Role) =>
+    role === 'director' ? (
+      <UserCog size={18} aria-hidden="true" />
+    ) : role === 'teacher' ? (
+      <GraduationCap size={18} aria-hidden="true" />
+    ) : role === 'lab' ? (
+      <FlaskConical size={18} aria-hidden="true" />
+    ) : role === 'canteen' ? (
+      <UtensilsCrossed size={18} aria-hidden="true" />
+    ) : role === 'supervisor' ? (
+      <Eye size={18} aria-hidden="true" />
+    ) : (
+      <Users size={18} aria-hidden="true" />
+    );
+
+  const schoolCategoryRoles: Role[] = ['director', 'supervisor', 'teacher', 'lab', 'canteen', 'student'];
+
+  const studentGroups = (() => {
+    const groups = new Map<string, PlatformUser[]>();
+    for (const user of accountsOfSchool(drillSchool?.id ?? '').filter((candidate) => candidate.role === 'student')) {
+      const key = `${user.stream ?? 'none'}|${user.classGroup?.trim() || 'unassigned'}`;
+      const list = groups.get(key) ?? [];
+      list.push(user);
+      groups.set(key, list);
+    }
+    return [...groups.entries()].sort((left, right) => left[0].localeCompare(right[0]));
+  })();
+
+  const studentGroupLabel = (key: string, members: PlatformUser[]) => {
+    const className = key.split('|')[1];
+    if (className === 'unassigned') {
+      return tr(language, 'unassignedStudents');
+    }
+    const first = members[0];
+    return first?.stream ? `${secondaryStreamLabel(language, first.stream, first.schoolYear ?? 1)} ${className}` : className;
+  };
 
   const createDirector = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -309,7 +350,16 @@ export function AdminUsersPanel({
             </div>
             <School size={24} aria-hidden="true" />
           </div>
-          <button type="button" className="back-button" onClick={() => setDrillStage(null)}>
+          <button
+            type="button"
+            className="back-button"
+            onClick={() => {
+              setDrillStage(null);
+              setDrillSchoolId(null);
+              setDrillCategory(null);
+              setDrillStudentGroup(null);
+            }}
+          >
             <ArrowLeft size={15} aria-hidden="true" />
             <span>{tr(language, 'back')}</span>
           </button>
@@ -317,11 +367,15 @@ export function AdminUsersPanel({
             {stageSchools(drillStage).length === 0 && <p className="empty-state">{tr(language, 'noRecords')}</p>}
             {stageSchools(drillStage).map((school) => (
               <button
-                type="button"
-                className="user-group user-group-school drill-row"
-                key={school.id}
-                onClick={() => setDrillSchoolId(school.id)}
-              >
+type="button"
+                  className="user-group user-group-school drill-row"
+                  key={school.id}
+                  onClick={() => {
+                    setDrillSchoolId(school.id);
+                    setDrillCategory(null);
+                    setDrillStudentGroup(null);
+                  }}
+                >
                 <span className="user-group-title">
                   <span className="user-group-label">
                     <School size={18} aria-hidden="true" />
@@ -340,16 +394,125 @@ export function AdminUsersPanel({
         </div>
       )}
 
-      {accountMode === 'view' && drillStage && drillSchoolId && drillSchool && (
+      {accountMode === 'view' && drillStage && drillSchoolId && drillSchool && !drillCategory && (
         <>
           <button type="button" className="back-button full" onClick={() => setDrillSchoolId(null)}>
             <ArrowLeft size={15} aria-hidden="true" />
             <span>{tr(language, 'back')}</span>
           </button>
+          <div className="panel">
+            <div className="panel-heading">
+              <div>
+                <p>{tr(language, 'schoolAccountsCount')}</p>
+                <h2>{drillSchool.name}</h2>
+              </div>
+              <School size={24} aria-hidden="true" />
+            </div>
+            <div className="user-groups">
+              {schoolCategoryRoles.map((role) => {
+                const users = accountsOfSchool(drillSchool.id).filter((user) => user.role === role);
+                if (users.length === 0 && role !== 'student') {
+                  return null;
+                }
+                return (
+                  <button
+                    type="button"
+                    className="user-group drill-row"
+                    key={role}
+                    onClick={() => {
+                      setDrillCategory(role);
+                      setDrillStudentGroup(null);
+                    }}
+                  >
+                    <span className="user-group-title">
+                      <span className="user-group-label">
+                        {schoolCategoryIcon(role)}
+                        <span className="user-group-label-name">{roleNames[language][role]}</span>
+                      </span>
+                      <span className="user-group-meta">
+                        <strong>{users.length}</strong>
+                        <span className="user-group-label-stage">{tr(language, 'schoolAccountsCount')}</span>
+                        <ChevronRight size={17} aria-hidden="true" />
+                      </span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </>
+      )}
+
+      {accountMode === 'view' && drillStage && drillSchoolId && drillSchool && drillCategory === 'student' && !drillStudentGroup && (
+        <>
+          <button type="button" className="back-button full" onClick={() => setDrillCategory(null)}>
+            <ArrowLeft size={15} aria-hidden="true" />
+            <span>{tr(language, 'back')}</span>
+          </button>
+          <div className="panel">
+            <div className="panel-heading">
+              <div>
+                <p>{roleNames[language].student}</p>
+                <h2>{drillSchool.name}</h2>
+              </div>
+              <Users size={24} aria-hidden="true" />
+            </div>
+            <div className="user-groups">
+              {studentGroups.length === 0 && <p className="empty-state">{tr(language, 'noRecords')}</p>}
+              {studentGroups.map(([key, members]) => (
+                <button
+                  type="button"
+                  className="user-group drill-row"
+                  key={key}
+                  onClick={() => setDrillStudentGroup(key)}
+                >
+                  <span className="user-group-title">
+                    <span className="user-group-label">
+                      <BookOpen size={18} aria-hidden="true" />
+                      <span className="user-group-label-name">{studentGroupLabel(key, members)}</span>
+                    </span>
+                    <span className="user-group-meta">
+                      <strong>{members.length}</strong>
+                      <span className="user-group-label-stage">{tr(language, 'schoolAccountsCount')}</span>
+                      <ChevronRight size={17} aria-hidden="true" />
+                    </span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+
+      {accountMode === 'view' && drillStage && drillSchoolId && drillSchool && drillCategory && drillCategory !== 'student' && (
+        <>
+          <button type="button" className="back-button full" onClick={() => setDrillCategory(null)}>
+            <ArrowLeft size={15} aria-hidden="true" />
+            <span>{tr(language, 'back')}</span>
+          </button>
           <UsersTable
-            title={`${drillSchool.name} - ${tr(language, 'schoolAccountsCount')}`}
+            title={`${drillSchool.name} - ${roleNames[language][drillCategory]}`}
             data={data}
-            users={accountsOfSchool(drillSchool.id)}
+            users={accountsOfSchool(drillSchool.id).filter((user) => user.role === drillCategory)}
+            currentUser={currentUser}
+            language={language}
+            onToggle={toggleStatus}
+            onDelete={deleteUser}
+            onEdit={(target) => setEditingUser(target)}
+          />
+        </>
+      )}
+
+      {accountMode === 'view' && drillStage && drillSchoolId && drillSchool && drillCategory === 'student' && drillStudentGroup && (
+        <>
+          <button type="button" className="back-button full" onClick={() => setDrillStudentGroup(null)}>
+            <ArrowLeft size={15} aria-hidden="true" />
+            <span>{tr(language, 'back')}</span>
+          </button>
+          <UsersTable
+            title={`${drillSchool.name} - ${studentGroupLabel(drillStudentGroup, studentGroups.find(([key]) => key === drillStudentGroup)?.[1] ?? [])}`}
+            data={data}
+            users={studentGroups.find(([key]) => key === drillStudentGroup)?.[1] ?? []}
             currentUser={currentUser}
             language={language}
             onToggle={toggleStatus}
