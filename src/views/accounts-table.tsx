@@ -1,4 +1,5 @@
 import {
+  ArrowRightLeft,
   BookOpen,
   CheckCircle2,
   ChevronDown,
@@ -27,6 +28,7 @@ export function UsersTable({
   onToggle,
   onDelete,
   onEdit,
+  onMove,
   groupByRole = false,
   groupBySchool = false,
   groupStudentsByClass = false
@@ -39,6 +41,7 @@ export function UsersTable({
   onToggle: (user: PlatformUser) => void;
   onDelete: (user: PlatformUser) => void;
   onEdit?: (user: PlatformUser) => void;
+  onMove?: (user: PlatformUser) => void;
   groupByRole?: boolean;
   groupBySchool?: boolean;
   groupStudentsByClass?: boolean;
@@ -114,6 +117,11 @@ export function UsersTable({
               {onEdit && canEditUser(currentUser, user) && (
                 <button className="icon-button" type="button" title={tr(language, 'edit')} onClick={() => onEdit(user)}>
                   <Edit3 size={16} aria-hidden="true" />
+                </button>
+              )}
+              {onMove && currentUser.role === 'admin' && (
+                <button className="icon-button" type="button" title={tr(language, 'moveAccount')} onClick={() => onMove(user)}>
+                  <ArrowRightLeft size={16} aria-hidden="true" />
                 </button>
               )}
               <button

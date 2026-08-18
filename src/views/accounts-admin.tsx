@@ -7,6 +7,7 @@ import { canDeleteUser, canToggleUser, compactEmailLocalPart, deleteUserRecords,
 import { schoolIsTrashed } from '../data-tombstones';
 import { Field } from '../ui';
 import { AccountEditPanel } from './accounts-edit';
+import { MoveAccountPanel } from './accounts-move';
 import { UsersTable } from './accounts-table';
 import { useBackShortcut } from '../back-shortcut';
 
@@ -31,6 +32,7 @@ export function AdminUsersPanel({
   });
   const [error, setError] = useState('');
   const [editingUser, setEditingUser] = useState<PlatformUser | null>(null);
+  const [movingUser, setMovingUser] = useState<PlatformUser | null>(null);
   const [directorEdit, setDirectorEdit] = useState<null | {
     id: string;
     schoolId: string;
@@ -330,6 +332,16 @@ export function AdminUsersPanel({
         />
       )}
 
+      {accountMode === 'view' && movingUser && (
+        <MoveAccountPanel
+          data={data}
+          setData={setData}
+          target={movingUser}
+          language={language}
+          onClose={() => setMovingUser(null)}
+        />
+      )}
+
       {accountMode === 'view' && !drillStage && !drillSchoolId && (
         <div className="panel">
           <div className="panel-heading">
@@ -521,6 +533,7 @@ type="button"
             onToggle={toggleStatus}
             onDelete={deleteUser}
             onEdit={(target) => setEditingUser(target)}
+            onMove={(target) => setMovingUser(target)}
           />
         </>
       )}
@@ -540,6 +553,7 @@ type="button"
             onToggle={toggleStatus}
             onDelete={deleteUser}
             onEdit={(target) => setEditingUser(target)}
+            onMove={(target) => setMovingUser(target)}
           />
         </>
       )}
