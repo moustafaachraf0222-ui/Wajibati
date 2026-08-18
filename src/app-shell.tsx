@@ -91,20 +91,29 @@ export function AppShell({
       if (isEditableTarget(event.target)) {
         return;
       }
-      if (event.key === 'Backspace') {
+      if (event.key === 'Backspace' || event.key === 'ArrowRight') {
+        event.preventDefault();
         if (triggerBackShortcut()) {
-          event.preventDefault();
           return;
         }
         if (canGoBackNow) {
-          event.preventDefault();
           onBack();
         }
         return;
       }
-      if (event.key === 'ArrowUp' || event.key === 'ArrowDown' || event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+      if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
         event.preventDefault();
         moveFocusWithArrows(event.key);
+        return;
+      }
+      if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        const active = document.activeElement;
+        if (active instanceof HTMLElement && active.tagName === 'BUTTON') {
+          active.click();
+        } else {
+          moveFocusWithArrows('ArrowDown');
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
