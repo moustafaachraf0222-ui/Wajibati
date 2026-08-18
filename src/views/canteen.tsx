@@ -610,26 +610,19 @@ function CanteenWorkerView({
   const streamRef = useRef<MediaStream | null>(null);
   const scanTimeoutRef = useRef<number | null>(null);
   const lastScanRef = useRef<{ code: string; at: number } | null>(null);
-  const todayScans = useMemo(() => {
-    const seenStudents = new Set<string>();
-    return data.canteenMealScans
-      .filter(
-        (scan) =>
-          scan.schoolId === currentUser.schoolId &&
-          scan.date === localDateKey() &&
-          scan.result === 'allowed' &&
-          scan.studentId
-      )
-      .sort((left, right) => right.scannedAt.localeCompare(left.scannedAt))
-      .filter((scan) => {
-        const studentId = scan.studentId as string;
-        if (seenStudents.has(studentId)) {
-          return false;
-        }
-        seenStudents.add(studentId);
-        return true;
-      })
-      .slice(0, 25);
+  const eatenTodayCount = useMemo(() => {
+    const eatenStudents = new Set(
+      data.canteenMealScans
+        .filter(
+          (scan) =>
+            scan.schoolId === currentUser.schoolId &&
+            scan.date === localDateKey() &&
+            scan.result === 'allowed' &&
+            scan.studentId
+        )
+        .map((scan) => scan.studentId as string)
+    );
+    return eatenStudents.size;
   }, [currentUser.schoolId, data.canteenMealScans]);
 
   const stopScanner = useCallback(() => {
@@ -737,6 +730,22 @@ function CanteenWorkerView({
       <div className="panel full">
         <div className="panel-heading">
           <div>
+            <p>{formatDate(language, localDateKey())}</p>
+            <h2>{tr(language, 'dailyCanteenReport')}</h2>
+          </div>
+          <Utensils size={24} aria-hidden="true" />
+        </div>
+        <div className="absence-report-stats">
+          <div className="absence-report-stat">
+            <span>{tr(language, 'eatingStudentsCount')}</span>
+            <strong>{eatenTodayCount}</strong>
+          </div>
+        </div>
+      </div>
+
+      <div className="panel full">
+        <div className="panel-heading">
+          <div>
             <p>{tr(language, 'mealScannerHint')}</p>
             <h2>{tr(language, 'mealScanner')}</h2>
           </div>
@@ -804,28 +813,6 @@ function CanteenWorkerView({
             )}
           </div>
         </div>
-      </div>
-
-      <div className="panel full">
-        <div className="panel-heading">
-          <div>
-            <p>{formatDate(language, localDateKey())}</p>
-            <h2>{tr(language, 'dailyCanteenReport')}</h2>
-          </div>
-          <Utensils size={24} aria-hidden="true" />
-        </div>
-        <ResponsiveTable columns={[tr(language, 'fullName'), tr(language, 'classGroup'), tr(language, 'scannedAt')]} emptyText={tr(language, 'noCanteenScans')}>
-          {todayScans.map((scan) => {
-            const student = scan.studentId ? data.users.find((user) => user.id === scan.studentId) : undefined;
-            return (
-              <tr key={scan.id}>
-                <td>{student?.name ?? '-'}</td>
-                <td>{classLabel(language, student)}</td>
-                <td>{formatDateTime(language, scan.scannedAt)}</td>
-              </tr>
-            );
-          })}
-        </ResponsiveTable>
       </div>
     </section>
   );
