@@ -3795,6 +3795,12 @@ summary.subject-group-heading:hover .subject-icon svg {
   font-weight: 700;
 }
 
+.absence-check.locked span {
+  border-style: dashed;
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
 @media (max-width: 1080px) {
   .app-shell {
     grid-template-columns: 1fr;
