@@ -1,7 +1,7 @@
 import type { Announcement, PlatformUser, TeacherNote } from './types';
 
 const ANNOUNCEMENT_ACTIVE_MS = 72 * 60 * 60 * 1000;
-const NOTE_ACTIVE_MS = 72 * 60 * 60 * 1000;
+const NOTE_ACTIVE_MS = 48 * 60 * 60 * 1000;
 const EXPIRING_SOON_MS = 24 * 60 * 60 * 1000;
 
 export type MessageStatus = 'active' | 'expiring' | 'archived';

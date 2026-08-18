@@ -291,7 +291,6 @@ function TeacherNotes({ data, setData, currentUser, language }: CommonViewProps 
   const [error, setError] = useState('');
   const notes = scopedNotes(data, currentUser).sort((left, right) => right.createdAt.localeCompare(left.createdAt));
   const activeNotes = notes.filter((note) => !isNoteArchived(note, now));
-  const archivedNotes = notes.filter((note) => isNoteArchived(note, now));
   const streamOptionsForSelectedYear = teacherStreamsForYear(form.targetSchoolYear);
   const subjectOptionsForSelectedYear = teacherAllowedSubjectsForYear(currentUser, form.targetSchoolYear);
   const streamRequired = currentUser.stage === 'secondary';
@@ -475,17 +474,7 @@ function TeacherNotes({ data, setData, currentUser, language }: CommonViewProps 
           </button>
         </form>
       </div>
-      <NotesList notes={activeNotes} data={data} language={language} titleKey="activeNotes" emptyKey="noNotes" archived={false} onDelete={deleteNote} />
-      <NotesList
-        notes={archivedNotes}
-        data={data}
-        language={language}
-        titleKey="noteArchive"
-        subtitleKey="noteArchiveHint"
-        emptyKey="noArchivedNotes"
-        archived
-        onDelete={deleteNote}
-      />
+      <NotesList notes={activeNotes} data={data} language={language} titleKey="activeNotes" subtitleKey="notesExpiryHint" emptyKey="noNotes" archived={false} onDelete={deleteNote} />
     </section>
   );
 }
