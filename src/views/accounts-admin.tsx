@@ -3,7 +3,7 @@ import { useState, type FormEvent } from 'react';
 import type { DataSetter, Language, PlatformData, PlatformUser, Role, Stage } from '../types';
 import { roleNames, stageNames, tr } from '../i18n';
 import { secondaryStreams, secondaryStreamLabel, stages } from '../education';
-import { canDeleteUser, canToggleUser, deleteUserRecords, makeId } from '../data';
+import { canDeleteUser, canToggleUser, compactEmailLocalPart, deleteUserRecords, makeId } from '../data';
 import { schoolIsTrashed } from '../data-tombstones';
 import { Field } from '../ui';
 import { AccountEditPanel } from './accounts-edit';
@@ -24,11 +24,9 @@ export function AdminUsersPanel({
   const [accountMode, setAccountMode] = useState<'create' | 'view'>('view');
   const [form, setForm] = useState({
     name: '',
-    email: '',
     password: '',
     schoolName: '',
     stage: 'middle' as Stage,
-    domain: '',
     city: ''
   });
   const [error, setError] = useState('');
@@ -125,14 +123,16 @@ export function AdminUsersPanel({
 
   const createDirector = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (data.users.some((user) => user.email.toLowerCase() === form.email.trim().toLowerCase())) {
+    const localPart = compactEmailLocalPart(form.schoolName.trim()) || 'school';
+    const domain = `${localPart}.dz`;
+    const directorEmail = `${localPart}@${domain}`;
+    if (data.users.some((user) => user.email.toLowerCase() === directorEmail)) {
       setError(tr(language, 'duplicateEmail'));
       return;
     }
 
     const schoolId = makeId('school');
     const directorId = makeId('director');
-    const domain = form.domain.replace(/^@/, '').trim();
 
     setData((previous) => ({
       ...previous,
@@ -155,7 +155,7 @@ export function AdminUsersPanel({
         {
           id: directorId,
           name: form.name.trim(),
-          email: form.email.trim(),
+          email: directorEmail,
           password: form.password,
           role: 'director',
           status: 'active',
@@ -165,7 +165,7 @@ export function AdminUsersPanel({
       ]
     }));
 
-    setForm({ name: '', email: '', password: '', schoolName: '', stage: 'middle', domain: '', city: '' });
+    setForm({ name: '', password: '', schoolName: '', stage: 'middle', city: '' });
     setError('');
   };
 
@@ -255,9 +255,11 @@ export function AdminUsersPanel({
         </div>
         <form className="form-grid" onSubmit={createDirector}>
           <Field label={tr(language, 'fullName')} value={form.name} onChange={(value) => setForm({ ...form, name: value })} required />
-          <Field label={tr(language, 'email')} value={form.email} onChange={(value) => setForm({ ...form, email: value })} type="email" required />
           <Field label={tr(language, 'passwordDefault')} value={form.password} onChange={(value) => setForm({ ...form, password: value })} required />
           <Field label={tr(language, 'schoolName')} value={form.schoolName} onChange={(value) => setForm({ ...form, schoolName: value })} required />
+          <p className="hint full">
+            {tr(language, 'directorEmailAuto')} <span dir="ltr">{(compactEmailLocalPart(form.schoolName.trim()) || 'school')}@{(compactEmailLocalPart(form.schoolName.trim()) || 'school')}.dz</span>
+          </p>
           <label>
             <span>{tr(language, 'stage')}</span>
             <select value={form.stage} onChange={(event) => setForm({ ...form, stage: event.target.value as Stage })}>
@@ -268,7 +270,6 @@ export function AdminUsersPanel({
               ))}
             </select>
           </label>
-          <Field label={tr(language, 'domain')} value={form.domain} onChange={(value) => setForm({ ...form, domain: value })} required />
           <Field label={tr(language, 'city')} value={form.city} onChange={(value) => setForm({ ...form, city: value })} required />
           {error && <p className="form-error full">{error}</p>}
           <button className="button primary form-submit" type="submit">
