@@ -10,6 +10,7 @@ import { CredentialDatabasePanel } from './accounts-credentials';
 import { AccountEditPanel } from './accounts-edit';
 import { DirectorCreateAccountPanel } from './accounts-director-create';
 import { MoveAccountPanel } from './accounts-move';
+import { PendingTransfersPanel } from './accounts-transfers';
 import { UsersTable } from './accounts-table';
 import { useBackShortcut } from '../back-shortcut';
 
@@ -159,7 +160,9 @@ export function DirectorUsersPanel({
       )}
 
       {accountMode === 'view' && !drillRole && (
-        <div className="panel">
+        <>
+          <PendingTransfersPanel data={data} setData={setData} currentUser={currentUser} language={language} />
+          <div className="panel">
           <div className="panel-heading">
             <div>
               <p>{school?.name ?? tr(language, 'scopedData')}</p>
@@ -188,7 +191,8 @@ export function DirectorUsersPanel({
               );
             })}
           </div>
-        </div>
+          </div>
+        </>
       )}
 
       {accountMode === 'view' && drillRole === 'student' && !drillClassKey && (
@@ -269,6 +273,7 @@ export function DirectorUsersPanel({
           data={data}
           setData={setData}
           target={movingUser}
+          currentUser={currentUser}
           language={language}
           onClose={() => setMovingUser(null)}
         />

@@ -122,6 +122,7 @@ export function normalizePlatformData(value: Partial<PlatformData> | null | unde
     labDevices: Array.isArray(source.labDevices) ? source.labDevices : fallback.labDevices,
     labFaultReports: Array.isArray(source.labFaultReports) ? source.labFaultReports : fallback.labFaultReports,
     labReservationRequests: Array.isArray(source.labReservationRequests) ? source.labReservationRequests : fallback.labReservationRequests,
+    transferRequests: Array.isArray(source.transferRequests) ? source.transferRequests : fallback.transferRequests,
     canteenCards: Array.isArray(source.canteenCards) ? source.canteenCards : fallback.canteenCards,
     canteenMealScans: Array.isArray(source.canteenMealScans) ? source.canteenMealScans : fallback.canteenMealScans,
     pushTokens: source.pushTokens && typeof source.pushTokens === 'object' ? source.pushTokens : fallback.pushTokens,

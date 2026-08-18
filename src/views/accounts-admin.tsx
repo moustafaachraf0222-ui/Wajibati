@@ -337,6 +337,7 @@ export function AdminUsersPanel({
           data={data}
           setData={setData}
           target={movingUser}
+          currentUser={currentUser}
           language={language}
           onClose={() => setMovingUser(null)}
         />

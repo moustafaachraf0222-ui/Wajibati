@@ -341,6 +341,20 @@ export type PushTokenRecord = {
   updatedAt: string;
 };
 
+export type TransferRequestStatus = 'pending' | 'confirmed' | 'rejected';
+
+export type TransferRequest = {
+  id: string;
+  userId: string;
+  fromSchoolId: string;
+  toSchoolId: string;
+  requestedBy: string;
+  requestedAt: string;
+  status: TransferRequestStatus;
+  resolvedAt?: string;
+  resolvedBy?: string;
+};
+
 export type PlatformData = {
   schools: SchoolRecord[];
   users: PlatformUser[];
@@ -358,6 +372,7 @@ export type PlatformData = {
   labDevices: LabDevice[];
   labFaultReports: LabFaultReport[];
   labReservationRequests: LabReservationRequest[];
+  transferRequests: TransferRequest[];
   canteenCards: CanteenCard[];
   canteenMealScans: CanteenMealScan[];
   pushTokens: Record<string, PushTokenRecord[]>;
