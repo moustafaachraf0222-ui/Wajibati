@@ -34,6 +34,37 @@ type AppShellProps = {
   onViewChange: (view: View) => void;
 };
 
+function isEditableTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+  return target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable;
+}
+
+function visibleButtons(container: HTMLElement) {
+  return [...container.querySelectorAll<HTMLButtonElement>('button')].filter((button) => !button.disabled && button.offsetParent !== null);
+}
+
+function moveFocusWithArrows(key: string) {
+  const active = document.activeElement;
+  let items: HTMLElement[] = [];
+  if (active instanceof HTMLElement && active.tagName === 'BUTTON' && active.parentElement) {
+    items = visibleButtons(active.parentElement);
+  }
+  if (items.length === 0) {
+    const first = document.querySelector<HTMLElement>(
+      '.screen-view .user-groups button, .screen-view .stats-grid button, .nav-list button'
+    );
+    first?.focus();
+    return;
+  }
+
+  const direction = key === 'ArrowUp' || key === 'ArrowLeft' ? -1 : 1;
+  const currentIndex = items.indexOf(active as HTMLElement);
+  const nextIndex = (currentIndex + direction + items.length) % items.length;
+  items[nextIndex].focus();
+}
+
 export function AppShell({
   children,
   currentSchool,
@@ -57,23 +88,23 @@ export function AppShell({
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Backspace') {
+      if (isEditableTarget(event.target)) {
         return;
       }
-      const target = event.target as HTMLElement | null;
-      if (
-        target &&
-        (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable)
-      ) {
+      if (event.key === 'Backspace') {
+        if (triggerBackShortcut()) {
+          event.preventDefault();
+          return;
+        }
+        if (canGoBackNow) {
+          event.preventDefault();
+          onBack();
+        }
         return;
       }
-      if (triggerBackShortcut()) {
+      if (event.key === 'ArrowUp' || event.key === 'ArrowDown' || event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
         event.preventDefault();
-        return;
-      }
-      if (canGoBackNow) {
-        event.preventDefault();
-        onBack();
+        moveFocusWithArrows(event.key);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
