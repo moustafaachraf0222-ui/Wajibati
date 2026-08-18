@@ -124,7 +124,7 @@ export function AdminUsersPanel({
   const createDirector = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const localPart = compactEmailLocalPart(form.schoolName.trim()) || 'school';
-    const domain = `${localPart}.dz`;
+    const domain = 'wajibati.dz';
     const directorEmail = `${localPart}@${domain}`;
     if (data.users.some((user) => user.email.toLowerCase() === directorEmail)) {
       setError(tr(language, 'duplicateEmail'));
@@ -258,7 +258,7 @@ export function AdminUsersPanel({
           <Field label={tr(language, 'passwordDefault')} value={form.password} onChange={(value) => setForm({ ...form, password: value })} required />
           <Field label={tr(language, 'schoolName')} value={form.schoolName} onChange={(value) => setForm({ ...form, schoolName: value })} required />
           <p className="hint full">
-            {tr(language, 'directorEmailAuto')} <span dir="ltr">{(compactEmailLocalPart(form.schoolName.trim()) || 'school')}@{(compactEmailLocalPart(form.schoolName.trim()) || 'school')}.dz</span>
+            {tr(language, 'directorEmailAuto')} <span dir="ltr">{(compactEmailLocalPart(form.schoolName.trim()) || 'school')}@wajibati.dz</span>
           </p>
           <label>
             <span>{tr(language, 'stage')}</span>

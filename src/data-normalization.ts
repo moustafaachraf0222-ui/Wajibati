@@ -64,6 +64,27 @@ function normalizeAbsenceSchedules(schedules: AbsenceSchedule[]) {
   });
 }
 
+export const WAJIBATI_DOMAIN = 'wajibati.dz';
+
+function migrateSchoolDomains(schools: PlatformData['schools']) {
+  return schools.map((school) => (school.domain === WAJIBATI_DOMAIN ? school : { ...school, domain: WAJIBATI_DOMAIN }));
+}
+
+function migrateUserEmailDomains(users: PlatformData['users']) {
+  return users.map((user) => {
+    if (user.role === 'admin' || !user.email) {
+      return user;
+    }
+    const atIndex = user.email.lastIndexOf('@');
+    if (atIndex <= 0) {
+      return user;
+    }
+    const localPart = user.email.slice(0, atIndex);
+    const migratedEmail = `${localPart}@${WAJIBATI_DOMAIN}`;
+    return migratedEmail === user.email ? user : { ...user, email: migratedEmail };
+  });
+}
+
 export function normalizePlatformData(value: Partial<PlatformData> | null | undefined): PlatformData {
   const fallback = cloneSeedData();
   const source = value ?? {};
@@ -75,13 +96,15 @@ export function normalizePlatformData(value: Partial<PlatformData> | null | unde
     ...fallback,
     ...source,
     schools: Array.isArray(source.schools)
-      ? source.schools.map((school) =>
-          school.stage === 'secondary' && (!Array.isArray(school.streams) || school.streams.length === 0)
-            ? { ...school, streams: [...secondaryStreams] }
-            : school
+      ? migrateSchoolDomains(
+          source.schools.map((school) =>
+            school.stage === 'secondary' && (!Array.isArray(school.streams) || school.streams.length === 0)
+              ? { ...school, streams: [...secondaryStreams] }
+              : school
+          )
         )
       : fallback.schools,
-    users: Array.isArray(source.users) ? source.users : fallback.users,
+    users: Array.isArray(source.users) ? migrateUserEmailDomains(source.users) : fallback.users,
     studentActivations: Array.isArray(source.studentActivations) ? source.studentActivations : fallback.studentActivations,
     exercises: Array.isArray(source.exercises) ? source.exercises : fallback.exercises,
     announcements: Array.isArray(source.announcements) ? source.announcements : fallback.announcements,
