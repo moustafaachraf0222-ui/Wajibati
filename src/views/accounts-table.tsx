@@ -119,7 +119,7 @@ export function UsersTable({
                   <Edit3 size={16} aria-hidden="true" />
                 </button>
               )}
-              {onMove && currentUser.role === 'admin' && (
+              {onMove && user.role !== 'director' && (
                 <button className="icon-button" type="button" title={tr(language, 'moveAccount')} onClick={() => onMove(user)}>
                   <ArrowRightLeft size={16} aria-hidden="true" />
                 </button>

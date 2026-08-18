@@ -19,12 +19,16 @@ export function MoveAccountPanel({
   onClose: () => void;
 }) {
   const [targetSchoolId, setTargetSchoolId] = useState('');
-  const [error, setError] = useState('');
 
   const currentSchool = data.schools.find((school) => school.id === target.schoolId);
   const sameStage = currentSchool?.stage ?? target.stage;
   const targetSchools = data.schools
-    .filter((school) => !schoolIsTrashed(school) && school.id !== target.schoolId && school.stage === sameStage)
+    .filter(
+      (school) =>
+        !schoolIsTrashed(school) &&
+        school.id !== target.schoolId &&
+        (target.role === 'teacher' || school.stage === sameStage)
+    )
     .sort((left, right) => left.name.localeCompare(right.name, language === 'ar' ? 'ar' : undefined, { sensitivity: 'base' }));
 
   const moveAccount = () => {
@@ -32,31 +36,28 @@ export function MoveAccountPanel({
     if (!targetSchool) {
       return;
     }
-    if (target.role === 'director' && targetSchool.directorId && targetSchool.directorId !== target.id) {
-      setError(tr(language, 'moveDirectorConflict'));
-      return;
-    }
 
     setData((previous) => ({
       ...previous,
-      schools: previous.schools.map((school) => {
-        if (school.id === currentSchool?.id && school.directorId === target.id) {
-          return { ...school, directorId: undefined };
-        }
-        if (school.id === targetSchoolId) {
-          return target.role === 'director' ? { ...school, directorId: target.id } : school;
-        }
-        return school;
-      }),
       laboratories:
         target.role === 'lab'
           ? previous.laboratories.map((lab) =>
               lab.schoolId === target.schoolId && lab.supervisorId === target.id ? { ...lab, supervisorId: '' } : lab
             )
           : previous.laboratories,
-      users: previous.users.map((user) =>
-        user.id === target.id ? { ...user, schoolId: targetSchoolId, stage: targetSchool.stage } : user
-      )
+      users: previous.users.map((user) => {
+        if (user.id !== target.id) {
+          return user;
+        }
+        const nextUser = { ...user, schoolId: targetSchoolId, stage: targetSchool.stage };
+        if (user.role === 'teacher' && user.stage !== targetSchool.stage) {
+          nextUser.schoolYears = undefined;
+          nextUser.subjectsByYear = undefined;
+          nextUser.yearClassGroups = undefined;
+          nextUser.yearStreamClassGroups = undefined;
+        }
+        return nextUser;
+      })
     }));
     onClose();
   };
@@ -92,7 +93,6 @@ export function MoveAccountPanel({
           </select>
         </label>
         {targetSchools.length === 0 && <p className="modal-copy">{tr(language, 'noMoveTargets')}</p>}
-        {error && <p className="form-error">{error}</p>}
         <div className="button-row center">
           <button className="button primary" type="button" disabled={!targetSchoolId || targetSchools.length === 0} onClick={moveAccount}>
             <School size={17} aria-hidden="true" />

@@ -9,6 +9,7 @@ import { RoleLabel } from '../ui';
 import { CredentialDatabasePanel } from './accounts-credentials';
 import { AccountEditPanel } from './accounts-edit';
 import { DirectorCreateAccountPanel } from './accounts-director-create';
+import { MoveAccountPanel } from './accounts-move';
 import { UsersTable } from './accounts-table';
 import { useBackShortcut } from '../back-shortcut';
 
@@ -36,6 +37,7 @@ export function DirectorUsersPanel({
   const [editingUser, setEditingUser] = useState<PlatformUser | null>(null);
   const [drillRole, setDrillRole] = useState<Role | null>(null);
   const [drillClassKey, setDrillClassKey] = useState<string | null>(null);
+  const [movingUser, setMovingUser] = useState<PlatformUser | null>(null);
 
   useBackShortcut(() => {
     if (drillClassKey) {
@@ -237,6 +239,7 @@ export function DirectorUsersPanel({
             onToggle={toggleStatus}
             onDelete={deleteUser}
             onEdit={(target) => setEditingUser(target)}
+            onMove={(target) => setMovingUser(target)}
           />
         </>
       )}
@@ -256,8 +259,19 @@ export function DirectorUsersPanel({
             onToggle={toggleStatus}
             onDelete={deleteUser}
             onEdit={(target) => setEditingUser(target)}
+            onMove={(target) => setMovingUser(target)}
           />
         </>
+      )}
+
+      {accountMode === 'view' && movingUser && (
+        <MoveAccountPanel
+          data={data}
+          setData={setData}
+          target={movingUser}
+          language={language}
+          onClose={() => setMovingUser(null)}
+        />
       )}
     </section>
   );
