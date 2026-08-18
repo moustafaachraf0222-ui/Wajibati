@@ -422,6 +422,7 @@ export const copy: Record<Language, Record<string, string>> = {
     emailMustMatchDomain: 'يجب أن ينتهي البريد بنطاق المدرسة.',
     duplicateEmail: 'هذا البريد مستعمل بالفعل.',
     directorEmailAuto: 'يُولَّد بريد حساب المدرسة تلقائياً من اسم المدرسة:',
+    cafeteriaEmailAuto: 'يُولَّد بريد حساب المطعم تلقائياً:',
     yearRequired: 'اختر سنة واحدة على الأقل.',
     classRequired: 'أدخل القسم.',
     classesRequired: 'أدخل قسماً واحداً على الأقل.',
@@ -978,6 +979,7 @@ export const copy: Record<Language, Record<string, string>> = {
     emailMustMatchDomain: 'L’e-mail doit utiliser le domaine de l’école.',
     duplicateEmail: 'Cet e-mail existe déjà.',
     directorEmailAuto: 'E-mail du compte de l’école généré automatiquement à partir du nom de l’école :',
+    cafeteriaEmailAuto: 'E-mail du compte de la cantine généré automatiquement :',
     yearRequired: 'Choisissez au moins une année.',
     classRequired: 'Saisissez la classe.',
     classesRequired: 'Saisissez au moins une classe.',
@@ -1534,6 +1536,7 @@ export const copy: Record<Language, Record<string, string>> = {
     emailMustMatchDomain: 'Email must use the school domain.',
     duplicateEmail: 'This email is already used.',
     directorEmailAuto: 'School account email is generated automatically from the school name:',
+    cafeteriaEmailAuto: 'Cafeteria account email is generated automatically:',
     yearRequired: 'Choose at least one year.',
     classRequired: 'Enter the class.',
     classesRequired: 'Enter at least one class.',
@@ -1675,6 +1678,7 @@ export const roleNames: Record<Language, Record<Role, string>> = {
   ar: {
     admin: 'المشرف العام',
     director: 'حساب المدرسة',
+    cafeteria: 'حساب المطعم',
     supervisor: 'المراقب',
     lab: 'المخبري',
     canteen: 'عامل المطعم',
@@ -1684,6 +1688,7 @@ export const roleNames: Record<Language, Record<Role, string>> = {
   fr: {
     admin: 'Administrateur',
     director: 'Compte de l’école',
+    cafeteria: 'Compte de la cantine',
     supervisor: 'Surveillant',
     lab: 'Laborantin',
     canteen: 'Agent de cantine',
@@ -1693,6 +1698,7 @@ export const roleNames: Record<Language, Record<Role, string>> = {
   en: {
     admin: 'Administrator',
     director: 'School account',
+    cafeteria: 'Cafeteria account',
     supervisor: 'Supervisor',
     lab: 'Lab technician',
     canteen: 'Canteen worker',

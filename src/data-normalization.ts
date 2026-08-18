@@ -1,7 +1,8 @@
-import type { AbsenceSchedule, PlatformData } from './types';
+import type { AbsenceSchedule, PlatformData, SchoolRecord } from './types';
 import { secondaryStreams, uniqueStrings } from './education';
 import { DATA_KEY } from './data-constants';
 import { cloneSeedData } from './data-seed';
+import { compactEmailLocalPart } from './data-identifiers';
 import { applyDeletionTombstones, purgeExpiredAbsenceJustifications, purgeExpiredTrashedSchools } from './data-tombstones';
 
 function normalizedScheduleClassGroup(value: string) {
@@ -85,6 +86,65 @@ function migrateUserEmailDomains(users: PlatformData['users']) {
   });
 }
 
+function cafeteriaEmailForSchool(school: SchoolRecord) {
+  return `cafeteria.${compactEmailLocalPart(school.name) || 'school'}@${WAJIBATI_DOMAIN}`;
+}
+
+function migrateCafeteriaAccounts(users: PlatformData['users'], schools: PlatformData['schools']) {
+  const migrated = [...users];
+  for (const school of schools) {
+    const schoolUsers = migrated.filter((user) => user.schoolId === school.id);
+    const cafeteriaAccount = schoolUsers.find((user) => user.role === 'cafeteria');
+    const canteenWorkers = schoolUsers.filter((user) => user.role === 'canteen');
+    if (cafeteriaAccount) {
+      const workerIds = new Set(canteenWorkers.map((worker) => worker.id));
+      if (workerIds.size === 0) {
+        continue;
+      }
+      for (let index = migrated.length - 1; index >= 0; index -= 1) {
+        if (workerIds.has(migrated[index].id)) {
+          migrated.splice(index, 1);
+        }
+      }
+      continue;
+    }
+
+    if (canteenWorkers.length === 0) {
+      const director = schoolUsers.find((user) => user.role === 'director');
+      migrated.push({
+        id: `cafeteria-${school.id}`,
+        name: `${school.name} - Cafeteria`,
+        email: cafeteriaEmailForSchool(school),
+        password: director?.password ?? 'cafeteria',
+        role: 'cafeteria',
+        status: 'active',
+        schoolId: school.id,
+        stage: school.stage
+      });
+      continue;
+    }
+
+    const converted = canteenWorkers.find((worker) => worker.status === 'active') ?? canteenWorkers[0];
+    const desiredEmail = cafeteriaEmailForSchool(school);
+    const emailTaken = migrated.some((user) => user.id !== converted.id && user.email.toLowerCase() === desiredEmail);
+    for (let index = migrated.length - 1; index >= 0; index -= 1) {
+      const user = migrated[index];
+      if (user.schoolId === school.id && user.role === 'canteen' && user.id !== converted.id) {
+        migrated.splice(index, 1);
+      }
+    }
+    const convertedIndex = migrated.findIndex((user) => user.id === converted.id);
+    migrated[convertedIndex] = {
+      ...converted,
+      name: `${school.name} - Cafeteria`,
+      email: emailTaken ? converted.email : desiredEmail,
+      role: 'cafeteria'
+    };
+  }
+
+  return migrated;
+}
+
 export function normalizePlatformData(value: Partial<PlatformData> | null | undefined): PlatformData {
   const fallback = cloneSeedData();
   const source = value ?? {};
@@ -104,7 +164,9 @@ export function normalizePlatformData(value: Partial<PlatformData> | null | unde
           )
         )
       : fallback.schools,
-    users: Array.isArray(source.users) ? migrateUserEmailDomains(source.users) : fallback.users,
+    users: Array.isArray(source.users)
+      ? migrateCafeteriaAccounts(migrateUserEmailDomains(source.users), Array.isArray(source.schools) ? source.schools : fallback.schools)
+      : fallback.users,
     studentActivations: Array.isArray(source.studentActivations) ? source.studentActivations : fallback.studentActivations,
     exercises: Array.isArray(source.exercises) ? source.exercises : fallback.exercises,
     announcements: Array.isArray(source.announcements) ? source.announcements : fallback.announcements,

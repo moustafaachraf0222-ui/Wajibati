@@ -119,7 +119,7 @@ export function UsersTable({
                   <Edit3 size={16} aria-hidden="true" />
                 </button>
               )}
-              {onMove && user.role !== 'director' && (
+              {onMove && user.role !== 'director' && user.role !== 'cafeteria' && (
                 <button className="icon-button" type="button" title={tr(language, 'moveAccount')} onClick={() => onMove(user)}>
                   <ArrowRightLeft size={16} aria-hidden="true" />
                 </button>
@@ -217,7 +217,7 @@ export function UsersTable({
     );
   };
 
-  const groupedUsers = (['admin', 'director', 'supervisor', 'lab', 'canteen', 'teacher', 'student'] as Role[])
+  const groupedUsers = (['admin', 'director', 'cafeteria', 'supervisor', 'lab', 'canteen', 'teacher', 'student'] as Role[])
     .map((role) => ({ role, users: users.filter((user) => user.role === role) }))
     .filter((group) => group.users.length > 0);
 
@@ -259,7 +259,7 @@ export function UsersTable({
   };
 
   const groupedByRoleForUsers = (groupUsers: PlatformUser[]) =>
-    (['admin', 'director', 'supervisor', 'lab', 'canteen', 'teacher', 'student'] as Role[])
+    (['admin', 'director', 'cafeteria', 'supervisor', 'lab', 'canteen', 'teacher', 'student'] as Role[])
       .map((role) => ({ role, users: groupUsers.filter((user) => user.role === role) }))
       .filter((group) => group.users.length > 0);
 

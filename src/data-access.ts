@@ -121,7 +121,7 @@ export function defaultView(role: Role): View {
     return 'labs';
   }
 
-  if (role === 'canteen') {
+  if (role === 'canteen' || role === 'cafeteria') {
     return 'canteen';
   }
 

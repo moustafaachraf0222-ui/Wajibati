@@ -78,7 +78,7 @@ export function DirectorCreateAccountPanel({
   school: SchoolRecord | undefined;
 }) {
   const [form, setForm] = useState({
-    role: 'teacher' as 'supervisor' | 'lab' | 'canteen' | 'teacher' | 'student',
+    role: 'teacher' as 'supervisor' | 'lab' | 'teacher' | 'student',
     name: '',
     subject: 'math' as Subject,
     subjectsByYear: {} as Record<string, Subject | ''>,
@@ -100,8 +100,8 @@ export function DirectorCreateAccountPanel({
   const [bulkCreatedCount, setBulkCreatedCount] = useState(0);
   const accountRoles =
     currentUser.stage === 'primary'
-      ? (['canteen', 'teacher', 'student'] as const)
-      : (['supervisor', 'lab', 'canteen', 'teacher', 'student'] as const);
+      ? (['teacher', 'student'] as const)
+      : (['supervisor', 'lab', 'teacher', 'student'] as const);
 
   const createAccount = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -274,7 +274,7 @@ export function DirectorCreateAccountPanel({
   const availableYearLabels = currentUser.stage ? schoolYearNames[language][currentUser.stage] : [];
   const generatedEmailPreview = school && form.name.trim() ? generateSchoolEmail(form.name, form.role, school.domain, data.users) : '';
 
-  const chooseAccountRole = (role: 'supervisor' | 'lab' | 'canteen' | 'teacher' | 'student') => {
+  const chooseAccountRole = (role: 'supervisor' | 'lab' | 'teacher' | 'student') => {
     if ((role === 'supervisor' || role === 'lab') && currentUser.stage === 'primary') {
       return;
     }

@@ -89,19 +89,19 @@ export function AdminUsersPanel({
   const schoolCategoryIcon = (role: Role) =>
     role === 'director' ? (
       <UserCog size={18} aria-hidden="true" />
+    ) : role === 'cafeteria' || role === 'canteen' ? (
+      <UtensilsCrossed size={18} aria-hidden="true" />
     ) : role === 'teacher' ? (
       <GraduationCap size={18} aria-hidden="true" />
     ) : role === 'lab' ? (
       <FlaskConical size={18} aria-hidden="true" />
-    ) : role === 'canteen' ? (
-      <UtensilsCrossed size={18} aria-hidden="true" />
     ) : role === 'supervisor' ? (
       <Eye size={18} aria-hidden="true" />
     ) : (
       <Users size={18} aria-hidden="true" />
     );
 
-  const schoolCategoryRoles: Role[] = ['director', 'supervisor', 'teacher', 'lab', 'canteen', 'student'];
+  const schoolCategoryRoles: Role[] = ['director', 'cafeteria', 'supervisor', 'teacher', 'lab', 'student'];
 
   const studentGroups = (() => {
     const groups = new Map<string, PlatformUser[]>();
@@ -128,7 +128,8 @@ export function AdminUsersPanel({
     const localPart = compactEmailLocalPart(form.schoolName.trim()) || 'school';
     const domain = 'wajibati.dz';
     const directorEmail = `${localPart}@${domain}`;
-    if (data.users.some((user) => user.email.toLowerCase() === directorEmail)) {
+    const cafeteriaEmail = `cafeteria.${localPart}@${domain}`;
+    if (data.users.some((user) => user.email.toLowerCase() === directorEmail) || data.users.some((user) => user.email.toLowerCase() === cafeteriaEmail)) {
       setError(tr(language, 'duplicateEmail'));
       return;
     }
@@ -160,6 +161,16 @@ export function AdminUsersPanel({
           email: directorEmail,
           password: form.password,
           role: 'director',
+          status: 'active',
+          schoolId,
+          stage: form.stage
+        },
+        {
+          id: `cafeteria-${schoolId}`,
+          name: `${form.schoolName.trim()} - Cafeteria`,
+          email: cafeteriaEmail,
+          password: form.password,
+          role: 'cafeteria',
           status: 'active',
           schoolId,
           stage: form.stage
@@ -261,6 +272,9 @@ export function AdminUsersPanel({
           <Field label={tr(language, 'schoolName')} value={form.schoolName} onChange={(value) => setForm({ ...form, schoolName: value })} required />
           <p className="hint full">
             {tr(language, 'directorEmailAuto')} <span dir="ltr">{(compactEmailLocalPart(form.schoolName.trim()) || 'school')}@wajibati.dz</span>
+          </p>
+          <p className="hint full">
+            {tr(language, 'cafeteriaEmailAuto')} <span dir="ltr">cafeteria.{(compactEmailLocalPart(form.schoolName.trim()) || 'school')}@wajibati.dz</span>
           </p>
           <label>
             <span>{tr(language, 'stage')}</span>

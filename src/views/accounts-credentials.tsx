@@ -13,7 +13,7 @@ function escapeHtml(value: string) {
     .replace(/'/g, '&#39;');
 }
 
-function sortedCredentialUsers(users: PlatformUser[], role: 'supervisor' | 'lab' | 'canteen' | 'teacher' | 'student') {
+function sortedCredentialUsers(users: PlatformUser[], role: 'supervisor' | 'lab' | 'teacher' | 'student') {
   return users
     .filter((user) => user.role === role)
     .sort((left, right) => left.name.localeCompare(right.name, undefined, { numeric: true, sensitivity: 'base' }));
@@ -201,7 +201,6 @@ export function CredentialDatabasePanel({
   const teacherUsers = sortedCredentialUsers(users, 'teacher');
   const supervisorUsers = sortedCredentialUsers(users, 'supervisor');
   const labUsers = sortedCredentialUsers(users, 'lab');
-  const canteenUsers = sortedCredentialUsers(users, 'canteen');
   const studentUsers = sortedCredentialUsers(users, 'student');
   const activationRecords = sortedStudentActivations(studentActivations);
   const schoolName = school?.name ?? '-';
@@ -218,7 +217,6 @@ export function CredentialDatabasePanel({
       <div className="credential-database-grid">
         <CredentialDatabaseCard title={tr(language, 'supervisorDatabase')} users={supervisorUsers} schoolName={schoolName} language={language} />
         <CredentialDatabaseCard title={tr(language, 'labDatabase')} users={labUsers} schoolName={schoolName} language={language} />
-        <CredentialDatabaseCard title={tr(language, 'canteenDatabase')} users={canteenUsers} schoolName={schoolName} language={language} />
         <CredentialDatabaseCard title={tr(language, 'teacherDatabase')} users={teacherUsers} schoolName={schoolName} language={language} />
         <CredentialDatabaseCard title={tr(language, 'studentDatabase')} users={studentUsers} schoolName={schoolName} language={language} />
         <StudentActivationDatabaseCard title={tr(language, 'studentActivationDatabase')} activations={activationRecords} school={school} language={language} />

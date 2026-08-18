@@ -15,6 +15,7 @@ const roleIcons: Record<Role, LucideIcon> = {
   director: Building2,
   supervisor: ClipboardCheck,
   lab: FlaskConical,
+  cafeteria: Utensils,
   canteen: Utensils,
   teacher: GraduationCap,
   student: BookOpen

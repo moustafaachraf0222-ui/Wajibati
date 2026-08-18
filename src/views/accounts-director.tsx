@@ -55,7 +55,7 @@ export function DirectorUsersPanel({
   const schoolUsers = scopedUsers(data, currentUser);
   const roleUsers = (role: Role) => schoolUsers.filter((user) => user.role === role);
 
-  const directorRoles = (['lab', 'teacher', 'student', 'canteen'] as Role[]).concat(schoolUsers.some((user) => user.role === 'supervisor') ? (['supervisor'] as Role[]) : []);
+  const directorRoles = (['lab', 'teacher', 'student'] as Role[]).concat(schoolUsers.some((user) => user.role === 'supervisor') ? (['supervisor'] as Role[]) : []);
 
   const studentClassKey = (user: PlatformUser) => `${user.schoolYear ?? ''}|${user.stream ?? ''}|${(user.classGroup ?? '').trim().toLowerCase()}`;
   const studentClassLabel = (user: PlatformUser) => {

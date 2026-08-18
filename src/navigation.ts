@@ -49,6 +49,11 @@ export const navItems: Record<Role, NavItem[]> = {
     { id: 'announcements', labelKey: 'announcements', icon: MessageSquare },
     { id: 'settings', labelKey: 'settings', icon: Settings }
   ],
+  cafeteria: [
+    { id: 'canteen', labelKey: 'schoolCanteen', icon: Utensils },
+    { id: 'announcements', labelKey: 'announcements', icon: MessageSquare },
+    { id: 'settings', labelKey: 'settings', icon: Settings }
+  ],
   canteen: [
     { id: 'canteen', labelKey: 'schoolCanteen', icon: Utensils },
     { id: 'announcements', labelKey: 'announcements', icon: MessageSquare },

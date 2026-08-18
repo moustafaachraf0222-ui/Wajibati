@@ -1,6 +1,6 @@
 import type { Dispatch, SetStateAction } from 'react';
 
-export type Role = 'admin' | 'director' | 'supervisor' | 'lab' | 'canteen' | 'teacher' | 'student';
+export type Role = 'admin' | 'director' | 'supervisor' | 'lab' | 'cafeteria' | 'canteen' | 'teacher' | 'student';
 export type Stage = 'primary' | 'middle' | 'secondary';
 export type Language = 'ar' | 'fr' | 'en';
 export type Theme = 'light' | 'dark';
