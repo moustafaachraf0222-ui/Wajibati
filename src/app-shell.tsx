@@ -101,8 +101,26 @@ export function AppShell({
         }
         return;
       }
-      if (event.key === 'ArrowUp' || event.key === 'ArrowDown' || event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+      if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
         event.preventDefault();
+        moveFocusWithArrows(event.key);
+        return;
+      }
+      if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+        event.preventDefault();
+        const segmented = document.querySelector<HTMLElement>('.screen-view .segmented');
+        if (segmented) {
+          const buttons = visibleButtons(segmented);
+          if (buttons.length > 0) {
+            const active = document.activeElement;
+            const currentIndex = active instanceof HTMLElement ? buttons.indexOf(active as HTMLButtonElement) : -1;
+            const direction = event.key === 'ArrowLeft' ? 1 : -1;
+            const nextIndex =
+              currentIndex === -1 ? 0 : (currentIndex + direction + buttons.length) % buttons.length;
+            buttons[nextIndex].click();
+            return;
+          }
+        }
         moveFocusWithArrows(event.key);
       }
     };
