@@ -4888,6 +4888,12 @@ summary.subject-group-heading:hover .subject-icon svg {
   font-weight: 600;
 }
 
+.settings-error {
+  color: #dc2626;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
 .settings-toggles {
   display: flex;
   flex-direction: column;

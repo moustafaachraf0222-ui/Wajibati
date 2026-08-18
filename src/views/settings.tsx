@@ -1,8 +1,9 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { Globe2, Moon, Palette, Phone, Save, Settings, Sun, Trash2 } from 'lucide-react';
+import { Globe2, KeyRound, Moon, Palette, Phone, Save, Settings, Sun, Trash2 } from 'lucide-react';
 import type { Accent, DataSetter, Language, PlatformData, PlatformUser, Theme } from '../types';
 import { languageNames, tr } from '../i18n';
 import { Field, languages } from '../ui';
+import { hashPassword, verifyPassword } from '../password';
 
 const accentOptions: Accent[] = ['green', 'navy', 'teal', 'amber', 'crimson', 'violet'];
 
@@ -44,6 +45,11 @@ export function SettingsView({
 }) {
   const [guardianPhone, setGuardianPhone] = useState(currentUser.guardianPhone ?? '');
   const [studentSaved, setStudentSaved] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordChanged, setPasswordChanged] = useState(false);
 
   useEffect(() => {
     setGuardianPhone(currentUser.guardianPhone ?? '');
@@ -60,6 +66,41 @@ export function SettingsView({
     }));
     setGuardianPhone(normalizedPhone);
     setStudentSaved(true);
+  };
+
+  const changePassword = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setPasswordChanged(false);
+
+    const matches = await verifyPassword(currentPassword, currentUser.password);
+    if (!matches) {
+      setPasswordError(tr(language, 'wrongCurrentPassword'));
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      setPasswordError(tr(language, 'passwordTooShort'));
+      return;
+    }
+
+    if (newPassword !== confirmNewPassword) {
+      setPasswordError(tr(language, 'passwordsDoNotMatch'));
+      return;
+    }
+
+    const hashedPassword = await hashPassword(newPassword);
+    setData((previous) => ({
+      ...previous,
+      users: previous.users.map((user) => (user.id === currentUser.id ? { ...user, password: hashedPassword } : user)),
+      accountCredentials: previous.accountCredentials.map((credential) =>
+        credential.userId === currentUser.id ? { ...credential, code: newPassword } : credential
+      )
+    }));
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmNewPassword('');
+    setPasswordError('');
+    setPasswordChanged(true);
   };
 
   return (
@@ -164,6 +205,39 @@ export function SettingsView({
                   <span>{tr(language, 'save')}</span>
                 </button>
                 {studentSaved && <span className="settings-saved">{tr(language, 'saved')}</span>}
+              </div>
+            </form>
+          </div>
+        )}
+
+        {currentUser.role !== 'admin' && (
+          <div className="settings-card">
+            <div className="settings-card-head">
+              <div className="settings-card-icon">
+                <KeyRound aria-hidden="true" />
+              </div>
+              <div>
+                <h2>{tr(language, 'changePassword')}</h2>
+                <p>{tr(language, 'changePasswordHint')}</p>
+              </div>
+            </div>
+            <form className="settings-form" onSubmit={changePassword}>
+              <div className="settings-input">
+                <Field label={tr(language, 'currentPassword')} value={currentPassword} type="password" required onChange={setCurrentPassword} />
+              </div>
+              <div className="settings-input">
+                <Field label={tr(language, 'newPassword')} value={newPassword} type="password" required onChange={setNewPassword} />
+              </div>
+              <div className="settings-input">
+                <Field label={tr(language, 'confirmNewPassword')} value={confirmNewPassword} type="password" required onChange={setConfirmNewPassword} />
+              </div>
+              {passwordError && <div className="settings-error">{passwordError}</div>}
+              <div className="settings-form-foot">
+                <button className="button primary" type="submit">
+                  <Save size={15} aria-hidden="true" />
+                  <span>{tr(language, 'changePassword')}</span>
+                </button>
+                {passwordChanged && <span className="settings-saved">{tr(language, 'passwordChanged')}</span>}
               </div>
             </form>
           </div>
