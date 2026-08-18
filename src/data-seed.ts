@@ -14,6 +14,7 @@ const seedData: PlatformData = {
     }
   ],
   accountCodes: [],
+  accountCredentials: [],
   studentActivations: [],
   exercises: [],
   announcements: [],
@@ -55,6 +56,7 @@ export function isSeedOnlyData(data: PlatformData) {
     data.users.length === 1 &&
     data.users[0]?.id === seedData.users[0].id &&
     data.accountCodes.length === 0 &&
+    data.accountCredentials.length === 0 &&
     data.studentActivations.length === 0 &&
     data.deletedSchoolIds.length === 0 &&
     data.deletedExerciseIds.length === 0 &&

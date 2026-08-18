@@ -176,6 +176,7 @@ export function normalizePlatformData(value: Partial<PlatformData> | null | unde
             .map((user) => user.password)
         : [])
     ]),
+    accountCredentials: Array.isArray(source.accountCredentials) ? source.accountCredentials : fallback.accountCredentials,
     studentActivations: Array.isArray(source.studentActivations) ? source.studentActivations : fallback.studentActivations,
     exercises: Array.isArray(source.exercises) ? source.exercises : fallback.exercises,
     announcements: Array.isArray(source.announcements) ? source.announcements : fallback.announcements,

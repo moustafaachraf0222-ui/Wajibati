@@ -125,6 +125,16 @@ export type StudentActivationRecord = {
   activatedAt?: string;
 };
 
+export type AccountCredential = {
+  id: string;
+  userId: string;
+  role: 'teacher' | 'lab' | 'supervisor';
+  name: string;
+  email: string;
+  code: string;
+  createdAt: string;
+};
+
 export type Exercise = {
   id: string;
   title: string;
@@ -359,6 +369,7 @@ export type PlatformData = {
   schools: SchoolRecord[];
   users: PlatformUser[];
   accountCodes: string[];
+  accountCredentials: AccountCredential[];
   studentActivations: StudentActivationRecord[];
   exercises: Exercise[];
   announcements: Announcement[];

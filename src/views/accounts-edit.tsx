@@ -33,8 +33,7 @@ import {
   subjectOptionsForTeacherYear,
   uniqueNumbers
 } from '../education';
-import { canEditUser, getSchool, makeAccountEditState } from '../data';
-import { generateUniqueCode } from '../data';
+import { canEditUser, generateUniqueCode, getSchool, makeAccountEditState, makeId } from '../data';
 import { hashPassword } from '../password';
 import { Field, RoleLabel } from '../ui';
 
@@ -304,6 +303,11 @@ export function AccountEditPanel({
 
     setData((previous) => ({
       ...previous,
+      accountCredentials: previous.accountCredentials.map((credential) =>
+        credential.userId === target.id
+          ? { ...credential, name: edit.name.trim(), email: edit.email.trim() }
+          : credential
+      ),
       schools: previous.schools.map((school) =>
         target.role === 'director' && school.id === target.schoolId
           ? {
@@ -369,9 +373,29 @@ export function AccountEditPanel({
   const resetPassword = async () => {
     const newCode = generateUniqueCode([...data.accountCodes, ...data.studentActivations.map((activation) => activation.code)]);
     const hashedPassword = await hashPassword(newCode);
+    const hasCredential = data.accountCredentials.some((credential) => credential.userId === target.id);
     setData((previous) => ({
       ...previous,
       users: previous.users.map((user) => (user.id === target.id ? { ...user, password: hashedPassword } : user)),
+      accountCredentials:
+        target.role === 'teacher' || target.role === 'lab' || target.role === 'supervisor'
+          ? hasCredential
+            ? previous.accountCredentials.map((credential) =>
+                credential.userId === target.id ? { ...credential, code: newCode, name: target.name, email: target.email } : credential
+              )
+            : [
+                ...previous.accountCredentials,
+                {
+                  id: makeId('credential'),
+                  userId: target.id,
+                  role: target.role,
+                  name: target.name,
+                  email: target.email,
+                  code: newCode,
+                  createdAt: new Date().toISOString()
+                }
+              ]
+          : previous.accountCredentials,
       accountCodes: previous.accountCodes.includes(newCode) ? previous.accountCodes : [...previous.accountCodes, newCode]
     }));
     setResetPasswordResult(newCode);

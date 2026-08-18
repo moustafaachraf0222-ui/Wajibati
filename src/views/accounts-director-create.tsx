@@ -217,6 +217,21 @@ export function DirectorCreateAccountPanel({
       return {
         ...previous,
         users: [...users, nextUser],
+        accountCredentials:
+          form.role === 'teacher' || form.role === 'lab' || form.role === 'supervisor'
+            ? [
+                ...previous.accountCredentials,
+                {
+                  id: makeId('credential'),
+                  userId: nextUser.id,
+                  role: form.role,
+                  name: accountName,
+                  email: nextUser.email,
+                  code: accountCode,
+                  createdAt: new Date().toISOString()
+                }
+              ]
+            : previous.accountCredentials,
         accountCodes: previous.accountCodes.includes(accountCode) ? previous.accountCodes : [...previous.accountCodes, accountCode]
       };
     });

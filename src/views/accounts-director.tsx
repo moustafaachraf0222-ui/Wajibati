@@ -141,6 +141,7 @@ export function DirectorUsersPanel({
       {accountMode === 'database' && (
         <CredentialDatabasePanel
           users={schoolUsers}
+          credentials={data.accountCredentials.filter((credential) => schoolUsers.some((user) => user.id === credential.userId))}
           studentActivations={data.studentActivations.filter((activation) => activation.schoolId === currentUser.schoolId)}
           school={school}
           language={language}

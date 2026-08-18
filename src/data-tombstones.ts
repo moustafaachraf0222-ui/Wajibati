@@ -53,6 +53,7 @@ export function deleteUserRecords(previous: PlatformData, target: PlatformUser):
   return {
     ...previous,
     users: previous.users.filter((user) => user.id !== target.id),
+    accountCredentials: previous.accountCredentials.filter((credential) => credential.userId !== target.id),
     schools: previous.schools.map((school) => (school.directorId === target.id ? { ...school, directorId: undefined } : school)),
     exercises: previous.exercises.filter((exercise) => exercise.teacherId !== target.id),
     announcements: previous.announcements.filter((announcement) => announcement.authorId !== target.id),
