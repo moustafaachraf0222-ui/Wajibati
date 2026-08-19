@@ -581,7 +581,7 @@ function DirectorCanteenView({
               <ArrowLeft size={15} aria-hidden="true" />
               <span>{tr(language, 'back')}</span>
             </button>
-            <div className="canteen-class-group">
+            <div className="drill-heading">
               <div className="absence-report-actions">
                 <button
                   className="button ghost"

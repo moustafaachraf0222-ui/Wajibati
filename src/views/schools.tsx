@@ -1,8 +1,9 @@
-import { Edit3, LockKeyhole, RotateCcw, Save, School, Trash2, X } from 'lucide-react';
+import { ArrowLeft, BookOpen, Building2, ChevronRight, Edit3, GraduationCap, LockKeyhole, RotateCcw, Save, School, Trash2, X } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
 import type { DataSetter, Language, PlatformData, PlatformUser, SchoolRecord, SecondaryStream, Stage } from '../types';
 import { secondaryStreamNames, stageNames, tr } from '../i18n';
 import { secondaryStreams, stages } from '../education';
+import { useBackShortcut } from '../back-shortcut';
 import {
   deleteSchoolRecords,
   getSchool,
@@ -40,6 +41,20 @@ export function SchoolsView({ data, setData, currentUser, language }: CommonView
   const [editingSchool, setEditingSchool] = useState<SchoolEditState | null>(null);
   const [schoolEditError, setSchoolEditError] = useState('');
   const canDeleteSchools = currentUser.role === 'admin';
+  const [selectedStage, setSelectedStage] = useState<Stage | null>(null);
+
+  useBackShortcut(() => {
+    if (selectedStage) {
+      setSelectedStage(null);
+      return true;
+    }
+    return false;
+  });
+
+  const stageGroups = stages
+    .map((stage) => ({ stage, schools: schools.filter((school) => school.stage === stage) }))
+    .filter((group) => group.schools.length > 0);
+  const visibleSchools = selectedStage ? schools.filter((school) => school.stage === selectedStage) : [];
   const columns = [tr(language, 'schoolName'), tr(language, 'stage'), tr(language, 'domain'), tr(language, 'city'), tr(language, 'director'), tr(language, 'users')];
   const trashColumns = [...columns, tr(language, 'deletedAt'), tr(language, 'deletesAt'), tr(language, 'actions')];
 
@@ -148,34 +163,72 @@ export function SchoolsView({ data, setData, currentUser, language }: CommonView
           </div>
           <School size={24} aria-hidden="true" />
         </div>
-        <ResponsiveTable columns={columns} emptyText={tr(language, 'noRecords')}>
-          {schools.map((school) => {
-            const director = data.users.find((user) => user.id === school.directorId);
-            const userCount = data.users.filter((user) => user.schoolId === school.id).length;
-            return (
-              <tr key={school.id}>
-                <td>{school.name}</td>
-                <td>{stageNames[language][school.stage]}</td>
-                <td>{school.domain}</td>
-                <td>{school.city}</td>
-                <td>{director?.name ?? '-'}</td>
-                <td>{userCount}</td>
-                {canDeleteSchools && (
-                  <td>
-                    <div className="table-actions">
-                      <button className="icon-button" type="button" title={tr(language, 'editSchool')} onClick={() => openSchoolEdit(school)}>
-                        <Edit3 size={16} aria-hidden="true" />
-                      </button>
-                      <button className="icon-button danger" type="button" title={tr(language, 'delete')} onClick={() => setPendingDeleteSchool(school)}>
-                        <Trash2 size={16} aria-hidden="true" />
-                      </button>
-                    </div>
-                  </td>
-                )}
-              </tr>
-            );
-          })}
-        </ResponsiveTable>
+        {!selectedStage && (
+          <div className="user-groups">
+            {stageGroups.length === 0 && <p className="empty-state">{tr(language, 'noRecords')}</p>}
+            {stageGroups.map((group) => (
+              <button type="button" className="user-group drill-row" key={group.stage} onClick={() => setSelectedStage(group.stage)}>
+                <span className="user-group-title">
+                  <span className="user-group-label">
+                    {group.stage === 'primary' ? (
+                      <GraduationCap size={16} aria-hidden="true" />
+                    ) : group.stage === 'middle' ? (
+                      <BookOpen size={16} aria-hidden="true" />
+                    ) : (
+                      <Building2 size={16} aria-hidden="true" />
+                    )}
+                    <span className="user-group-label-name">{stageNames[language][group.stage]}</span>
+                  </span>
+                  <span className="user-group-meta">
+                    <strong>
+                      {tr(language, 'schools')}: {group.schools.length}
+                    </strong>
+                    <ChevronRight size={17} aria-hidden="true" />
+                  </span>
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+        {selectedStage && (
+          <>
+            <button type="button" className="back-button full" onClick={() => setSelectedStage(null)}>
+              <ArrowLeft size={15} aria-hidden="true" />
+              <span>{tr(language, 'back')}</span>
+            </button>
+            <div className="drill-heading">
+              <h3>{stageNames[language][selectedStage]}</h3>
+              <ResponsiveTable columns={columns} emptyText={tr(language, 'noRecords')}>
+                {visibleSchools.map((school) => {
+                  const director = data.users.find((user) => user.id === school.directorId);
+                  const userCount = data.users.filter((user) => user.schoolId === school.id).length;
+                  return (
+                    <tr key={school.id}>
+                      <td>{school.name}</td>
+                      <td>{stageNames[language][school.stage]}</td>
+                      <td>{school.domain}</td>
+                      <td>{school.city}</td>
+                      <td>{director?.name ?? '-'}</td>
+                      <td>{userCount}</td>
+                      {canDeleteSchools && (
+                        <td>
+                          <div className="table-actions">
+                            <button className="icon-button" type="button" title={tr(language, 'editSchool')} onClick={() => openSchoolEdit(school)}>
+                              <Edit3 size={16} aria-hidden="true" />
+                            </button>
+                            <button className="icon-button danger" type="button" title={tr(language, 'delete')} onClick={() => setPendingDeleteSchool(school)}>
+                              <Trash2 size={16} aria-hidden="true" />
+                            </button>
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
+              </ResponsiveTable>
+            </div>
+          </>
+        )}
       </div>
       {canDeleteSchools && (
         <div className="panel trash-panel">

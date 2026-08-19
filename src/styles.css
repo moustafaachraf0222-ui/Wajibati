@@ -3801,11 +3801,11 @@ summary.subject-group-heading:hover .subject-icon svg {
   opacity: 0.65;
 }
 
-.canteen-class-group {
+.drill-heading {
   margin-bottom: 18px;
 }
 
-.canteen-class-group h3 {
+.drill-heading h3 {
   margin: 0 0 8px;
   font-size: 0.92rem;
   color: var(--ink);
@@ -3814,7 +3814,7 @@ summary.subject-group-heading:hover .subject-icon svg {
   gap: 8px;
 }
 
-.canteen-class-group h3::before {
+.drill-heading h3::before {
   content: '';
   width: 10px;
   height: 10px;
