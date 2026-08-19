@@ -5,6 +5,7 @@ import {
   SHARED_DATA_REFRESH_MS,
   fetchSharedData,
   fetchSharedDataUpdatedAt,
+  mergeCanteenRecordsForPush,
   mergeDeletionTombstones,
   promoteLocalDataIfRemoteIsEmpty,
   saveSharedData
@@ -144,6 +145,10 @@ export function useSharedDataSync(data: PlatformData, setData: DataSetter, curre
     latestLocalChangeAtRef.current = Date.now();
 
     const saveTimer = window.setTimeout(() => {
+      if (sharedSaveInFlightRef.current) {
+        return;
+      }
+
       sharedSaveInFlightRef.current = true;
       setSyncStatusIfChanged('saving');
       saveSharedData(data)
@@ -165,6 +170,39 @@ export function useSharedDataSync(data: PlatformData, setData: DataSetter, curre
     };
   }, [data, setSyncStatusIfChanged]);
 
+  const retryPendingSave = useCallback(async () => {
+    if (
+      !remoteEnabledRef.current ||
+      !hasPendingLocalChanges() ||
+      sharedSaveInFlightRef.current ||
+      sharedRefreshInFlightRef.current ||
+      isLocalEditSettling()
+    ) {
+      return;
+    }
+
+    const currentData = latestDataRef.current;
+    sharedSaveInFlightRef.current = true;
+    setSyncStatusIfChanged('saving');
+    try {
+      const sharedSnapshot = await fetchSharedData();
+      const mergedData = sharedSnapshot
+        ? mergeCanteenRecordsForPush(mergeDeletionTombstones(sharedSnapshot.data, currentData), currentData)
+        : currentData;
+      const snapshot = await saveSharedData(mergedData);
+      remoteUpdatedAtRef.current = snapshot?.updatedAt ?? remoteUpdatedAtRef.current;
+      savedLocalChangeVersionRef.current = localChangeVersionRef.current;
+      remoteEnabledRef.current = true;
+      remoteLoadedRef.current = true;
+      applySharedData(mergedData);
+      setSyncStatusIfChanged('shared');
+    } catch {
+      setSyncStatusIfChanged('error');
+    } finally {
+      sharedSaveInFlightRef.current = false;
+    }
+  }, [applySharedData, hasPendingLocalChanges, isLocalEditSettling, setSyncStatusIfChanged]);
+
   useEffect(() => {
     if (!currentUserId) {
       return;
@@ -173,15 +211,7 @@ export function useSharedDataSync(data: PlatformData, setData: DataSetter, curre
     let cancelled = false;
 
     const refreshLatestSharedData = async () => {
-      if (
-        cancelled ||
-        !remoteEnabledRef.current ||
-        document.visibilityState === 'hidden' ||
-        sharedSaveInFlightRef.current ||
-        sharedRefreshInFlightRef.current ||
-        hasPendingLocalChanges() ||
-        isLocalEditSettling()
-      ) {
+      if (cancelled || !remoteEnabledRef.current) {
         return;
       }
 
@@ -213,26 +243,56 @@ export function useSharedDataSync(data: PlatformData, setData: DataSetter, curre
       }
     };
 
-    const refreshOnFocus = () => {
-      refreshLatestSharedData();
-    };
-    const refreshOnVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        refreshLatestSharedData();
+    const tick = async () => {
+      if (
+        cancelled ||
+        document.visibilityState === 'hidden' ||
+        sharedSaveInFlightRef.current ||
+        sharedRefreshInFlightRef.current ||
+        isLocalEditSettling()
+      ) {
+        return;
+      }
+
+      if (hasPendingLocalChanges()) {
+        await retryPendingSave();
+      } else {
+        await refreshLatestSharedData();
       }
     };
 
-    const refreshTimer = window.setInterval(refreshLatestSharedData, SHARED_DATA_REFRESH_MS);
-    window.addEventListener('focus', refreshOnFocus);
-    document.addEventListener('visibilitychange', refreshOnVisibility);
+    const onOnline = () => {
+      if (hasPendingLocalChanges()) {
+        void retryPendingSave();
+      }
+    };
+    const onFocus = () => void tick();
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        void tick();
+      }
+    };
+
+    const refreshTimer = window.setInterval(() => void tick(), SHARED_DATA_REFRESH_MS);
+    window.addEventListener('focus', onFocus);
+    window.addEventListener('online', onOnline);
+    document.addEventListener('visibilitychange', onVisibility);
 
     return () => {
       cancelled = true;
       window.clearInterval(refreshTimer);
-      window.removeEventListener('focus', refreshOnFocus);
-      document.removeEventListener('visibilitychange', refreshOnVisibility);
+      window.removeEventListener('focus', onFocus);
+      window.removeEventListener('online', onOnline);
+      document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, [applySharedData, currentUserId, hasPendingLocalChanges, isLocalEditSettling, setSyncStatusIfChanged]);
+  }, [
+    applySharedData,
+    currentUserId,
+    hasPendingLocalChanges,
+    isLocalEditSettling,
+    retryPendingSave,
+    setSyncStatusIfChanged
+  ]);
 
   return { refreshSharedData, syncStatus };
 }

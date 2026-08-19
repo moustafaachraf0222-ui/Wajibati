@@ -1,4 +1,4 @@
-import type { Accent, DataSetter, Language, PlatformData, PlatformUser, Theme, View } from './types';
+import type { Accent, DataSetter, Language, PlatformData, PlatformUser, SyncStatus, Theme, View } from './types';
 import { AbsencesView } from './views/absences';
 import { UsersView } from './views/accounts';
 import { ExercisesView } from './views/exercises';
@@ -18,6 +18,7 @@ type AppRouterProps = {
   accent: Accent;
   stack: NavStack;
   setData: DataSetter;
+  syncStatus: SyncStatus;
   onLanguageChange: (language: Language) => void;
   onResetDemo: () => void;
   onThemeChange: (theme: Theme) => void;
@@ -33,6 +34,7 @@ export function AppRouter({
   accent,
   stack,
   setData,
+  syncStatus,
   onLanguageChange,
   onResetDemo,
   onThemeChange,
@@ -60,7 +62,7 @@ export function AppRouter({
     case 'labDevices':
       return <LabDevicesView data={data} setData={setData} currentUser={currentUser} language={language} />;
     case 'canteen':
-      return <CanteenView data={data} setData={setData} currentUser={currentUser} language={language} />;
+      return <CanteenView data={data} setData={setData} currentUser={currentUser} language={language} syncStatus={syncStatus} />;
     case 'settings':
       return (
         <SettingsView

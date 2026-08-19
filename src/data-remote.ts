@@ -1,4 +1,4 @@
-import type { PlatformData, SharedDataSnapshot } from './types';
+import type { CanteenCard, CanteenMealScan, PlatformData, SharedDataSnapshot } from './types';
 import { uniqueStrings } from './education';
 import { REMOTE_STATE_ENDPOINT } from './data-constants';
 import { normalizePlatformData } from './data-normalization';
@@ -97,16 +97,58 @@ export async function saveSharedData(data: PlatformData): Promise<SharedDataSnap
   };
 }
 
+function mergeCanteenCards(baseData: PlatformData, sourceData: PlatformData) {
+  const cardsById = new Map(baseData.canteenCards.map((card) => [card.id, card]));
+
+  sourceData.canteenCards.forEach((sourceCard) => {
+    const baseCard = cardsById.get(sourceCard.id);
+    if (!baseCard) {
+      cardsById.set(sourceCard.id, sourceCard);
+      return;
+    }
+
+    const sourceTimestamp = Date.parse(sourceCard.updatedAt ?? sourceCard.createdAt);
+    const baseTimestamp = Date.parse(baseCard.updatedAt ?? baseCard.createdAt);
+    if (sourceTimestamp >= baseTimestamp) {
+      cardsById.set(sourceCard.id, sourceCard);
+    }
+  });
+
+  return [...cardsById.values()];
+}
+
+function mergeCanteenMealScans(baseData: PlatformData, sourceData: PlatformData) {
+  const scansById = new Map(baseData.canteenMealScans.map((scan) => [scan.id, scan]));
+
+  sourceData.canteenMealScans.forEach((scan) => {
+    if (!scansById.has(scan.id)) {
+      scansById.set(scan.id, scan);
+    }
+  });
+
+  return [...scansById.values()];
+}
+
 export function mergeDeletionTombstones(baseData: PlatformData, sourceData: PlatformData): PlatformData {
   return applyDeletionTombstones({
     ...baseData,
     studentActivations: mergeStudentActivations(baseData, sourceData),
     accountCodes: uniqueStrings([...baseData.accountCodes, ...sourceData.accountCodes]),
+    canteenCards: mergeCanteenCards(baseData, sourceData),
+    canteenMealScans: mergeCanteenMealScans(baseData, sourceData),
     deletedSchoolIds: uniqueStrings([...baseData.deletedSchoolIds, ...sourceData.deletedSchoolIds]),
     deletedExerciseIds: uniqueStrings([...baseData.deletedExerciseIds, ...sourceData.deletedExerciseIds]),
     deletedNoteIds: uniqueStrings([...baseData.deletedNoteIds, ...sourceData.deletedNoteIds]),
     deletedScheduleIds: uniqueStrings([...baseData.deletedScheduleIds, ...sourceData.deletedScheduleIds])
   });
+}
+
+export function mergeCanteenRecordsForPush(baseData: PlatformData, sourceData: PlatformData): PlatformData {
+  return {
+    ...baseData,
+    canteenCards: mergeCanteenCards(baseData, sourceData),
+    canteenMealScans: mergeCanteenMealScans(baseData, sourceData)
+  };
 }
 
 export function hasUserData(data: PlatformData) {

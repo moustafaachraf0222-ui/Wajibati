@@ -1,7 +1,7 @@
-import { AlertTriangle, ArrowLeft, CheckCircle2, ChevronRight, Printer, QrCode, ScanLine, Users, Utensils, XCircle } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, CheckCircle2, ChevronRight, CloudOff, Printer, QrCode, ScanLine, Users, Utensils, XCircle } from 'lucide-react';
 import QRCode from 'qrcode';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import type { CanteenCard, CanteenMealScan, CanteenScanResult, DataSetter, Language, PlatformData, PlatformUser } from '../types';
+import type { CanteenCard, CanteenMealScan, CanteenScanResult, DataSetter, Language, PlatformData, PlatformUser, SyncStatus } from '../types';
 import { generateUniqueCode, getSchool, makeId } from '../data';
 import { localeNames, roleNames, schoolYearLabel, tr } from '../i18n';
 import { secondaryStreamLabel } from '../education';
@@ -410,13 +410,16 @@ function DirectorCanteenView({
   data,
   setData,
   currentUser,
-  language
+  language,
+  syncStatus
 }: {
   data: PlatformData;
   currentUser: PlatformUser;
   language: Language;
   setData: DataSetter;
+  syncStatus: SyncStatus;
 }) {
+  const offline = syncStatus === 'error' || syncStatus === 'local';
   const [selectedDate, setSelectedDate] = useState(localDateKey());
   const [selectedMonth, setSelectedMonth] = useState(localMonthKey());
   const students = useMemo(
@@ -531,6 +534,12 @@ function DirectorCanteenView({
 
   return (
     <section className="content-grid canteen-view">
+      {offline && (
+        <div className="offline-banner full" role="status">
+          <CloudOff size={17} aria-hidden="true" />
+          <span>{tr(language, 'canteenOfflineMode')}</span>
+        </div>
+      )}
       <div className="panel full">
         <div className="panel-heading">
           <div>
@@ -773,13 +782,16 @@ function CanteenWorkerView({
   data,
   setData,
   currentUser,
-  language
+  language,
+  syncStatus
 }: {
   data: PlatformData;
   currentUser: PlatformUser;
   language: Language;
   setData: DataSetter;
+  syncStatus: SyncStatus;
 }) {
+  const offline = syncStatus === 'error' || syncStatus === 'local';
   const [manualCode, setManualCode] = useState('');
   const [scanOutcome, setScanOutcome] = useState<ScanOutcome | null>(null);
   const [scanNotice, setScanNotice] = useState<'idle' | 'success'>('idle');
@@ -906,6 +918,12 @@ function CanteenWorkerView({
 
   return (
     <section className="content-grid canteen-view">
+      {offline && (
+        <div className="offline-banner full" role="status">
+          <CloudOff size={17} aria-hidden="true" />
+          <span>{tr(language, 'canteenOfflineMode')}</span>
+        </div>
+      )}
       <div className="panel full">
         <div className="panel-heading">
           <div>
@@ -987,6 +1005,7 @@ function CanteenWorkerView({
                   <span>{tr(language, 'scanResult')}</span>
                   <strong>{resultLabel(language, scanOutcome.result)}</strong>
                   <small>{scanOutcome.student?.name ?? scanOutcome.scan.code}</small>
+                  {offline && <small className="canteen-result-queued">{tr(language, 'scanQueuedLocally')}</small>}
                 </div>
               </div>
             )}
@@ -1001,16 +1020,18 @@ export function CanteenView({
   data,
   setData,
   currentUser,
-  language
+  language,
+  syncStatus
 }: {
   data: PlatformData;
   currentUser: PlatformUser;
   language: Language;
   setData: DataSetter;
+  syncStatus: SyncStatus;
 }) {
   if (currentUser.role === 'director') {
-    return <DirectorCanteenView data={data} setData={setData} currentUser={currentUser} language={language} />;
+    return <DirectorCanteenView data={data} setData={setData} currentUser={currentUser} language={language} syncStatus={syncStatus} />;
   }
 
-  return <CanteenWorkerView data={data} setData={setData} currentUser={currentUser} language={language} />;
+  return <CanteenWorkerView data={data} setData={setData} currentUser={currentUser} language={language} syncStatus={syncStatus} />;
 }
