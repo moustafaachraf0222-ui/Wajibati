@@ -175,7 +175,7 @@ export function AppShell({
             )}
             <div>
               <p>{tr(language, activeView)}</p>
-              <h1>{currentUser.name}</h1>
+              <h1>{currentUser.email}</h1>
             </div>
           </div>
           <div className="topbar-actions">
