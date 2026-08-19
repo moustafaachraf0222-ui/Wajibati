@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle2, Printer, QrCode, ScanLine, Users, Utensils, XCircle } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, CheckCircle2, ChevronRight, Printer, QrCode, ScanLine, Users, Utensils, XCircle } from 'lucide-react';
 import QRCode from 'qrcode';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import type { CanteenCard, CanteenMealScan, CanteenScanResult, DataSetter, Language, PlatformData, PlatformUser } from '../types';
@@ -6,6 +6,7 @@ import { generateUniqueCode, getSchool, makeId } from '../data';
 import { localeNames, roleNames, schoolYearLabel, tr } from '../i18n';
 import { secondaryStreamLabel } from '../education';
 import { ResponsiveTable } from '../ui';
+import { useBackShortcut } from '../back-shortcut';
 
 type BarcodeDetectorResult = { rawValue?: string };
 type BarcodeDetectorInstance = {
@@ -516,6 +517,18 @@ function DirectorCanteenView({
     }));
   };
 
+  const [selectedClassKey, setSelectedClassKey] = useState<string | null>(null);
+
+  useBackShortcut(() => {
+    if (selectedClassKey) {
+      setSelectedClassKey(null);
+      return true;
+    }
+    return false;
+  });
+
+  const selectedClassGroup = selectedClassKey ? studentClassGroups.find((group) => group.label === selectedClassKey) : undefined;
+
   return (
     <section className="content-grid canteen-view">
       <div className="panel full">
@@ -532,53 +545,107 @@ function DirectorCanteenView({
             <span>{tr(language, 'printAllCanteenCards')}</span>
           </button>
         </div>
-        {studentClassGroups.length === 0 && <p className="empty-state">{tr(language, 'noStudentsInSelectedClass')}</p>}
-        {studentClassGroups.map((group) => (
-          <div className="canteen-class-group" key={group.label}>
-            <h3>{group.label}</h3>
-            <ResponsiveTable
-              columns={[tr(language, 'fullName'), tr(language, 'canteenCardCode'), tr(language, 'status'), tr(language, 'actions')]}
-              emptyText={tr(language, 'noStudentsInSelectedClass')}
-            >
-              {group.students.map((student) => {
-                const card = cardForStudent(data, student.id);
+        {!selectedClassKey && (
+          <>
+            {studentClassGroups.length === 0 && <p className="empty-state">{tr(language, 'noStudentsInSelectedClass')}</p>}
+            <div className="user-groups">
+              {studentClassGroups.map((group) => {
+                const issuedCount = group.students.filter((student) => Boolean(cardForStudent(data, student.id))).length;
                 return (
-                  <tr key={student.id}>
-                    <td>{student.name}</td>
-                    <td dir="ltr">{card?.code ?? '-'}</td>
-                    <td>
-                      {card ? (
-                        <span className={`status ${card.status}`}>{tr(language, card.status === 'active' ? 'activeCard' : 'disabledCard')}</span>
-                      ) : (
-                        <span className="muted-cell">-</span>
-                      )}
-                    </td>
-                    <td>
-                      <div className="table-actions">
-                        {card ? (
-                          <>
-                            <button className="button ghost small" type="button" onClick={() => void printCanteenCards(language, data, [card])}>
-                              <Printer size={15} aria-hidden="true" />
-                              <span>{tr(language, 'printCanteenCard')}</span>
-                            </button>
-                            <button className="button ghost small" type="button" onClick={() => toggleCard(card)}>
-                              <span>{card.status === 'active' ? tr(language, 'disable') : tr(language, 'activate')}</span>
-                            </button>
-                          </>
-                        ) : (
-                          <button className="button primary small" type="button" onClick={() => issueCard(student)}>
-                            <QrCode size={15} aria-hidden="true" />
-                            <span>{tr(language, 'issueCanteenCard')}</span>
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
+                  <button type="button" className="user-group drill-row" key={group.label} onClick={() => setSelectedClassKey(group.label)}>
+                    <span className="user-group-title">
+                      <span className="user-group-label">
+                        <Users size={16} aria-hidden="true" />
+                        <span className="user-group-label-name">{group.label}</span>
+                      </span>
+                      <span className="user-group-meta">
+                        <strong>
+                          {tr(language, 'studentCount')}: {group.students.length}
+                        </strong>
+                        <strong>
+                          {tr(language, 'canteenCards')}: {issuedCount}
+                        </strong>
+                        <ChevronRight size={17} aria-hidden="true" />
+                      </span>
+                    </span>
+                  </button>
                 );
               })}
-            </ResponsiveTable>
-          </div>
-        ))}
+            </div>
+          </>
+        )}
+
+        {selectedClassGroup && (
+          <>
+            <button type="button" className="back-button full" onClick={() => setSelectedClassKey(null)}>
+              <ArrowLeft size={15} aria-hidden="true" />
+              <span>{tr(language, 'back')}</span>
+            </button>
+            <div className="canteen-class-group">
+              <div className="absence-report-actions">
+                <button
+                  className="button ghost"
+                  type="button"
+                  disabled={!selectedClassGroup.students.some((student) => Boolean(cardForStudent(data, student.id)))}
+                  onClick={() =>
+                    void printCanteenCards(
+                      language,
+                      data,
+                      data.canteenCards.filter(
+                        (card) => card.schoolId === currentUser.schoolId && selectedClassGroup.students.some((student) => student.id === card.studentId)
+                      )
+                    )
+                  }
+                >
+                  <Printer size={17} aria-hidden="true" />
+                  <span>{tr(language, 'printCanteenCardsForClass')}</span>
+                </button>
+              </div>
+              <h3>{selectedClassGroup.label}</h3>
+              <ResponsiveTable
+                columns={[tr(language, 'fullName'), tr(language, 'canteenCardCode'), tr(language, 'status'), tr(language, 'actions')]}
+                emptyText={tr(language, 'noStudentsInSelectedClass')}
+              >
+                {selectedClassGroup.students.map((student) => {
+                  const card = cardForStudent(data, student.id);
+                  return (
+                    <tr key={student.id}>
+                      <td>{student.name}</td>
+                      <td dir="ltr">{card?.code ?? '-'}</td>
+                      <td>
+                        {card ? (
+                          <span className={`status ${card.status}`}>{tr(language, card.status === 'active' ? 'activeCard' : 'disabledCard')}</span>
+                        ) : (
+                          <span className="muted-cell">-</span>
+                        )}
+                      </td>
+                      <td>
+                        <div className="table-actions">
+                          {card ? (
+                            <>
+                              <button className="button ghost small" type="button" onClick={() => void printCanteenCards(language, data, [card])}>
+                                <Printer size={15} aria-hidden="true" />
+                                <span>{tr(language, 'printCanteenCard')}</span>
+                              </button>
+                              <button className="button ghost small" type="button" onClick={() => toggleCard(card)}>
+                                <span>{card.status === 'active' ? tr(language, 'disable') : tr(language, 'activate')}</span>
+                              </button>
+                            </>
+                          ) : (
+                            <button className="button primary small" type="button" onClick={() => issueCard(student)}>
+                              <QrCode size={15} aria-hidden="true" />
+                              <span>{tr(language, 'issueCanteenCard')}</span>
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </ResponsiveTable>
+            </div>
+          </>
+        )}
       </div>
 
       <div className="panel full">
