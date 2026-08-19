@@ -1,9 +1,9 @@
-import { AlertTriangle, CheckCircle2, Printer, QrCode, ScanLine, Utensils, XCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Printer, QrCode, ScanLine, Users, Utensils, XCircle } from 'lucide-react';
 import QRCode from 'qrcode';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import type { CanteenCard, CanteenMealScan, CanteenScanResult, DataSetter, Language, PlatformData, PlatformUser } from '../types';
 import { generateUniqueCode, getSchool, makeId } from '../data';
-import { localeNames, schoolYearLabel, tr } from '../i18n';
+import { localeNames, roleNames, schoolYearLabel, tr } from '../i18n';
 import { secondaryStreamLabel } from '../education';
 import { ResponsiveTable } from '../ui';
 
@@ -132,7 +132,7 @@ function classLabel(language: Language, student?: PlatformUser) {
 }
 
 function studentForCard(data: PlatformData, card: CanteenCard) {
-  return data.users.find((user) => user.id === card.studentId && user.role === 'student');
+  return data.users.find((user) => user.id === card.studentId);
 }
 
 function cardForStudent(data: PlatformData, studentId: string) {
@@ -292,25 +292,42 @@ function printFrame(language: Language, title: string, body: string) {
 async function printCanteenCards(language: Language, data: PlatformData, cards: CanteenCard[]) {
   const school = data.schools.find((candidate) => candidate.id === cards[0]?.schoolId);
   const title = tr(language, 'canteenCards');
+  const groups = new Map<string, CanteenCard[]>();
+  cards.forEach((card) => {
+    const holder = studentForCard(data, card);
+    const label = holder && holder.role !== 'student' ? tr(language, 'schoolStaff') : classLabel(language, holder);
+    const existing = groups.get(label);
+    if (existing) {
+      existing.push(card);
+    } else {
+      groups.set(label, [card]);
+    }
+  });
   const cardsHtml = await Promise.all(
-    cards.map(async (card) => {
-      const student = studentForCard(data, card);
-      const qrDataUrl = await QRCode.toDataURL(card.code, { width: 190, margin: 1, errorCorrectionLevel: 'M' });
-      return `<article class="meal-card">
+    [...groups.entries()].map(async ([label, groupCards]) => {
+      const groupHtml = await Promise.all(
+        groupCards.map(async (card) => {
+          const holder = studentForCard(data, card);
+          const qrDataUrl = await QRCode.toDataURL(card.code, { width: 190, margin: 1, errorCorrectionLevel: 'M' });
+          return `<article class="meal-card">
         <h2>${escapeHtml(tr(language, 'schoolCanteen'))}</h2>
         <p>${escapeHtml(school?.name ?? '-')}</p>
         <img src="${qrDataUrl}" alt="QR" />
-        <strong>${escapeHtml(student?.name ?? '-')}</strong>
-        <p>${escapeHtml(classLabel(language, student))}</p>
+        <strong>${escapeHtml(holder?.name ?? '-')}</strong>
+        <p>${escapeHtml(holder && holder.role !== 'student' ? tr(language, 'schoolStaff') : classLabel(language, holder))}</p>
         <code>${escapeHtml(card.code)}</code>
       </article>`;
+        })
+      );
+
+      return `<h2>${escapeHtml(label)}</h2><div class="card-grid">${groupHtml.join('')}</div>`;
     })
   );
 
   printFrame(
     language,
     title,
-    `<header><h1>${escapeHtml(title)}</h1><p>${escapeHtml(school?.name ?? '-')}</p></header><main class="card-grid">${cardsHtml.join('')}</main>`
+    `<header><h1>${escapeHtml(title)}</h1><p>${escapeHtml(school?.name ?? '-')}</p></header>${cardsHtml.join('')}`
   );
 }
 
@@ -419,6 +436,42 @@ function DirectorCanteenView({
         }),
     [currentUser.schoolId, data]
   );
+  const staff = useMemo(
+    () =>
+      data.users
+        .filter(
+          (user) =>
+            (user.role === 'teacher' || user.role === 'supervisor' || user.role === 'lab') &&
+            user.schoolId === currentUser.schoolId &&
+            user.status === 'active'
+        )
+        .sort((left, right) => left.role.localeCompare(right.role) || sortByName(left, right)),
+    [currentUser.schoolId, data.users]
+  );
+  const studentClassGroups = useMemo(() => {
+    const groups = new Map<string, { label: string; students: PlatformUser[] }>();
+    students.forEach((student) => {
+      const key = `${student.schoolYear ?? ''}|${student.stream ?? ''}|${(student.classGroup ?? '').trim().toLowerCase()}`;
+      const existing = groups.get(key) ?? { label: classLabel(language, student), students: [] };
+      existing.students.push(student);
+      groups.set(key, existing);
+    });
+    return [...groups.values()];
+  }, [language, students]);
+  const staffCards = useMemo(
+    () =>
+      data.canteenCards
+        .filter((card) => card.schoolId === currentUser.schoolId && staff.some((user) => user.id === card.studentId))
+        .sort((left, right) => {
+          const leftHolder = studentForCard(data, left);
+          const rightHolder = studentForCard(data, right);
+          return (
+            (leftHolder?.role ?? '').localeCompare(rightHolder?.role ?? '') ||
+            sortByName(leftHolder ?? ({ name: '' } as PlatformUser), rightHolder ?? ({ name: '' } as PlatformUser))
+          );
+        }),
+    [currentUser.schoolId, data, staff]
+  );
   const dailyScans = useMemo(() => allowedScansForDate(data, currentUser.schoolId, selectedDate), [currentUser.schoolId, data, selectedDate]);
   const monthlyStats = useMemo(() => monthlyCanteenStats(data, currentUser.schoolId, selectedMonth, language), [currentUser.schoolId, data, language, selectedMonth]);
 
@@ -479,17 +532,76 @@ function DirectorCanteenView({
             <span>{tr(language, 'printAllCanteenCards')}</span>
           </button>
         </div>
-        <ResponsiveTable
-          columns={[tr(language, 'fullName'), tr(language, 'schoolYear'), tr(language, 'classGroup'), tr(language, 'canteenCardCode'), tr(language, 'status'), tr(language, 'actions')]}
-          emptyText={tr(language, 'noStudentsInSelectedClass')}
-        >
-          {students.map((student) => {
-            const card = cardForStudent(data, student.id);
+        {studentClassGroups.length === 0 && <p className="empty-state">{tr(language, 'noStudentsInSelectedClass')}</p>}
+        {studentClassGroups.map((group) => (
+          <div className="canteen-class-group" key={group.label}>
+            <h3>{group.label}</h3>
+            <ResponsiveTable
+              columns={[tr(language, 'fullName'), tr(language, 'canteenCardCode'), tr(language, 'status'), tr(language, 'actions')]}
+              emptyText={tr(language, 'noStudentsInSelectedClass')}
+            >
+              {group.students.map((student) => {
+                const card = cardForStudent(data, student.id);
+                return (
+                  <tr key={student.id}>
+                    <td>{student.name}</td>
+                    <td dir="ltr">{card?.code ?? '-'}</td>
+                    <td>
+                      {card ? (
+                        <span className={`status ${card.status}`}>{tr(language, card.status === 'active' ? 'activeCard' : 'disabledCard')}</span>
+                      ) : (
+                        <span className="muted-cell">-</span>
+                      )}
+                    </td>
+                    <td>
+                      <div className="table-actions">
+                        {card ? (
+                          <>
+                            <button className="button ghost small" type="button" onClick={() => void printCanteenCards(language, data, [card])}>
+                              <Printer size={15} aria-hidden="true" />
+                              <span>{tr(language, 'printCanteenCard')}</span>
+                            </button>
+                            <button className="button ghost small" type="button" onClick={() => toggleCard(card)}>
+                              <span>{card.status === 'active' ? tr(language, 'disable') : tr(language, 'activate')}</span>
+                            </button>
+                          </>
+                        ) : (
+                          <button className="button primary small" type="button" onClick={() => issueCard(student)}>
+                            <QrCode size={15} aria-hidden="true" />
+                            <span>{tr(language, 'issueCanteenCard')}</span>
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </ResponsiveTable>
+          </div>
+        ))}
+      </div>
+
+      <div className="panel full">
+        <div className="panel-heading">
+          <div>
+            <p>{tr(language, 'schoolStaffCardsHint')}</p>
+            <h2>{tr(language, 'schoolStaff')}</h2>
+          </div>
+          <Users size={24} aria-hidden="true" />
+        </div>
+        <div className="button-row">
+          <button className="button ghost" type="button" disabled={staffCards.length === 0} onClick={() => void printCanteenCards(language, data, staffCards)}>
+            <Printer size={17} aria-hidden="true" />
+            <span>{tr(language, 'printAllCanteenCards')}</span>
+          </button>
+        </div>
+        <ResponsiveTable columns={[tr(language, 'fullName'), tr(language, 'role'), tr(language, 'canteenCardCode'), tr(language, 'status'), tr(language, 'actions')]} emptyText={tr(language, 'noStaffCanteenCards')}>
+          {staff.map((member) => {
+            const card = cardForStudent(data, member.id);
             return (
-              <tr key={student.id}>
-                <td>{student.name}</td>
-                <td>{schoolYearLabel(language, student.stage, student.schoolYear)}</td>
-                <td>{student.stage === 'secondary' && student.stream ? `${secondaryStreamLabel(language, student.stream, student.schoolYear)} - ${student.classGroup ?? '-'}` : student.classGroup ?? '-'}</td>
+              <tr key={member.id}>
+                <td>{member.name}</td>
+                <td>{roleNames[language][member.role]}</td>
                 <td dir="ltr">{card?.code ?? '-'}</td>
                 <td>
                   {card ? (
@@ -511,7 +623,7 @@ function DirectorCanteenView({
                         </button>
                       </>
                     ) : (
-                      <button className="button primary small" type="button" onClick={() => issueCard(student)}>
+                      <button className="button primary small" type="button" onClick={() => issueCard(member)}>
                         <QrCode size={15} aria-hidden="true" />
                         <span>{tr(language, 'issueCanteenCard')}</span>
                       </button>
