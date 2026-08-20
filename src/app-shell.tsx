@@ -21,6 +21,7 @@ type AppShellProps = {
   currentUser: PlatformUser;
   language: Language;
   logoutOpen: boolean;
+  navBadges?: Partial<Record<View, number>>;
   stack: NavStack;
   syncStatus: SyncStatus;
   tabs: NavItem[];
@@ -71,6 +72,7 @@ export function AppShell({
   currentUser,
   language,
   logoutOpen,
+  navBadges,
   stack,
   syncStatus,
   tabs,
@@ -126,6 +128,7 @@ export function AppShell({
         <nav className="nav-list" aria-label="Primary">
           {tabs.map((item) => {
             const Icon = item.icon;
+            const badge = navBadges?.[item.id] ?? 0;
             return (
               <button
                 key={item.id}
@@ -135,6 +138,7 @@ export function AppShell({
               >
                 <Icon size={18} aria-hidden="true" />
                 <span>{tr(language, item.labelKey)}</span>
+                {badge > 0 && <span className="nav-badge">{badge}</span>}
               </button>
             );
           })}

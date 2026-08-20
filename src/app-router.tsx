@@ -80,6 +80,6 @@ export function AppRouter({
       );
     case 'overview':
     default:
-      return <OverviewView data={data} currentUser={currentUser} language={language} />;
+      return <OverviewView data={data} setData={setData} currentUser={currentUser} language={language} />;
   }
 }

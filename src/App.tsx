@@ -3,7 +3,8 @@ import type {
   Accent,
   Language,
   PlatformData,
-  Theme
+  Theme,
+  View
 } from './types';
 import {
   cloneSeedData,
@@ -21,6 +22,7 @@ import {
 } from './app-effects';
 import { useAppSession } from './app-session';
 import { useSharedDataSync } from './app-sync';
+import { transferBadgeCount } from './views/accounts-transfers';
 import { AppRouter } from './app-router';
 import { AppShell } from './app-shell';
 import { LoginPage } from './views/login';
@@ -33,6 +35,14 @@ function App() {
   const session = useAppSession(data);
   const currentUser = session.currentUser;
   const { refreshSharedData, syncStatus } = useSharedDataSync(data, setData, currentUser?.id);
+
+  const navBadges: Partial<Record<View, number>> = {};
+  if (currentUser?.role === 'director') {
+    const pendingIncoming = transferBadgeCount(data, currentUser);
+    if (pendingIncoming > 0) {
+      navBadges.users = pendingIncoming;
+    }
+  }
 
   useExpiredSchoolTrashPurge(setData);
   useLanguagePreference(language);
@@ -62,6 +72,7 @@ function App() {
       currentUser={currentUser}
       language={language}
       logoutOpen={session.logoutOpen}
+      navBadges={navBadges}
       stack={session.stack}
       syncStatus={syncStatus}
       tabs={session.tabs}

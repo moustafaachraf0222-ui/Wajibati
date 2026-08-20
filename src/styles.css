@@ -630,6 +630,42 @@ img {
   stroke-width: 2.5;
 }
 
+.nav-badge {
+  position: absolute;
+  top: 5px;
+  inset-inline-end: 8px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--rose);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+}
+
+.mm-tag.confirmed {
+  border-color: color-mix(in srgb, var(--teal) 40%, var(--paper));
+  background: var(--teal-soft);
+  color: var(--teal);
+}
+
+.mm-tag.confirmed svg {
+  color: var(--teal);
+}
+
+.mm-tag.rejected {
+  border-color: color-mix(in srgb, var(--rose) 40%, var(--paper));
+  background: var(--rose-soft);
+  color: var(--rose);
+}
+
+.mm-tag.rejected svg {
+  color: var(--rose);
+}
+
 .scope-card {
   margin-top: auto;
   border: 1px solid var(--line);

@@ -1,5 +1,5 @@
 import { BookOpen, CalendarDays, CheckCircle2, CircleOff, Download, LockKeyhole, Users } from 'lucide-react';
-import type { Language, PlatformData, PlatformUser } from '../types';
+import type { DataSetter, Language, PlatformData, PlatformUser } from '../types';
 import { localeNames, stageNames, statusNames, subjectNames, tr } from '../i18n';
 import {
   assignedClassGroups,
@@ -17,6 +17,7 @@ import {
   weekRangeLabel
 } from '../homework';
 import { RoleLabel } from '../ui';
+import { TransferNoticesPanel } from './accounts-transfers';
 
 type CommonViewProps = {
   data: PlatformData;
@@ -180,7 +181,7 @@ function createReportPdfBlob(title: string, lines: string[], language: Language)
   return canvasToPdfBlob(canvas);
 }
 
-export function OverviewView({ data, currentUser, language }: CommonViewProps) {
+export function OverviewView({ data, setData, currentUser, language }: CommonViewProps & { setData: DataSetter }) {
   const school = getSchool(data, currentUser);
   const users = scopedUsers(data, currentUser);
   const exercises = scopedExercises(data, currentUser);
@@ -196,6 +197,7 @@ export function OverviewView({ data, currentUser, language }: CommonViewProps) {
     return (
       <section className="content-grid">
         <DirectorWeeklyReport data={data} currentUser={currentUser} language={language} />
+        <TransferNoticesPanel data={data} setData={setData} currentUser={currentUser} language={language} />
       </section>
     );
   }
