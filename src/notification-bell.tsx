@@ -56,13 +56,11 @@ function buildBellItems(data: PlatformData, currentUser: PlatformUser, language:
         (request) => request.fromSchoolId === currentUser.schoolId && request.status !== 'pending' && (request.resolvedAt ?? '') > transferThreshold
       )
       .forEach((request) => {
-        const user = data.users.find((candidate) => candidate.id === request.userId);
-        const toSchool = data.schools.find((candidate) => candidate.id === request.toSchoolId);
         pushItem(items, {
           id: `transfer-${request.id}`,
           kind: request.status === 'confirmed' ? 'transferAccepted' : 'transferRejected',
           title: tr(language, request.status === 'confirmed' ? 'transferAcceptedNotice' : 'transferRejectedNotice'),
-          subtitle: `${user?.name ?? '-'} - ${toSchool?.name ?? '-'}`,
+          subtitle: '',
           at: request.resolvedAt ?? '',
           view: 'users'
         });
@@ -209,7 +207,7 @@ export function NotificationBell({
                       <Icon size={17} aria-hidden="true" />
                       <span className="notification-item-text">
                         <strong>{item.title}</strong>
-                        <small>{item.subtitle}</small>
+                        {item.subtitle !== '' && <small>{item.subtitle}</small>}
                         <small>{formatDateTime(language, item.at)}</small>
                       </span>
                     </button>

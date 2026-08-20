@@ -143,7 +143,7 @@ export function TransferNoticesPanel({
     .filter((request) => request.toSchoolId === currentUser.schoolId && request.status === 'pending')
     .sort((left, right) => right.requestedAt.localeCompare(left.requestedAt));
   const outcomeRequests = data.transferRequests
-    .filter((request) => request.fromSchoolId === currentUser.schoolId && request.status !== 'pending')
+    .filter((request) => request.fromSchoolId === currentUser.schoolId && request.status === 'confirmed')
     .sort((left, right) => (right.resolvedAt ?? '').localeCompare(left.resolvedAt ?? ''));
 
   const confirmTransfer = (request: TransferRequest) => {
