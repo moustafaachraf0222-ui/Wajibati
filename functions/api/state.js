@@ -511,7 +511,8 @@ function targetUsersForAnnouncement(data, announcement) {
     (user) =>
       user.status === 'active' &&
       user.schoolId === announcement.schoolId &&
-      (user.role === 'teacher' || user.role === 'student')
+      user.role !== 'admin' &&
+      user.role !== 'director'
   );
 }
 
@@ -712,6 +713,26 @@ function updatedReservationResponses(previousRequests = [], nextRequests = []) {
   });
 }
 
+function updatedTransferResponses(previousRequests = [], nextRequests = []) {
+  const previousById = new Map(previousRequests.map((request) => [request.id, request]));
+  return nextRequests.filter((request) => {
+    const previousRequest = previousById.get(request.id);
+    return (
+      previousRequest &&
+      previousRequest.status === 'pending' &&
+      (request.status === 'confirmed' || request.status === 'rejected')
+    );
+  });
+}
+
+function updatedLabRepairs(previousReports = [], nextReports = []) {
+  const previousById = new Map(previousReports.map((report) => [report.id, report]));
+  return nextReports.filter((report) => {
+    const previousReport = previousById.get(report.id);
+    return previousReport && previousReport.status !== 'repaired' && report.status === 'repaired';
+  });
+}
+
 async function sendNotificationsForChanges(env, previousData, nextData) {
   const notifications = [];
 
@@ -816,6 +837,46 @@ async function sendNotificationsForChanges(env, previousData, nextData) {
             : `تم رفض طلب حجز ${cleanText(lab?.name, 'المخبر')} في ${reservationSlotLabel(request)}.`
       },
       data: { type: 'lab_reservation_response', id: request.id, labId: request.labId, slotId: request.slotId, status: request.status }
+    });
+  });
+
+  updatedTransferResponses(previousData.transferRequests ?? [], nextData.transferRequests ?? []).forEach((request) => {
+    const user = nextData.users.find((item) => item.id === request.userId);
+    const toSchool = nextData.schools.find((school) => school.id === request.toSchoolId);
+    const targetDirectors = nextData.users.filter(
+      (candidate) => candidate.role === 'director' && candidate.status === 'active' && candidate.schoolId === request.fromSchoolId
+    );
+    if (targetDirectors.length === 0) {
+      return;
+    }
+
+    notifications.push({
+      users: targetDirectors,
+      notification: {
+        title: request.status === 'confirmed' ? 'تم قبول طلب النقل' : 'تم رفض طلب النقل',
+        body:
+          request.status === 'confirmed'
+            ? `تم قبول نقل ${cleanText(user?.name, 'الحساب')} إلى ${cleanText(toSchool?.name, 'المدرسة').trim() || 'المدرسة المستقبلة'}.`
+            : `تم رفض طلب نقل ${cleanText(user?.name, 'الحساب')} إلى ${cleanText(toSchool?.name, 'المدرسة').trim() || 'المدرسة المستقبلة'}.`
+      },
+      data: { type: 'transfer_response', id: request.id, status: request.status }
+    });
+  });
+
+  updatedLabRepairs(previousData.labFaultReports ?? [], nextData.labFaultReports ?? []).forEach((report) => {
+    const lab = (nextData.laboratories ?? []).find((item) => item.id === report.labId);
+    const supervisor = nextData.users.find((user) => user.id === lab?.supervisorId);
+    if (!supervisor) {
+      return;
+    }
+
+    notifications.push({
+      users: [supervisor],
+      notification: {
+        title: 'تم إصلاح الجهاز',
+        body: `تم إصلاح ${cleanText(report.deviceName, 'الجهاز')} داخل ${cleanText(lab?.name, 'المخبر')}.`
+      },
+      data: { type: 'lab_repair', id: report.id, labId: report.labId, deviceId: report.deviceId }
     });
   });
 
