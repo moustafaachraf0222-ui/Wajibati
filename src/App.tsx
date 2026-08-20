@@ -25,6 +25,7 @@ import { useSharedDataSync } from './app-sync';
 import { transferBadgeCount } from './views/accounts-transfers';
 import {
   absenceNotificationCount,
+  announcementNotificationCount,
   canteenNotificationCount,
   labNotificationCount,
   labRepairNotificationCount,
@@ -78,6 +79,10 @@ function App() {
     const canteen = canteenNotificationCount(data, currentUser);
     if (canteen > 0) {
       badges.canteen = canteen;
+    }
+    const announcements = announcementNotificationCount(data, currentUser);
+    if (announcements > 0) {
+      badges.announcements = announcements;
     }
     return badges;
   }, [currentUser, data, seenVersion]);

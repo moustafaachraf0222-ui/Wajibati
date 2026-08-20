@@ -25,6 +25,7 @@ import {
 } from '../messages';
 import { AttachmentPreview, Field } from '../ui';
 import { useBackShortcut } from '../back-shortcut';
+import { markSeenAt } from '../notification-seen';
 
 type CommonViewProps = {
   data: PlatformData;
@@ -45,6 +46,14 @@ function useTimeTick(intervalMs = 60_000) {
 
 export function AnnouncementsView({ data, setData, currentUser, language }: CommonViewProps & { setData: DataSetter }) {
   const school = getSchool(data, currentUser);
+
+  useEffect(() => {
+    if (currentUser.schoolId) {
+      markSeenAt(currentUser.id, 'announcements');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const scopedAnnouncementList = scopedAnnouncements(data, currentUser);
   const activeAnnouncements = scopedAnnouncementList
     .filter((announcement) => !isAnnouncementArchived(announcement))

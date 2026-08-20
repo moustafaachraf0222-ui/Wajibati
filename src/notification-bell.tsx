@@ -1,4 +1,4 @@
-import { AlertTriangle, Bell, CheckCircle2, ClipboardCheck, Utensils, Wrench, XCircle } from 'lucide-react';
+import { AlertTriangle, Bell, CheckCircle2, ClipboardCheck, Megaphone, Utensils, Wrench, XCircle } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { Language, PlatformData, PlatformUser, View } from './types';
@@ -7,13 +7,14 @@ import { formatDateTime } from './dates';
 import { markAllDomainsSeen, markSeenAt, seenThreshold, type SeenDomain } from './notification-seen';
 import {
   absenceNotificationCount,
+  announcementNotificationCount,
   canteenNotificationCount,
   labNotificationCount,
   labRepairNotificationCount,
   transferOutcomeNotificationCount
 } from './notification-badges';
 
-type BellItemKind = 'transferAccepted' | 'transferRejected' | 'absence' | 'labFault' | 'labRepair' | 'canteen';
+type BellItemKind = 'transferAccepted' | 'transferRejected' | 'absence' | 'labFault' | 'labRepair' | 'canteen' | 'announcement';
 
 type BellItem = {
   id: string;
@@ -30,7 +31,8 @@ const bellItemIcons: Record<BellItemKind, LucideIcon> = {
   absence: ClipboardCheck,
   labFault: AlertTriangle,
   labRepair: Wrench,
-  canteen: Utensils
+  canteen: Utensils,
+  announcement: Megaphone
 };
 
 const bellItemDomains: Record<BellItemKind, SeenDomain> = {
@@ -39,7 +41,8 @@ const bellItemDomains: Record<BellItemKind, SeenDomain> = {
   absence: 'absences',
   labFault: 'labs',
   labRepair: 'labRepairs',
-  canteen: 'canteen'
+  canteen: 'canteen',
+  announcement: 'announcements'
 };
 
 function formatDateLabel(language: Language, value: string) {
@@ -143,6 +146,23 @@ function buildBellItems(data: PlatformData, currentUser: PlatformUser, language:
       });
   }
 
+  if (currentUser.schoolId) {
+    const announcementThreshold = seenThreshold(currentUser.id, 'announcements');
+    data.announcements
+      .filter((announcement) => announcement.schoolId === currentUser.schoolId && announcement.createdAt > announcementThreshold)
+      .forEach((announcement) => {
+        const author = data.users.find((candidate) => candidate.id === announcement.authorId);
+        pushItem(items, {
+          id: `announcement-${announcement.id}`,
+          kind: 'announcement',
+          title: announcement.title,
+          subtitle: author?.name ?? '',
+          at: announcement.createdAt,
+          view: 'announcements'
+        });
+      });
+  }
+
   return items.sort((left, right) => right.at.localeCompare(left.at)).slice(0, 30);
 }
 
@@ -163,7 +183,8 @@ export function NotificationBell({
     labNotificationCount(data, currentUser) +
     canteenNotificationCount(data, currentUser) +
     labRepairNotificationCount(data, currentUser) +
-    transferOutcomeNotificationCount(data, currentUser);
+    transferOutcomeNotificationCount(data, currentUser) +
+    announcementNotificationCount(data, currentUser);
   const items = open ? buildBellItems(data, currentUser, language) : [];
 
   useEffect(() => {

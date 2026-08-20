@@ -44,6 +44,15 @@ export function labRepairNotificationCount(data: PlatformData, currentUser: Plat
   ).length;
 }
 
+export function announcementNotificationCount(data: PlatformData, currentUser: PlatformUser) {
+  if (!currentUser.schoolId) {
+    return 0;
+  }
+
+  const threshold = seenThreshold(currentUser.id, 'announcements');
+  return data.announcements.filter((announcement) => announcement.schoolId === currentUser.schoolId && announcement.createdAt > threshold).length;
+}
+
 export function transferOutcomeNotificationCount(data: PlatformData, currentUser: PlatformUser) {
   if (currentUser.role !== 'director') {
     return 0;
