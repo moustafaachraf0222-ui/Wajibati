@@ -14,6 +14,7 @@ import type {
 import { localeNames, schoolYearLabel, tr } from '../i18n';
 import { assignedYearClassGroups, assignedYearStreamClassGroups, sameClassGroup, secondaryStreamLabel, uniqueStrings } from '../education';
 import { absenceJustificationExpiresAt, absenceJustificationIsExpired, getSchool, makeId } from '../data';
+import { markSeenAt } from '../notification-seen';
 import { readAttachmentFromInput } from '../files';
 import { AttachmentPreview, ResponsiveTable } from '../ui';
 import { useBackShortcut } from '../back-shortcut';
@@ -1167,6 +1168,12 @@ function RecorderAbsenceJustifications({ data, currentUser, language }: CommonVi
 }
 
 export function AbsencesView({ data, setData, currentUser, language }: CommonViewProps & { setData: DataSetter }) {
+  useEffect(() => {
+    if (currentUser.role === 'director') {
+      markSeenAt('absences');
+    }
+  }, [currentUser.role, data]);
+
   if (currentUser.role === 'director') {
     return <DirectorAbsenceReports data={data} setData={setData} currentUser={currentUser} language={language} />;
   }

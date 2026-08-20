@@ -3,6 +3,7 @@ import QRCode from 'qrcode';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import type { CanteenCard, CanteenMealScan, CanteenScanResult, DataSetter, Language, PlatformData, PlatformUser, SyncStatus } from '../types';
 import { generateUniqueCode, getSchool, makeId } from '../data';
+import { markSeenAt } from '../notification-seen';
 import { localeNames, roleNames, schoolYearLabel, tr } from '../i18n';
 import { secondaryStreamLabel } from '../education';
 import { ResponsiveTable } from '../ui';
@@ -420,6 +421,11 @@ function DirectorCanteenView({
   syncStatus: SyncStatus;
 }) {
   const offline = syncStatus === 'error' || syncStatus === 'local';
+
+  useEffect(() => {
+    markSeenAt('canteen');
+  }, [data]);
+
   const [selectedDate, setSelectedDate] = useState(localDateKey());
   const [selectedMonth, setSelectedMonth] = useState(localMonthKey());
   const students = useMemo(

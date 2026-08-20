@@ -17,6 +17,7 @@ import type {
 } from '../types';
 import { localeNames, tr } from '../i18n';
 import { makeId } from '../data';
+import { markSeenAt } from '../notification-seen';
 import { readAttachmentFromInput } from '../files';
 import { AttachmentPreview, Field, ResponsiveTable } from '../ui';
 import { useBackShortcut } from '../back-shortcut';
@@ -304,6 +305,12 @@ export function LaboratoriesView({
   const reports = reportsForLabs(data, labs);
   const canManageLabs = currentUser.role === 'lab';
   const canHandleFaults = currentUser.role === 'lab' || currentUser.role === 'director';
+
+  useEffect(() => {
+    if (currentUser.role === 'lab') {
+      markSeenAt('labs');
+    }
+  }, [currentUser.role, data]);
 
   return (
     <section className="content-grid labs-view">
