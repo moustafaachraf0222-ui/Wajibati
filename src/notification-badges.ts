@@ -1,5 +1,7 @@
 import type { PlatformData, PlatformUser } from './types';
 import { seenThreshold } from './notification-seen';
+import { exerciseMatchesStudent } from './education-matching';
+import { noteMatchesStudent } from './data-access';
 
 export function absenceNotificationCount(data: PlatformData, currentUser: PlatformUser) {
   if (currentUser.role !== 'director') {
@@ -51,6 +53,24 @@ export function announcementNotificationCount(data: PlatformData, currentUser: P
 
   const threshold = seenThreshold(currentUser.id, 'announcements');
   return data.announcements.filter((announcement) => announcement.schoolId === currentUser.schoolId && announcement.createdAt > threshold).length;
+}
+
+export function exerciseNotificationCount(data: PlatformData, currentUser: PlatformUser) {
+  if (currentUser.role !== 'student') {
+    return 0;
+  }
+
+  const threshold = seenThreshold(currentUser.id, 'studentExercises');
+  return data.exercises.filter((exercise) => exerciseMatchesStudent(exercise, currentUser) && exercise.createdAt > threshold).length;
+}
+
+export function noteNotificationCount(data: PlatformData, currentUser: PlatformUser) {
+  if (currentUser.role !== 'student') {
+    return 0;
+  }
+
+  const threshold = seenThreshold(currentUser.id, 'studentNotes');
+  return data.notes.filter((note) => noteMatchesStudent(note, currentUser) && note.createdAt > threshold).length;
 }
 
 export function transferOutcomeNotificationCount(data: PlatformData, currentUser: PlatformUser) {

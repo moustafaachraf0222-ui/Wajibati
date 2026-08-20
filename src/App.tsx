@@ -27,8 +27,10 @@ import {
   absenceNotificationCount,
   announcementNotificationCount,
   canteenNotificationCount,
+  exerciseNotificationCount,
   labNotificationCount,
   labRepairNotificationCount,
+  noteNotificationCount,
   transferOutcomeNotificationCount
 } from './notification-badges';
 import { SEEN_CHANGED_EVENT } from './notification-seen';
@@ -83,6 +85,14 @@ function App() {
     const announcements = announcementNotificationCount(data, currentUser);
     if (announcements > 0) {
       badges.announcements = announcements;
+    }
+    const exercises = exerciseNotificationCount(data, currentUser);
+    if (exercises > 0) {
+      badges.exercises = exercises;
+    }
+    const notes = noteNotificationCount(data, currentUser);
+    if (notes > 0) {
+      badges.notes = notes;
     }
     return badges;
   }, [currentUser, data, seenVersion]);

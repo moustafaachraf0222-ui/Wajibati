@@ -503,6 +503,12 @@ function TeacherNotes({ data, setData, currentUser, language }: CommonViewProps 
 
 function StudentNotes({ data, currentUser, language }: CommonViewProps) {
   const now = useTimeTick();
+
+  useEffect(() => {
+    markSeenAt(currentUser.id, 'studentNotes');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const notes = scopedNotes(data, currentUser)
     .filter((note) => !isNoteArchived(note, now))
     .sort((left, right) => right.createdAt.localeCompare(left.createdAt));

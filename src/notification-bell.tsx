@@ -1,20 +1,33 @@
-import { AlertTriangle, Bell, CheckCircle2, ClipboardCheck, Megaphone, Utensils, Wrench, XCircle } from 'lucide-react';
+import { AlertTriangle, Bell, BookOpen, CheckCircle2, ClipboardCheck, Megaphone, StickyNote, Utensils, Wrench, XCircle } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { Language, PlatformData, PlatformUser, View } from './types';
 import { localeNames, tr } from './i18n';
 import { formatDateTime } from './dates';
 import { markAllDomainsSeen, markSeenAt, seenThreshold, type SeenDomain } from './notification-seen';
+import { exerciseMatchesStudent } from './education-matching';
+import { noteMatchesStudent } from './data-access';
 import {
   absenceNotificationCount,
   announcementNotificationCount,
   canteenNotificationCount,
+  exerciseNotificationCount,
   labNotificationCount,
   labRepairNotificationCount,
+  noteNotificationCount,
   transferOutcomeNotificationCount
 } from './notification-badges';
 
-type BellItemKind = 'transferAccepted' | 'transferRejected' | 'absence' | 'labFault' | 'labRepair' | 'canteen' | 'announcement';
+type BellItemKind =
+  | 'transferAccepted'
+  | 'transferRejected'
+  | 'absence'
+  | 'labFault'
+  | 'labRepair'
+  | 'canteen'
+  | 'announcement'
+  | 'exercise'
+  | 'note';
 
 type BellItem = {
   id: string;
@@ -32,7 +45,9 @@ const bellItemIcons: Record<BellItemKind, LucideIcon> = {
   labFault: AlertTriangle,
   labRepair: Wrench,
   canteen: Utensils,
-  announcement: Megaphone
+  announcement: Megaphone,
+  exercise: BookOpen,
+  note: StickyNote
 };
 
 const bellItemDomains: Record<BellItemKind, SeenDomain> = {
@@ -42,7 +57,9 @@ const bellItemDomains: Record<BellItemKind, SeenDomain> = {
   labFault: 'labs',
   labRepair: 'labRepairs',
   canteen: 'canteen',
-  announcement: 'announcements'
+  announcement: 'announcements',
+  exercise: 'studentExercises',
+  note: 'studentNotes'
 };
 
 function formatDateLabel(language: Language, value: string) {
@@ -163,6 +180,38 @@ function buildBellItems(data: PlatformData, currentUser: PlatformUser, language:
       });
   }
 
+  if (currentUser.role === 'student') {
+    const exerciseThreshold = seenThreshold(currentUser.id, 'studentExercises');
+    data.exercises
+      .filter((exercise) => exerciseMatchesStudent(exercise, currentUser) && exercise.createdAt > exerciseThreshold)
+      .forEach((exercise) => {
+        const teacher = data.users.find((candidate) => candidate.id === exercise.teacherId);
+        pushItem(items, {
+          id: `exercise-${exercise.id}`,
+          kind: 'exercise',
+          title: exercise.title,
+          subtitle: teacher?.name ?? '',
+          at: exercise.createdAt,
+          view: 'exercises'
+        });
+      });
+
+    const noteThreshold = seenThreshold(currentUser.id, 'studentNotes');
+    data.notes
+      .filter((note) => noteMatchesStudent(note, currentUser) && note.createdAt > noteThreshold)
+      .forEach((note) => {
+        const teacher = data.users.find((candidate) => candidate.id === note.teacherId);
+        pushItem(items, {
+          id: `note-${note.id}`,
+          kind: 'note',
+          title: note.title,
+          subtitle: teacher?.name ?? '',
+          at: note.createdAt,
+          view: 'notes'
+        });
+      });
+  }
+
   return items.sort((left, right) => right.at.localeCompare(left.at)).slice(0, 30);
 }
 
@@ -184,7 +233,9 @@ export function NotificationBell({
     canteenNotificationCount(data, currentUser) +
     labRepairNotificationCount(data, currentUser) +
     transferOutcomeNotificationCount(data, currentUser) +
-    announcementNotificationCount(data, currentUser);
+    announcementNotificationCount(data, currentUser) +
+    exerciseNotificationCount(data, currentUser) +
+    noteNotificationCount(data, currentUser);
   const items = open ? buildBellItems(data, currentUser, language) : [];
 
   useEffect(() => {

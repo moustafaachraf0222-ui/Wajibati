@@ -66,6 +66,7 @@ import {
   yearClassGroupsLabel
 } from '../education';
 import { applyDeletedExerciseTombstones, getSchool, makeId, scopedExercises } from '../data';
+import { markSeenAt } from '../notification-seen';
 import {
   exerciseSubjectGroups,
   feedbackForStudent,
@@ -502,6 +503,12 @@ function TeacherExercises({ data, setData, currentUser, language }: CommonViewPr
 
 function StudentExercises({ data, setData, currentUser, language }: CommonViewProps & { setData: DataSetter }) {
   const exercises = scopedExercises(data, currentUser);
+
+  useEffect(() => {
+    markSeenAt(currentUser.id, 'studentExercises');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const completed = data.completions[currentUser.id] ?? [];
   const [selectedExerciseId, setSelectedExerciseId] = useState<string | null>(null);
   const [pendingDoneExercise, setPendingDoneExercise] = useState<Exercise | null>(null);

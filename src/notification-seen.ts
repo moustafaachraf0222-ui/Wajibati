@@ -1,6 +1,23 @@
-export type SeenDomain = 'absences' | 'labs' | 'canteen' | 'labRepairs' | 'transferOutcomes' | 'announcements';
+export type SeenDomain =
+  | 'absences'
+  | 'labs'
+  | 'canteen'
+  | 'labRepairs'
+  | 'transferOutcomes'
+  | 'announcements'
+  | 'studentExercises'
+  | 'studentNotes';
 
-export const ALL_SEEN_DOMAINS: SeenDomain[] = ['absences', 'labs', 'canteen', 'labRepairs', 'transferOutcomes', 'announcements'];
+export const ALL_SEEN_DOMAINS: SeenDomain[] = [
+  'absences',
+  'labs',
+  'canteen',
+  'labRepairs',
+  'transferOutcomes',
+  'announcements',
+  'studentExercises',
+  'studentNotes'
+];
 
 export const SEEN_CHANGED_EVENT = 'wajibati:seen-changed';
 
