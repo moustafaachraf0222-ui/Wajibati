@@ -112,23 +112,7 @@ export function scopedNotes(data: PlatformData, user: PlatformUser) {
   return data.notes.filter((note) => noteMatchesStudent(note, user));
 }
 
-export function defaultView(role: Role): View {
-  if (role === 'supervisor') {
-    return 'absences';
-  }
-
-  if (role === 'lab') {
-    return 'labs';
-  }
-
-  if (role === 'canteen' || role === 'cafeteria') {
-    return 'canteen';
-  }
-
-  if (role === 'student') {
-    return 'exercises';
-  }
-
+export function defaultView(): View {
   return 'overview';
 }
 

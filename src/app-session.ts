@@ -73,7 +73,7 @@ export function useAppSession(data: PlatformData) {
 
   useEffect(() => {
     if (currentUser) {
-      setStack(resetStack({ view: defaultView(currentUser.role) }));
+      setStack(resetStack({ view: defaultView() }));
     }
   }, [currentUser?.id, currentUser?.role]);
 
