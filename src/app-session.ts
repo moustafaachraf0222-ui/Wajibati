@@ -35,6 +35,7 @@ export function useAppSession(data: PlatformData) {
   const loginUser = useCallback((userId: string) => {
     localStorage.setItem(SESSION_KEY, userId);
     setSessionUserId(userId);
+    setStack(resetStack({ view: defaultView() }));
   }, []);
 
   const logoutUser = useCallback(() => {
