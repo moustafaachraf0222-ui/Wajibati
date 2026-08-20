@@ -307,7 +307,7 @@ export function LaboratoriesView({
   const canHandleFaults = currentUser.role === 'lab' || currentUser.role === 'director';
 
   useEffect(() => {
-    if (currentUser.role === 'lab') {
+    if (currentUser.role === 'director') {
       markSeenAt('labs');
     }
   }, [currentUser.role, data]);

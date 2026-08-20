@@ -11,14 +11,13 @@ export function absenceNotificationCount(data: PlatformData, currentUser: Platfo
 }
 
 export function labNotificationCount(data: PlatformData, currentUser: PlatformUser) {
-  if (currentUser.role !== 'lab') {
+  if (currentUser.role !== 'director') {
     return 0;
   }
 
-  const labIds = new Set(data.laboratories.filter((lab) => lab.supervisorId === currentUser.id).map((lab) => lab.id));
   const seen = seenAt('labs');
   return data.labFaultReports.filter(
-    (fault) => fault.status === 'open' && labIds.has(fault.labId) && (!seen || fault.reportedAt > seen)
+    (fault) => fault.schoolId === currentUser.schoolId && fault.status === 'open' && (!seen || fault.reportedAt > seen)
   ).length;
 }
 
