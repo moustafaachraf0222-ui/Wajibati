@@ -23,7 +23,13 @@ import {
 import { useAppSession } from './app-session';
 import { useSharedDataSync } from './app-sync';
 import { transferBadgeCount } from './views/accounts-transfers';
-import { absenceNotificationCount, canteenNotificationCount, labNotificationCount } from './notification-badges';
+import {
+  absenceNotificationCount,
+  canteenNotificationCount,
+  labNotificationCount,
+  labRepairNotificationCount,
+  transferOutcomeNotificationCount
+} from './notification-badges';
 import { SEEN_CHANGED_EVENT } from './notification-seen';
 import { AppRouter } from './app-router';
 import { AppShell } from './app-shell';
@@ -52,8 +58,10 @@ function App() {
     }
 
     const pendingIncoming = transferBadgeCount(data, currentUser);
-    if (pendingIncoming > 0) {
-      badges.users = pendingIncoming;
+    const transferOutcomes = transferOutcomeNotificationCount(data, currentUser);
+    const transferTotal = pendingIncoming + transferOutcomes;
+    if (transferTotal > 0) {
+      badges.users = transferTotal;
     }
     const absences = absenceNotificationCount(data, currentUser);
     if (absences > 0) {
@@ -62,6 +70,10 @@ function App() {
     const labs = labNotificationCount(data, currentUser);
     if (labs > 0) {
       badges.labs = labs;
+    }
+    const labRepairs = labRepairNotificationCount(data, currentUser);
+    if (labRepairs > 0) {
+      badges.labs = labRepairs;
     }
     const canteen = canteenNotificationCount(data, currentUser);
     if (canteen > 0) {

@@ -310,6 +310,9 @@ export function LaboratoriesView({
     if (currentUser.role === 'director') {
       markSeenAt('labs');
     }
+    if (currentUser.role === 'lab') {
+      markSeenAt('labRepairs');
+    }
   }, [currentUser.role, data]);
 
   return (

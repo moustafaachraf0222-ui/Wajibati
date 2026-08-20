@@ -1,4 +1,4 @@
-export type SeenDomain = 'absences' | 'labs' | 'canteen';
+export type SeenDomain = 'absences' | 'labs' | 'canteen' | 'labRepairs' | 'transferOutcomes';
 
 const SEEN_STORAGE_KEY = 'wajibati.notification-seen-at';
 export const SEEN_CHANGED_EVENT = 'wajibati:seen-changed';
