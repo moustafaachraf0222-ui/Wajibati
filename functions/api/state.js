@@ -614,10 +614,10 @@ async function createFirebaseNotificationSender(env) {
 
   return async function sendNotification(tokens, notification, data = {}) {
     if (tokens.length === 0) {
-      return;
+      return [];
     }
 
-    await Promise.allSettled(
+    const results = await Promise.allSettled(
       tokens.map((token) =>
         fetch(endpoint, {
           method: 'POST',
@@ -638,6 +638,15 @@ async function createFirebaseNotificationSender(env) {
         })
       )
     );
+    for (const result of results) {
+      if (result.status === 'rejected') {
+        console.error('[push] send rejected:', result.reason?.message ?? result.reason);
+      } else if (!result.value.ok) {
+        console.error(`[push] FCM error ${result.value.status}:`, (await result.value.text()).slice(0, 300));
+      }
+    }
+
+    return results.map((result) => (result.status === 'fulfilled' ? { status: result.value.status } : { error: result.reason?.message ?? String(result.reason) }));
   };
 }
 
@@ -880,21 +889,53 @@ async function sendNotificationsForChanges(env, previousData, nextData) {
     });
   });
 
-  const sendNotification = await createFirebaseNotificationSender(env);
+  let sendNotification;
+  try {
+    sendNotification = await createFirebaseNotificationSender(env);
+  } catch (error) {
+    console.error('[push] sender init failed:', error?.message ?? error);
+    return;
+  }
   if (!sendNotification) {
     return;
   }
 
-  await Promise.allSettled(
+  const sendResults = await Promise.allSettled(
     notifications.flatMap((item) =>
-      item.users.map((user) =>
-        sendNotification(tokensForUser(nextData, user), typeof item.notification === 'function' ? item.notification(user) : personalizedNotification(user, item.notification), {
+      item.users.map((user) => {
+        const tokens = tokensForUser(nextData, user);
+        return sendNotification(tokens, typeof item.notification === 'function' ? item.notification(user) : personalizedNotification(user, item.notification), {
           ...item.data,
           userId: user.id
-        })
-      )
+        }).then((results) => ({ userId: user.id, tokens, results }));
+      })
     )
   );
+
+  let pruned = false;
+  for (const settled of sendResults) {
+    if (settled.status !== 'fulfilled' || !Array.isArray(settled.value.results)) {
+      continue;
+    }
+    const { userId, tokens, results } = settled.value;
+    const staleTokens = tokens.filter((token, index) => results[index]?.status === 404);
+    if (staleTokens.length === 0) {
+      continue;
+    }
+    nextData.pushTokens[userId] = (nextData.pushTokens[userId] ?? []).filter((record) => !staleTokens.includes(record.token));
+    pruned = true;
+  }
+
+  if (pruned) {
+    try {
+      await env.DB
+        .prepare('UPDATE app_state SET data = ?, updated_at = ? WHERE id = ?')
+        .bind(JSON.stringify(nextData), new Date().toISOString(), STATE_ID)
+        .run();
+    } catch (error) {
+      console.error('[push] token prune persist failed:', error?.message ?? error);
+    }
+  }
 }
 
 export async function onRequestGet(context) {
