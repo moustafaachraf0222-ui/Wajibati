@@ -146,7 +146,7 @@ function buildBellItems(data: PlatformData, currentUser: PlatformUser, language:
       });
   }
 
-  if (currentUser.schoolId) {
+  if (currentUser.schoolId && currentUser.role !== 'director') {
     const announcementThreshold = seenThreshold(currentUser.id, 'announcements');
     data.announcements
       .filter((announcement) => announcement.schoolId === currentUser.schoolId && announcement.createdAt > announcementThreshold)

@@ -45,7 +45,7 @@ export function labRepairNotificationCount(data: PlatformData, currentUser: Plat
 }
 
 export function announcementNotificationCount(data: PlatformData, currentUser: PlatformUser) {
-  if (!currentUser.schoolId) {
+  if (currentUser.role === 'director' || !currentUser.schoolId) {
     return 0;
   }
 
