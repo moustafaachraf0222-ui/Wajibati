@@ -6,7 +6,7 @@ export function absenceNotificationCount(data: PlatformData, currentUser: Platfo
     return 0;
   }
 
-  const threshold = seenThreshold('absences');
+  const threshold = seenThreshold(currentUser.id, 'absences');
   return data.absenceReports.filter((report) => report.schoolId === currentUser.schoolId && report.createdAt > threshold).length;
 }
 
@@ -15,7 +15,7 @@ export function labNotificationCount(data: PlatformData, currentUser: PlatformUs
     return 0;
   }
 
-  const threshold = seenThreshold('labs');
+  const threshold = seenThreshold(currentUser.id, 'labs');
   return data.labFaultReports.filter(
     (fault) => fault.schoolId === currentUser.schoolId && fault.status === 'open' && fault.reportedAt > threshold
   ).length;
@@ -26,7 +26,7 @@ export function canteenNotificationCount(data: PlatformData, currentUser: Platfo
     return 0;
   }
 
-  const threshold = seenThreshold('canteen');
+  const threshold = seenThreshold(currentUser.id, 'canteen');
   return data.canteenMealScans.filter(
     (scan) => scan.schoolId === currentUser.schoolId && scan.result === 'allowed' && scan.scannedAt > threshold
   ).length;
@@ -38,7 +38,7 @@ export function labRepairNotificationCount(data: PlatformData, currentUser: Plat
   }
 
   const labIds = new Set(data.laboratories.filter((lab) => lab.supervisorId === currentUser.id).map((lab) => lab.id));
-  const threshold = seenThreshold('labRepairs');
+  const threshold = seenThreshold(currentUser.id, 'labRepairs');
   return data.labFaultReports.filter(
     (fault) => fault.status === 'repaired' && labIds.has(fault.labId) && (fault.repairDate ?? fault.updatedAt ?? '') > threshold
   ).length;
@@ -49,7 +49,7 @@ export function transferOutcomeNotificationCount(data: PlatformData, currentUser
     return 0;
   }
 
-  const threshold = seenThreshold('transferOutcomes');
+  const threshold = seenThreshold(currentUser.id, 'transferOutcomes');
   return data.transferRequests.filter(
     (request) => request.fromSchoolId === currentUser.schoolId && request.status !== 'pending' && (request.resolvedAt ?? '') > threshold
   ).length;

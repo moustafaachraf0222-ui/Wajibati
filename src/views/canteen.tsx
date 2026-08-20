@@ -423,8 +423,9 @@ function DirectorCanteenView({
   const offline = syncStatus === 'error' || syncStatus === 'local';
 
   useEffect(() => {
-    markSeenAt('canteen');
-  }, [data]);
+    markSeenAt(currentUser.id, 'canteen');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const [selectedDate, setSelectedDate] = useState(localDateKey());
   const [selectedMonth, setSelectedMonth] = useState(localMonthKey());

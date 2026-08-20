@@ -1170,9 +1170,10 @@ function RecorderAbsenceJustifications({ data, currentUser, language }: CommonVi
 export function AbsencesView({ data, setData, currentUser, language }: CommonViewProps & { setData: DataSetter }) {
   useEffect(() => {
     if (currentUser.role === 'director') {
-      markSeenAt('absences');
+      markSeenAt(currentUser.id, 'absences');
     }
-  }, [currentUser.role, data]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser.role]);
 
   if (currentUser.role === 'director') {
     return <DirectorAbsenceReports data={data} setData={setData} currentUser={currentUser} language={language} />;

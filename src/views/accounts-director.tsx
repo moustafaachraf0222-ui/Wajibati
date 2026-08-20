@@ -38,8 +38,9 @@ export function DirectorUsersPanel({
   const [accountMode, setAccountMode] = useState<'create' | 'view' | 'database'>('view');
 
   useEffect(() => {
-    markSeenAt('transferOutcomes');
-  }, [data]);
+    markSeenAt(currentUser.id, 'transferOutcomes');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [editingUser, setEditingUser] = useState<PlatformUser | null>(null);
   const [drillRole, setDrillRole] = useState<Role | null>(null);
   const [drillClassKey, setDrillClassKey] = useState<string | null>(null);

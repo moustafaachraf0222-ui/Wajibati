@@ -50,7 +50,7 @@ function buildBellItems(data: PlatformData, currentUser: PlatformUser, language:
   const items: BellItem[] = [];
 
   if (currentUser.role === 'director') {
-    const transferThreshold = seenThreshold('transferOutcomes');
+    const transferThreshold = seenThreshold(currentUser.id, 'transferOutcomes');
     data.transferRequests
       .filter(
         (request) => request.fromSchoolId === currentUser.schoolId && request.status !== 'pending' && (request.resolvedAt ?? '') > transferThreshold
@@ -66,7 +66,7 @@ function buildBellItems(data: PlatformData, currentUser: PlatformUser, language:
         });
       });
 
-    const absenceThreshold = seenThreshold('absences');
+    const absenceThreshold = seenThreshold(currentUser.id, 'absences');
     data.absenceReports
       .filter((report) => report.schoolId === currentUser.schoolId && report.createdAt > absenceThreshold)
       .forEach((report) => {
@@ -80,7 +80,7 @@ function buildBellItems(data: PlatformData, currentUser: PlatformUser, language:
         });
       });
 
-    const labThreshold = seenThreshold('labs');
+    const labThreshold = seenThreshold(currentUser.id, 'labs');
     data.labFaultReports
       .filter((fault) => fault.schoolId === currentUser.schoolId && fault.status === 'open' && fault.reportedAt > labThreshold)
       .forEach((fault) => {
@@ -95,7 +95,7 @@ function buildBellItems(data: PlatformData, currentUser: PlatformUser, language:
         });
       });
 
-    const canteenThreshold = seenThreshold('canteen');
+    const canteenThreshold = seenThreshold(currentUser.id, 'canteen');
     const canteenDays = new Map<string, number>();
     data.canteenMealScans
       .filter((scan) => scan.schoolId === currentUser.schoolId && scan.result === 'allowed' && scan.scannedAt > canteenThreshold)
@@ -116,7 +116,7 @@ function buildBellItems(data: PlatformData, currentUser: PlatformUser, language:
 
   if (currentUser.role === 'lab') {
     const labIds = new Set(data.laboratories.filter((lab) => lab.supervisorId === currentUser.id).map((lab) => lab.id));
-    const repairThreshold = seenThreshold('labRepairs');
+    const repairThreshold = seenThreshold(currentUser.id, 'labRepairs');
     data.labFaultReports
       .filter(
         (fault) => fault.status === 'repaired' && labIds.has(fault.labId) && (fault.repairDate ?? fault.updatedAt ?? '') > repairThreshold
@@ -170,7 +170,7 @@ export function NotificationBell({
   }, []);
 
   const dismissAll = () => {
-    markAllDomainsSeen();
+    markAllDomainsSeen(currentUser.id);
     setOpen(false);
   };
 

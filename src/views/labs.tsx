@@ -308,12 +308,13 @@ export function LaboratoriesView({
 
   useEffect(() => {
     if (currentUser.role === 'director') {
-      markSeenAt('labs');
+      markSeenAt(currentUser.id, 'labs');
     }
     if (currentUser.role === 'lab') {
-      markSeenAt('labRepairs');
+      markSeenAt(currentUser.id, 'labRepairs');
     }
-  }, [currentUser.role, data]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser.role]);
 
   return (
     <section className="content-grid labs-view">
