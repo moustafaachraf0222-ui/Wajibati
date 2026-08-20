@@ -108,6 +108,7 @@ function App() {
     <AppShell
       currentSchool={session.currentSchool}
       currentUser={currentUser}
+      data={data}
       language={language}
       logoutOpen={session.logoutOpen}
       navBadges={navBadges}

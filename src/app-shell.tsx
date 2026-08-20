@@ -1,7 +1,8 @@
 import { ArrowLeft, LogOut, Moon, School, Sun } from 'lucide-react';
 import { useEffect, type ReactNode } from 'react';
-import type { Language, PlatformUser, SchoolRecord, SyncStatus, Theme, View } from './types';
+import type { Language, PlatformData, PlatformUser, SchoolRecord, SyncStatus, Theme, View } from './types';
 import { stageNames, tr } from './i18n';
+import { NotificationBell } from './notification-bell';
 import {
   assignedClassGroups,
   assignedSchoolYears,
@@ -19,6 +20,7 @@ type AppShellProps = {
   children: ReactNode;
   currentSchool?: SchoolRecord;
   currentUser: PlatformUser;
+  data: PlatformData;
   language: Language;
   logoutOpen: boolean;
   navBadges?: Partial<Record<View, number>>;
@@ -70,6 +72,7 @@ export function AppShell({
   children,
   currentSchool,
   currentUser,
+  data,
   language,
   logoutOpen,
   navBadges,
@@ -183,6 +186,7 @@ export function AppShell({
             </div>
           </div>
           <div className="topbar-actions">
+            <NotificationBell data={data} currentUser={currentUser} language={language} onViewChange={onViewChange} />
             <SyncIndicator status={syncStatus} language={language} />
             <LanguageMenu language={language} onLanguageChange={onLanguageChange} />
             <button
