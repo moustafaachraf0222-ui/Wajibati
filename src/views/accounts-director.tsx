@@ -1,6 +1,6 @@
 import { ArrowLeft, BookOpen, ChevronRight, ClipboardCheck, Database, FlaskConical, GraduationCap, Plus, Users, Utensils } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import type { DataSetter, Language, PlatformData, PlatformUser, Role } from '../types';
 import { roleNames, schoolYearLabel, tr } from '../i18n';
 import { secondaryStreamLabel } from '../education';
@@ -13,7 +13,6 @@ import { MoveAccountPanel } from './accounts-move';
 import { PendingTransfersPanel } from './accounts-transfers';
 import { UsersTable } from './accounts-table';
 import { useBackShortcut } from '../back-shortcut';
-import { markSeenAt } from '../notification-seen';
 
 const directorRoleIcons: Partial<Record<Role, LucideIcon>> = {
   supervisor: ClipboardCheck,
@@ -37,10 +36,6 @@ export function DirectorUsersPanel({
   const school = getSchool(data, currentUser);
   const [accountMode, setAccountMode] = useState<'create' | 'view' | 'database'>('view');
 
-  useEffect(() => {
-    markSeenAt(currentUser.id, 'transferOutcomes');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
   const [editingUser, setEditingUser] = useState<PlatformUser | null>(null);
   const [drillRole, setDrillRole] = useState<Role | null>(null);
   const [drillClassKey, setDrillClassKey] = useState<string | null>(null);

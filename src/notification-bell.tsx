@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Language, PlatformData, PlatformUser, View } from './types';
 import { localeNames, tr } from './i18n';
 import { formatDateTime } from './dates';
-import { markAllDomainsSeen, seenThreshold } from './notification-seen';
+import { markAllDomainsSeen, markSeenAt, seenThreshold, type SeenDomain } from './notification-seen';
 import {
   absenceNotificationCount,
   canteenNotificationCount,
@@ -31,6 +31,15 @@ const bellItemIcons: Record<BellItemKind, LucideIcon> = {
   labFault: AlertTriangle,
   labRepair: Wrench,
   canteen: Utensils
+};
+
+const bellItemDomains: Record<BellItemKind, SeenDomain> = {
+  transferAccepted: 'transferOutcomes',
+  transferRejected: 'transferOutcomes',
+  absence: 'absences',
+  labFault: 'labs',
+  labRepair: 'labRepairs',
+  canteen: 'canteen'
 };
 
 function formatDateLabel(language: Language, value: string) {
@@ -140,13 +149,11 @@ function buildBellItems(data: PlatformData, currentUser: PlatformUser, language:
 export function NotificationBell({
   data,
   currentUser,
-  language,
-  onViewChange
+  language
 }: {
   data: PlatformData;
   currentUser: PlatformUser;
   language: Language;
-  onViewChange: (view: View) => void;
 }) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -174,9 +181,9 @@ export function NotificationBell({
     setOpen(false);
   };
 
-  const openItem = (view: View) => {
-    dismissAll();
-    onViewChange(view);
+  const openItem = (item: BellItem) => {
+    markSeenAt(currentUser.id, bellItemDomains[item.kind]);
+    setOpen(false);
   };
 
   return (
@@ -203,7 +210,7 @@ export function NotificationBell({
                 const Icon = bellItemIcons[item.kind];
                 return (
                   <li key={item.id}>
-                    <button className="notification-item" type="button" onClick={() => openItem(item.view)}>
+                    <button className="notification-item" type="button" onClick={() => openItem(item)}>
                       <Icon size={17} aria-hidden="true" />
                       <span className="notification-item-text">
                         <strong>{item.title}</strong>

@@ -186,7 +186,7 @@ export function AppShell({
             </div>
           </div>
           <div className="topbar-actions">
-            <NotificationBell data={data} currentUser={currentUser} language={language} onViewChange={onViewChange} />
+            <NotificationBell data={data} currentUser={currentUser} language={language} />
             <SyncIndicator status={syncStatus} language={language} />
             <LanguageMenu language={language} onLanguageChange={onLanguageChange} />
             <button
