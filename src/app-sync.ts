@@ -172,7 +172,6 @@ export function useSharedDataSync(data: PlatformData, setData: DataSetter, curre
 
   const retryPendingSave = useCallback(async () => {
     if (
-      !remoteEnabledRef.current ||
       !hasPendingLocalChanges() ||
       sharedSaveInFlightRef.current ||
       sharedRefreshInFlightRef.current ||
@@ -211,7 +210,7 @@ export function useSharedDataSync(data: PlatformData, setData: DataSetter, curre
     let cancelled = false;
 
     const refreshLatestSharedData = async () => {
-      if (cancelled || !remoteEnabledRef.current) {
+      if (cancelled) {
         return;
       }
 
