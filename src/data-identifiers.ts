@@ -65,6 +65,13 @@ export function compactEmailLocalPart(value: string) {
     .replace(/[^a-z0-9]+/g, '');
 }
 
+export function isEnglishName(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  if (!/[A-Za-z]/.test(trimmed)) return false;
+  return /^[A-Za-z][A-Za-z\s'.-]*$/.test(trimmed);
+}
+
 export function generateSchoolEmail(name: string, role: Exclude<Role, 'admin' | 'director'>, domain: string, users: PlatformUser[]) {
   const emailDomain = normalizeEmailDomain(domain);
   const localBase = compactEmailLocalPart(name) || role;

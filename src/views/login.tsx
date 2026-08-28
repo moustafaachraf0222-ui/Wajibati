@@ -17,6 +17,7 @@ import {
   canAuthenticateUser,
   forgetStoredAccount,
   generateSchoolEmail,
+  isEnglishName,
   loadRememberedAccounts,
   makeId,
   normalizeEmailDomain,
@@ -198,6 +199,11 @@ export function LoginPage({ data, setData, language, theme, onLanguageChange, on
 
     if (!studentSignupForm.name.trim()) {
       setStudentSignupError(tr(language, 'nameRequired'));
+      return;
+    }
+
+    if (!isEnglishName(studentSignupForm.name.trim())) {
+      setStudentSignupError(tr(language, 'englishNameRequired'));
       return;
     }
 
@@ -431,6 +437,7 @@ export function LoginPage({ data, setData, language, theme, onLanguageChange, on
                     required
                   />
                 </label>
+                <p className="login-signup-hint">{tr(language, 'englishNameHint')}</p>
                 <label>
                   <span>{tr(language, 'schoolDomain')}</span>
                   <input

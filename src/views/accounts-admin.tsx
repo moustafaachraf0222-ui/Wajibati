@@ -3,7 +3,7 @@ import { useState, type FormEvent } from 'react';
 import type { DataSetter, Language, PlatformData, PlatformUser, Role, Stage } from '../types';
 import { roleNames, stageNames, tr } from '../i18n';
 import { secondaryStreams, secondaryStreamLabel, stages } from '../education';
-import { canDeleteUser, canToggleUser, compactEmailLocalPart, deleteUserRecords, makeId } from '../data';
+import { canDeleteUser, canToggleUser, compactEmailLocalPart, deleteUserRecords, isEnglishName, makeId } from '../data';
 import { schoolIsTrashed } from '../data-tombstones';
 import { Field } from '../ui';
 import { hashPassword } from '../password';
@@ -126,6 +126,15 @@ export function AdminUsersPanel({
 
   const createDirector = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    const directorName = form.name.trim();
+    if (!directorName) {
+      setError(tr(language, 'nameRequired'));
+      return;
+    }
+    if (!isEnglishName(directorName)) {
+      setError(tr(language, 'englishNameRequired'));
+      return;
+    }
     const localPart = compactEmailLocalPart(form.schoolName.trim()) || 'school';
     const domain = 'wajibati.dz';
     const directorEmail = `${localPart}@${domain}`;
@@ -213,6 +222,11 @@ export function AdminUsersPanel({
       return;
     }
 
+    if (!isEnglishName(directorEdit.name.trim())) {
+      setError(tr(language, 'englishNameRequired'));
+      return;
+    }
+
     const normalizedEmail = directorEdit.email.trim().toLowerCase();
     if (data.users.some((user) => user.id !== directorEdit.id && user.email.toLowerCase() === normalizedEmail)) {
       setError(tr(language, 'duplicateEmail'));
@@ -270,6 +284,7 @@ export function AdminUsersPanel({
         </div>
         <form className="form-grid" onSubmit={createDirector}>
           <Field label={tr(language, 'fullName')} value={form.name} onChange={(value) => setForm({ ...form, name: value })} required />
+          <p className="hint full">{tr(language, 'englishNameHint')}</p>
           <Field label={tr(language, 'passwordDefault')} value={form.password} onChange={(value) => setForm({ ...form, password: value })} required />
           <Field label={tr(language, 'schoolName')} value={form.schoolName} onChange={(value) => setForm({ ...form, schoolName: value })} required />
           <p className="hint full">

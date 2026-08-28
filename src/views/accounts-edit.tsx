@@ -33,7 +33,7 @@ import {
   subjectOptionsForTeacherYear,
   uniqueNumbers
 } from '../education';
-import { canEditUser, generateUniqueCode, getSchool, makeAccountEditState, makeId } from '../data';
+import { canEditUser, generateUniqueCode, getSchool, isEnglishName, makeAccountEditState, makeId } from '../data';
 import { hashPassword } from '../password';
 import { Field, RoleLabel } from '../ui';
 
@@ -222,6 +222,11 @@ export function AccountEditPanel({
     event.preventDefault();
 
     if (!canEditUser(currentUser, target)) {
+      return;
+    }
+
+    if (!isEnglishName(edit.name.trim())) {
+      setError(tr(language, 'englishNameRequired'));
       return;
     }
 
